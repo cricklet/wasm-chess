@@ -1,19 +1,18 @@
 use super::arithmetic::*;
 
-
 pub fn bitboard_string(bb: Bitboard) -> String {
-    let mut result: [String;8] = Default::default();
+    let mut result: [String; 8] = Default::default();
 
     for rank in 0..=7 {
-		let bits_before = rank * 8;
-		let bits_after = 64 - bits_before - 8;
+        let bits_before = rank * 8;
+        let bits_after = 64 - bits_before - 8;
 
         let mut sub = bb;
 
-		// clip everything above this rank
-		sub = shift_toward_index_63(sub, bits_after);
-		// clip everything before this rank
-		sub = shift_toward_index_0(sub, bits_before+bits_after);
+        // clip everything above this rank
+        sub = shift_toward_index_63(sub, bits_after);
+        // clip everything before this rank
+        sub = shift_toward_index_0(sub, bits_before + bits_after);
 
         result[7 - rank as usize] = format!("{:08b}", reverse_bits(sub as u8)).replace("0", ".");
     }
@@ -32,7 +31,7 @@ pub fn bitboard_from_string(str: String) -> Bitboard {
 
         for (file, c) in line.chars().enumerate() {
             if c == '1' {
-                bb |= single_bitboard(index_from_rank_file(rank as i32, file as i32))
+                bb |= single_bitboard(index_from_file_rank(file as i32, rank as i32))
             }
         }
     }
@@ -41,8 +40,7 @@ pub fn bitboard_from_string(str: String) -> Bitboard {
 
 #[test]
 fn test_bitboard_string_zero_roundtrip() {
-    let start =
-            "........\n\
+    let start = "........\n\
             ........\n\
             ........\n\
             ........\n\
@@ -59,8 +57,7 @@ fn test_bitboard_string_zero_roundtrip() {
 }
 #[test]
 fn test_bitboard_string_simple_roundtrip() {
-    let start =
-            ".1......\n\
+    let start = ".1......\n\
             ........\n\
             ........\n\
             ........\n\
@@ -77,8 +74,7 @@ fn test_bitboard_string_simple_roundtrip() {
 }
 #[test]
 fn test_bitboard_string_many_roundtrip() {
-    let start =
-            "........\n\
+    let start = "........\n\
             .1......\n\
             ....1...\n\
             ........\n\
