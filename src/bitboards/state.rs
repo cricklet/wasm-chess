@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use strum::IntoEnumIterator;
 
-use crate::types::*;
+use crate::{helpers::*, types::*};
 
 use super::arithmetic::*;
 

@@ -31,8 +31,6 @@ pub enum Piece {
 
 pub type PlayerPiece = (Player, Piece);
 
-pub type ErrorResult<T> = Result<T, String>;
-
 pub fn player_and_piece_from_fen_char(c: char) -> Option<PlayerPiece> {
     let piece = match c.to_ascii_uppercase() {
         'P' => Piece::Pawn,
