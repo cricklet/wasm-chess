@@ -129,6 +129,14 @@ pub fn pre_move_mask(offset: isize) -> ErrorResult<Bitboard> {
     }
 }
 
+#[memoize]
+pub fn starting_pawns_mask(player: Player) -> Bitboard {
+    match player {
+        Player::White => !zeros_for(&['2']).unwrap(),
+        Player::Black => !zeros_for(&['7']).unwrap(),
+    }
+}
+
 #[test]
 fn test_bitwise_not() {
     let bb = single_bitboard(0);
@@ -201,6 +209,36 @@ fn test_pre_move_mask() {
         1111111.\n\
         1111111.\n\
         1111111.\n\
+        ........\n\
+        ........"
+            .to_string()
+    );
+}
+
+#[test]
+fn test_starting_pawns_mask() {
+    assert_eq!(
+        bitboard_string(starting_pawns_mask(Player::White)),
+        "\
+        ........\n\
+        ........\n\
+        ........\n\
+        ........\n\
+        ........\n\
+        ........\n\
+        11111111\n\
+        ........"
+            .to_string()
+    );
+    assert_eq!(
+        bitboard_string(starting_pawns_mask(Player::Black)),
+        "\
+        ........\n\
+        11111111\n\
+        ........\n\
+        ........\n\
+        ........\n\
+        ........\n\
         ........\n\
         ........"
             .to_string()
