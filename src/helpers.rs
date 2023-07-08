@@ -7,29 +7,29 @@ pub enum Loop {
     Break,
 }
 
-pub struct IteratorFn<T, F>
+pub struct FnIterator<T, F>
 where
     F: FnMut() -> Option<T>,
 {
-    pub callback: F,
+    pub next: F,
 }
 
-impl<T, F> IteratorFn<T, F>
+impl<T, F> FnIterator<T, F>
 where
     F: FnMut() -> Option<T>,
 {
-    pub fn new(callback: F) -> IteratorFn<T, F> {
-        IteratorFn { callback }
+    pub fn new(callback: F) -> FnIterator<T, F> {
+        FnIterator { next: callback }
     }
 }
 
-impl<T, F> Iterator for IteratorFn<T, F>
+impl<T, F> Iterator for FnIterator<T, F>
 where
     F: FnMut() -> Option<T>,
 {
     type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
-        (self.callback)()
+        (self.next)()
     }
 }

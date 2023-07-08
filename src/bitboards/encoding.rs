@@ -38,6 +38,34 @@ pub fn bitboard_from_string(str: String) -> Bitboard {
     bb
 }
 
+pub fn bitboard_from_bytes(bytes: [u8; 8]) -> Bitboard {
+    let mut bb: Bitboard = 0;
+    for byte in bytes {
+        bb <<= 8;
+        bb |= byte.reverse_bits() as Bitboard;
+    }
+    bb
+}
+
+#[test]
+fn test_bitboard_from_bytes() {
+    let expected = ".1......\n\
+            ........\n\
+            ........\n\
+            ........\n\
+            ........\n\
+            ........\n\
+            ........\n\
+            ........";
+
+    let bb = bitboard_from_bytes([
+        0b01000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000,
+        0b00000000,
+    ]);
+
+    assert_eq!(bitboard_string(bb), expected);
+}
+
 #[test]
 fn test_bitboard_string_zero_roundtrip() {
     let start = "........\n\

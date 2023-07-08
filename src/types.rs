@@ -1,6 +1,7 @@
-pub use strum::EnumIter;
+use enum_map::Enum;
+use strum::EnumIter;
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, strum::EnumIter)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, EnumIter, Enum)]
 pub enum Player {
     White,
     Black,
@@ -13,13 +14,13 @@ pub fn other_player(player: Player) -> Player {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, strum::EnumIter)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, EnumIter, Enum)]
 pub enum CastlingSide {
     KingSide,
     QueenSide,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, EnumIter)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, EnumIter, Enum)]
 pub enum Piece {
     Pawn,
     Rook,
