@@ -120,7 +120,7 @@ impl Bitboards {
                 rank -= 1;
                 file = 0;
             } else if let Some(d) = c.to_digit(10) {
-                file += d as i32;
+                file += d as isize;
                 if file > 8 {
                     return Err(format!(
                         "too many squares in rank ({:}, fen {:})",
@@ -145,7 +145,7 @@ impl Bitboards {
         Ok(bb)
     }
 
-    pub fn piece_at_index(&self, index: i32) -> Option<(Player, Piece)> {
+    pub fn piece_at_index(&self, index: isize) -> Option<(Player, Piece)> {
         for piece in Piece::iter() {
             for player in Player::iter() {
                 if single_bitboard(index) & self.pieces[player][piece] != 0 {
@@ -193,11 +193,11 @@ impl Bitboards {
         s
     }
 
-    pub fn is_occupied_by_player(&self, index: i32, player: Player) -> bool {
+    pub fn is_occupied_by_player(&self, index: isize, player: Player) -> bool {
         self.occupied[player] & single_bitboard(index) != 0
     }
 
-    pub fn is_occupied(&self, index: i32) -> bool {
+    pub fn is_occupied(&self, index: isize) -> bool {
         self.occupied[Player::White] & single_bitboard(index) != 0
             || self.occupied[Player::Black] & single_bitboard(index) != 0
     }
@@ -256,14 +256,14 @@ impl Bitboards {
         Ok(())
     }
 
-    pub fn clear_square(&mut self, index: i32, player: Player, piece: Piece) {
+    pub fn clear_square(&mut self, index: isize, player: Player, piece: Piece) {
         let bb = single_bitboard(index);
 
         self.pieces[player][piece] &= !bb;
         self.occupied[player] &= !bb;
     }
 
-    pub fn set_square(&mut self, index: i32, player: Player, piece: Piece) {
+    pub fn set_square(&mut self, index: isize, player: Player, piece: Piece) {
         let bb = single_bitboard(index);
 
         self.pieces[player][piece] |= bb;

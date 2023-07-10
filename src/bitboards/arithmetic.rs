@@ -19,12 +19,20 @@ fn test_least_significant_one() {
     assert_eq!(least_significant_one(binary), single_bitboard(4));
 }
 
-pub fn shift_toward_index_0(bb: Bitboard, n: i32) -> Bitboard {
+pub fn shift_toward_index_0(bb: Bitboard, n: isize) -> Bitboard {
     bb >> n
 }
 
-pub fn shift_toward_index_63(bb: Bitboard, n: i32) -> Bitboard {
+pub fn shift_toward_index_63(bb: Bitboard, n: isize) -> Bitboard {
     bb << n
+}
+
+pub fn rotate_toward_index_0(bb: Bitboard, n: isize) -> Bitboard {
+    bb.rotate_right(n as u32)
+}
+
+pub fn rotate_toward_index_63(bb: Bitboard, n: isize) -> Bitboard {
+    bb.rotate_left(n as u32)
 }
 
 #[memoize]
@@ -44,7 +52,7 @@ pub fn reverse_bits(v: u8) -> u8 {
     return reverse_bits_cache()[v as usize];
 }
 
-pub fn single_bitboard(index: i32) -> Bitboard {
+pub fn single_bitboard(index: isize) -> Bitboard {
     shift_toward_index_63(1, index)
 }
 
@@ -69,15 +77,15 @@ fn test_single_bitboard() {
     assert_eq!(binary_string(bb), binary_expected);
 }
 
-pub fn index_from_file_rank(file: i32, rank: i32) -> i32 {
+pub fn index_from_file_rank(file: isize, rank: isize) -> isize {
     rank * 8 + file
 }
 
-pub fn file_rank_from_index(index: i32) -> (i32, i32) {
+pub fn file_rank_from_index(index: isize) -> (isize, isize) {
     (index % 8, index / 8)
 }
 
-pub fn file_from_char(file: char) -> Option<i32> {
+pub fn file_from_char(file: char) -> Option<isize> {
     match file {
         'a' => Some(0),
         'b' => Some(1),
@@ -91,7 +99,7 @@ pub fn file_from_char(file: char) -> Option<i32> {
     }
 }
 
-pub fn rank_from_char(rank: char) -> Option<i32> {
+pub fn rank_from_char(rank: char) -> Option<isize> {
     match rank {
         '1' => Some(0),
         '2' => Some(1),
@@ -119,7 +127,7 @@ pub fn is_file(c: char) -> bool {
     }
 }
 
-pub fn index_from_file_rank_str(file_rank_str: &str) -> Option<i32> {
+pub fn index_from_file_rank_str(file_rank_str: &str) -> Option<isize> {
     let mut chars = file_rank_str.chars();
 
     if file_rank_str.len() != 2 {
@@ -149,7 +157,7 @@ pub fn index_from_file_rank_str(file_rank_str: &str) -> Option<i32> {
     return Some(index_from_file_rank(file, rank));
 }
 
-pub fn file_rank_to_str(file: i32, rank: i32) -> String {
+pub fn file_rank_to_str(file: isize, rank: isize) -> String {
     let file_char = match file {
         0 => 'a',
         1 => 'b',
@@ -177,7 +185,23 @@ pub fn file_rank_to_str(file: i32, rank: i32) -> String {
     format!("{}{}", file_char, rank_char)
 }
 
-pub fn index_to_file_rank_str(i: i32) -> String {
+pub fn index_to_file_rank_str(i: isize) -> String {
     let (file, rank) = file_rank_from_index(i);
     file_rank_to_str(file, rank)
+}
+
+pub fn bitboard_with_indices_set(indices: &[isize]) -> Bitboard {
+    let mut bb: Bitboard = 0;
+    for index in indices {
+        bb |= single_bitboard(*index);
+    }
+    bb
+}
+
+pub fn bitboard_with_file_rank_strs_set(locations: &[&str]) -> Bitboard {
+    let indices = locations
+        .iter()
+        .map(|s| index_from_file_rank_str(s).unwrap())
+        .collect::<Vec<isize>>();
+    bitboard_with_indices_set(&indices)
 }

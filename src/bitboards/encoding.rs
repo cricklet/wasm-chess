@@ -31,7 +31,7 @@ pub fn bitboard_from_string(str: String) -> Bitboard {
 
         for (file, c) in line.chars().enumerate() {
             if c == '1' {
-                bb |= single_bitboard(index_from_file_rank(file as i32, rank as i32))
+                bb |= single_bitboard(index_from_file_rank(file as isize, rank as isize))
             }
         }
     }

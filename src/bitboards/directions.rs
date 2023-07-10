@@ -244,3 +244,116 @@ fn test_starting_pawns_mask() {
             .to_string()
     );
 }
+
+#[memoize]
+pub fn knight_move_bitboard(index: isize) -> Bitboard {
+    let mut mask = ALL_ZEROS;
+
+    let bb = single_bitboard(index);
+
+    for offset in KNIGHT_DIRS.iter() {
+        let filtered_bb = bb & pre_move_mask(*offset).unwrap();
+        let offset_bb = rotate_toward_index_63(filtered_bb, *offset);
+        mask |= offset_bb;
+    }
+    mask
+}
+
+pub fn king_move_bitobard(index: isize) -> Bitboard {
+    let mut mask = ALL_ZEROS;
+
+    let bb = single_bitboard(index);
+
+    for offset in KING_DIRS.iter() {
+        let filtered_bb = bb & pre_move_mask(*offset).unwrap();
+        let offset_bb = rotate_toward_index_63(filtered_bb, *offset);
+        mask |= offset_bb;
+    }
+    mask
+}
+
+#[test]
+pub fn test_knight_move_bitboard() {
+    assert_eq!(
+        bitboard_string(single_bitboard(9)),
+        "\
+        ........\n\
+        ........\n\
+        ........\n\
+        ........\n\
+        ........\n\
+        ........\n\
+        .1......\n\
+        ........"
+            .to_string()
+    );
+    assert_eq!(
+        bitboard_string(knight_move_bitboard(9)),
+        "\
+        ........\n\
+        ........\n\
+        ........\n\
+        ........\n\
+        1.1.....\n\
+        ...1....\n\
+        ........\n\
+        ...1...."
+            .to_string()
+    );
+}
+
+#[test]
+pub fn test_king_move_bitboard() {
+    assert_eq!(
+        bitboard_string(single_bitboard(9)),
+        "\
+        ........\n\
+        ........\n\
+        ........\n\
+        ........\n\
+        ........\n\
+        ........\n\
+        .1......\n\
+        ........"
+            .to_string()
+    );
+    assert_eq!(
+        bitboard_string(king_move_bitobard(9)),
+        "\
+        ........\n\
+        ........\n\
+        ........\n\
+        ........\n\
+        ........\n\
+        111.....\n\
+        1.1.....\n\
+        111....."
+            .to_string()
+    );
+    assert_eq!(
+        bitboard_string(single_bitboard(47)),
+        "\
+        ........\n\
+        ........\n\
+        .......1\n\
+        ........\n\
+        ........\n\
+        ........\n\
+        ........\n\
+        ........"
+            .to_string()
+    );
+    assert_eq!(
+        bitboard_string(king_move_bitobard(47)),
+        "\
+        ........\n\
+        ......11\n\
+        ......1.\n\
+        ......11\n\
+        ........\n\
+        ........\n\
+        ........\n\
+        ........"
+            .to_string()
+    );
+}

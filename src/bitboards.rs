@@ -11,3 +11,6 @@ pub use each_index_of::*;
 
 pub mod directions;
 pub use directions::*;
+
+pub mod castling;
+pub use castling::*;
