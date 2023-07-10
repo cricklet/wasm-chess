@@ -4,7 +4,7 @@ use strum::IntoEnumIterator;
 
 use crate::{helpers::*, types::*};
 
-use super::arithmetic::*;
+use super::*;
 
 #[derive(Debug)]
 pub struct PieceBitboards {

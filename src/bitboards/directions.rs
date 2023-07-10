@@ -2,34 +2,34 @@ use memoize::memoize;
 
 use crate::{helpers::ErrorResult, types::Player};
 
-use super::{arithmetic::*, *};
+use super::*;
 
-const N: isize = 8;
-const S: isize = -8;
-const E: isize = 1;
-const W: isize = -1;
+pub const N: isize = 8;
+pub const S: isize = -8;
+pub const E: isize = 1;
+pub const W: isize = -1;
 
-const NE: isize = N + E;
-const NW: isize = N + W;
-const SE: isize = S + E;
-const SW: isize = S + W;
+pub const NE: isize = N + E;
+pub const NW: isize = N + W;
+pub const SE: isize = S + E;
+pub const SW: isize = S + W;
 
-const NNE: isize = N + N + E;
-const NNW: isize = N + N + W;
-const SSE: isize = S + S + E;
-const SSW: isize = S + S + W;
-const EEN: isize = E + E + N;
-const EES: isize = E + E + S;
-const WWN: isize = W + W + N;
-const WWS: isize = W + W + S;
+pub const NNE: isize = N + N + E;
+pub const NNW: isize = N + N + W;
+pub const SSE: isize = S + S + E;
+pub const SSW: isize = S + S + W;
+pub const EEN: isize = E + E + N;
+pub const EES: isize = E + E + S;
+pub const WWN: isize = W + W + N;
+pub const WWS: isize = W + W + S;
 
-const KNIGHT_DIRS: [isize; 8] = [NNE, NNW, SSE, SSW, EEN, EES, WWN, WWS];
+pub const KNIGHT_DIRS: [isize; 8] = [NNE, NNW, SSE, SSW, EEN, EES, WWN, WWS];
 
-const KING_DIRS: [isize; 8] = [N, S, E, W, NE, NW, SE, SW];
+pub const KING_DIRS: [isize; 8] = [N, S, E, W, NE, NW, SE, SW];
 
-const ROOK_DIRS: [isize; 4] = [N, S, E, W];
+pub const ROOK_DIRS: [isize; 4] = [N, S, E, W];
 
-const BISHOP_DIRS: [isize; 4] = [NE, NW, SE, SW];
+pub const BISHOP_DIRS: [isize; 4] = [NE, NW, SE, SW];
 
 pub fn pawn_dir_for_player(player: Player) -> isize {
     match player {
@@ -60,8 +60,8 @@ pub fn pawn_promotion_bitboard() -> Bitboard {
     )
 }
 
-const ALL_ZEROS: Bitboard = 0;
-const ALL_ONES: Bitboard = 0xffffffffffffffff;
+pub const ALL_ZEROS: Bitboard = 0;
+pub const ALL_ONES: Bitboard = 0xffffffffffffffff;
 
 #[memoize]
 pub fn zeros_for_file(file: char) -> Bitboard {

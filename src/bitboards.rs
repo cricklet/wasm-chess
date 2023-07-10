@@ -1,4 +1,5 @@
-mod arithmetic;
+pub mod arithmetic;
+pub use arithmetic::*;
 
 pub mod encoding;
 pub use encoding::*;
@@ -14,3 +15,6 @@ pub use directions::*;
 
 pub mod castling;
 pub use castling::*;
+
+pub mod magic;
+pub use magic::*;

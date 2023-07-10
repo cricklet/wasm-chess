@@ -1,6 +1,6 @@
 use crate::helpers::*;
 
-use super::arithmetic::*;
+use super::*;
 
 fn each_index_of_one_callback<F: FnMut(i32) -> Loop>(bb: Bitboard, mut callback: F) {
     let mut temp = bb;
@@ -51,7 +51,7 @@ fn each_index_of_one_iteratorfn(bb: Bitboard) -> FnIterator<i32, impl FnMut() ->
     })
 }
 
-pub fn each_index_of_one(bb: Bitboard) -> impl Iterator<Item = i32> {
+pub fn each_index_of_one(bb: Bitboard) -> impl Iterator<Item = u32> {
     let mut temp = bb;
 
     FnIterator::new(move || {
@@ -61,7 +61,7 @@ pub fn each_index_of_one(bb: Bitboard) -> impl Iterator<Item = i32> {
 
             temp = temp ^ ls1;
 
-            return Some(index as i32);
+            return Some(index as u32);
         } else {
             return None;
         }

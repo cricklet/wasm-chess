@@ -1,4 +1,4 @@
-use super::arithmetic::*;
+use super::*;
 
 pub fn bitboard_string(bb: Bitboard) -> String {
     let mut result: [String; 8] = Default::default();

@@ -2,7 +2,7 @@ use memoize::memoize;
 
 use crate::types::*;
 
-use super::arithmetic::*;
+use super::*;
 
 #[derive(Debug, Clone, Copy)]
 pub struct CastlingRequirements {
