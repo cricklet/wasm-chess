@@ -1,0 +1,51 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'crab-chess'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=crab-chess",
+                    "--package=crab-chess"
+                ],
+                "filter": {
+                    "name": "crab-chess",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "sourceMap": {
+                "/home/kenrick/Sandbox/crab-chess": "/home/kenrick/Dropbox/2022/Sandbox/crab-chess",
+            },
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'crab-chess'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=crab-chess",
+                    "--package=crab-chess"
+                ],
+                "filter": {
+                    "name": "crab-chess",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "sourceMap": {
+                "/home/kenrick/Sandbox/crab-chess": "/home/kenrick/Dropbox/2022/Sandbox/crab-chess",
+            },
+        }
+    ]
+}

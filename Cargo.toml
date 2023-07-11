@@ -6,4 +6,5 @@ edition = "2021"
 [dependencies]
 enum-map = "2.6.0"
 memoize = "0.4.0"
+rand = "0.8.5"
 strum = { version = "0.25.0", features = ["derive"] }
