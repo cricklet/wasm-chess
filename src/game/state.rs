@@ -6,9 +6,9 @@ pub struct Game {
     pub board: bitboards::Bitboards,
     pub player: types::Player,
     pub can_castle_on_side_for_player: [[bool; 2]; 2],
-    pub en_passant: Option<i32>,
-    pub half_moves_since_pawn_or_capture: i32,
-    pub full_moves_total: i32,
+    pub en_passant: Option<usize>,
+    pub half_moves_since_pawn_or_capture: usize,
+    pub full_moves_total: usize,
 }
 
 impl Game {

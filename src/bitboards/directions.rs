@@ -46,6 +46,13 @@ pub fn pawn_capture_offsets_for_player(player: Player) -> &'static [isize; 2] {
     }
 }
 
+pub fn en_passant_move_and_target_offsets(player: Player) -> &'static [(isize, isize); 2] {
+    match player {
+        Player::White => &[(NE, E), (NW, W)],
+        Player::Black => &[(SE, S), (SW, W)],
+    }
+}
+
 lazy_static! {
     pub static ref PAWN_PROMOTION_BITBOARD: Bitboard = bitboard_from_string(
         "11111111\n\

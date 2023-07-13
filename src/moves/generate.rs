@@ -78,6 +78,7 @@ pub fn jump_moves(
 
 pub enum Quiet {
     Castle { rook_start: usize, rook_end: usize },
+    PawnSkip { skipped_index: usize },
     Move,
 }
 
@@ -98,7 +99,7 @@ pub struct Move {
     move_type: MoveType,
 }
 
-pub fn pawn_pushes(player: Player, bitboards: Bitboards) -> impl Iterator<Item = Move> {
+pub fn pawn_moves(player: Player, bitboards: Bitboards) -> impl Iterator<Item = Move> {
     let pawns = bitboards.pieces[player][Piece::Pawn];
     let pawn_offset = pawn_push_offset_for_player(player);
 
@@ -152,4 +153,33 @@ pub fn pawn_pushes(player: Player, bitboards: Bitboards) -> impl Iterator<Item =
     };
 
     push_moves.chain(skip_moves).chain(capture_moves)
+}
+
+pub fn en_passant_move(
+    player: Player,
+    bitboards: Bitboards,
+    en_passant_index: Option<usize>,
+) -> Option<Move> {
+    let pawns = bitboards.pieces[player][Piece::Pawn];
+
+    if let Some(en_passant_index) = en_passant_index {
+        let en_passant_bb = single_bitboard(en_passant_index);
+
+        for (move_offset, target_offset) in en_passant_move_and_target_offsets(player) {
+            let moved_pawns = shift_toward_index_63(pawns, *move_offset);
+
+            if moved_pawns & en_passant_bb != 0 {
+                return Some(Move {
+                    player,
+                    start_index: (en_passant_index as isize - move_offset) as usize,
+                    end_index: en_passant_index,
+                    move_type: MoveType::Capture(Capture::EnPassant {
+                        taken_index: (en_passant_index as isize - target_offset) as usize,
+                    }),
+                });
+            }
+        }
+    }
+
+    None
 }
