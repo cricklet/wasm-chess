@@ -8,10 +8,10 @@ use super::*;
 pub struct CastlingRequirements {
     require_safe: Bitboard,
     require_empty: Bitboard,
-    king_start: isize,
-    king_end: isize,
-    rook_start: isize,
-    rook_end: isize,
+    king_start: usize,
+    king_end: usize,
+    rook_start: usize,
+    rook_end: usize,
     castling_pieces: Bitboard,
 }
 

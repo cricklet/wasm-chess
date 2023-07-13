@@ -4,8 +4,8 @@ use super::*;
 
 #[memoize]
 pub fn precomputed_magic_value_for_index_and_piece(
-    piece_index: isize,
-    piece_for_magic: PieceForMagic,
+    piece_index: usize,
+    piece_for_magic: WalkingPieces,
 ) -> MagicValue {
     MagicValue {
         magic: DEFAULT_MAGICS[piece_for_magic as usize][piece_index as usize],
@@ -148,7 +148,7 @@ const DEFAULT_MAGICS: [[u64; 64]; 2] = [
     ],
 ];
 
-const DEFAULT_BITS_REQUIRED: [[isize; 64]; 2] = [
+const DEFAULT_BITS_REQUIRED: [[usize; 64]; 2] = [
     [
         12, 11, 11, 11, 11, 11, 11, 12, 11, 10, 10, 10, 10, 10, 10, 11, 11, 10, 10, 10, 10, 10, 10,
         11, 11, 10, 10, 10, 10, 10, 10, 11, 11, 10, 10, 10, 10, 10, 10, 11, 11, 10, 10, 10, 10, 10,

@@ -51,7 +51,7 @@ fn each_index_of_one_iteratorfn(bb: Bitboard) -> FnIterator<i32, impl FnMut() ->
     })
 }
 
-pub fn each_index_of_one(bb: Bitboard) -> impl Iterator<Item = u32> {
+pub fn each_index_of_one(bb: Bitboard) -> impl Iterator<Item = usize> {
     let mut temp = bb;
 
     FnIterator::new(move || {
@@ -61,7 +61,7 @@ pub fn each_index_of_one(bb: Bitboard) -> impl Iterator<Item = u32> {
 
             temp = temp ^ ls1;
 
-            return Some(index as u32);
+            return Some(index as usize);
         } else {
             return None;
         }

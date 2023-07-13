@@ -2,6 +2,7 @@
 pub mod bitboards;
 pub mod game;
 pub mod helpers;
+pub mod moves;
 pub mod types;
 
 fn main() {

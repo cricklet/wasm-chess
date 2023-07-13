@@ -6,9 +6,9 @@ pub fn least_significant_one(bb: Bitboard) -> Bitboard {
     bb & bb.wrapping_neg()
 }
 
-pub fn first_index_of_one(bb: Bitboard) -> u32 {
+pub fn first_index_of_one(bb: Bitboard) -> usize {
     let ls1 = least_significant_one(bb);
-    (ls1 - 1).count_ones()
+    (ls1 - 1).count_ones() as usize
 }
 
 #[test]
@@ -52,8 +52,8 @@ pub fn reverse_bits(v: u8) -> u8 {
     return reverse_bits_cache()[v as usize];
 }
 
-pub fn single_bitboard(index: isize) -> Bitboard {
-    shift_toward_index_63(1, index)
+pub fn single_bitboard(index: usize) -> Bitboard {
+    shift_toward_index_63(1, index as isize)
 }
 
 #[test]
@@ -77,15 +77,15 @@ fn test_single_bitboard() {
     assert_eq!(binary_string(bb), binary_expected);
 }
 
-pub fn index_from_file_rank(file: isize, rank: isize) -> isize {
+pub fn index_from_file_rank(file: usize, rank: usize) -> usize {
     rank * 8 + file
 }
 
-pub fn file_rank_from_index(index: isize) -> (isize, isize) {
+pub fn file_rank_from_index(index: usize) -> (usize, usize) {
     (index % 8, index / 8)
 }
 
-pub fn file_from_char(file: char) -> Option<isize> {
+pub fn file_from_char(file: char) -> Option<usize> {
     match file {
         'a' => Some(0),
         'b' => Some(1),
@@ -99,7 +99,7 @@ pub fn file_from_char(file: char) -> Option<isize> {
     }
 }
 
-pub fn rank_from_char(rank: char) -> Option<isize> {
+pub fn rank_from_char(rank: char) -> Option<usize> {
     match rank {
         '1' => Some(0),
         '2' => Some(1),
@@ -127,7 +127,7 @@ pub fn is_file(c: char) -> bool {
     }
 }
 
-pub fn index_from_file_rank_str(file_rank_str: &str) -> Option<isize> {
+pub fn index_from_file_rank_str(file_rank_str: &str) -> Option<usize> {
     let mut chars = file_rank_str.chars();
 
     if file_rank_str.len() != 2 {
@@ -154,10 +154,10 @@ pub fn index_from_file_rank_str(file_rank_str: &str) -> Option<isize> {
         None => return None,
     };
 
-    return Some(index_from_file_rank(file, rank));
+    Some(index_from_file_rank(file, rank))
 }
 
-pub fn file_rank_to_str(file: isize, rank: isize) -> String {
+pub fn file_rank_to_str(file: usize, rank: usize) -> String {
     let file_char = match file {
         0 => 'a',
         1 => 'b',
@@ -185,12 +185,12 @@ pub fn file_rank_to_str(file: isize, rank: isize) -> String {
     format!("{}{}", file_char, rank_char)
 }
 
-pub fn index_to_file_rank_str(i: isize) -> String {
+pub fn index_to_file_rank_str(i: usize) -> String {
     let (file, rank) = file_rank_from_index(i);
     file_rank_to_str(file, rank)
 }
 
-pub fn bitboard_with_indices_set(indices: &[isize]) -> Bitboard {
+pub fn bitboard_with_indices_set(indices: &[usize]) -> Bitboard {
     let mut bb: Bitboard = 0;
     for index in indices {
         bb |= single_bitboard(*index);
@@ -202,6 +202,6 @@ pub fn bitboard_with_file_rank_strs_set(locations: &[&str]) -> Bitboard {
     let indices = locations
         .iter()
         .map(|s| index_from_file_rank_str(s).unwrap())
-        .collect::<Vec<isize>>();
+        .collect::<Vec<usize>>();
     bitboard_with_indices_set(&indices)
 }

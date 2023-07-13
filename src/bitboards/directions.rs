@@ -31,14 +31,14 @@ pub const ROOK_DIRS: [isize; 4] = [N, S, E, W];
 
 pub const BISHOP_DIRS: [isize; 4] = [NE, NW, SE, SW];
 
-pub fn pawn_dir_for_player(player: Player) -> isize {
+pub fn pawn_push_offset_for_player(player: Player) -> isize {
     match player {
         Player::White => N,
         Player::Black => S,
     }
 }
 
-pub fn pawn_capture_dir_for_player(player: Player) -> [isize; 2] {
+pub fn pawn_capture_offset_for_player(player: Player) -> [isize; 2] {
     match player {
         Player::White => [NE, NW],
         Player::Black => [SE, SW],
@@ -246,7 +246,7 @@ fn test_starting_pawns_mask() {
 }
 
 #[memoize]
-pub fn knight_move_bitboard(index: isize) -> Bitboard {
+pub fn knight_move_bitboard(index: usize) -> Bitboard {
     let mut mask = ALL_ZEROS;
 
     let bb = single_bitboard(index);
@@ -259,7 +259,7 @@ pub fn knight_move_bitboard(index: isize) -> Bitboard {
     mask
 }
 
-pub fn king_move_bitobard(index: isize) -> Bitboard {
+pub fn king_move_bitobard(index: usize) -> Bitboard {
     let mut mask = ALL_ZEROS;
 
     let bb = single_bitboard(index);
