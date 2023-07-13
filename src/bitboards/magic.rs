@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use super::*;
 use memoize::memoize;
 use rand::*;
@@ -75,7 +77,7 @@ pub fn magic_move_table(
     let mut magic_move_table: Vec<Bitboard> = vec![0; size];
     let mut populated: Vec<bool> = vec![false; size];
 
-    for potential in potential_moves {
+    for potential in potential_moves.as_ref() {
         let magic_index =
             magic_index_for_specific_blocker_bb(magic_value, potential.specific_blocker_bb);
 
@@ -321,11 +323,14 @@ pub fn test_generate_specific_blocker_bb() {
 }
 
 #[memoize]
-pub fn potential_moves_for_piece(piece_index: usize, piece: WalkingPieces) -> Vec<PotentialMoves> {
+pub fn potential_moves_for_piece(
+    piece_index: usize,
+    piece: WalkingPieces,
+) -> Rc<Vec<PotentialMoves>> {
     let mask_blockers_bb = generate_mask_blockers_bb(piece_index, piece);
     let num_seeds = 1 << mask_blockers_bb.count_ones();
 
-    let mut moves: Vec<PotentialMoves> = vec![];
+    let mut moves = vec![];
 
     for seed in 0..num_seeds {
         let specific_blocker_bb = generate_specific_blocker_bb(mask_blockers_bb, seed);
@@ -341,7 +346,7 @@ pub fn potential_moves_for_piece(piece_index: usize, piece: WalkingPieces) -> Ve
         });
     }
 
-    moves
+    moves.into()
 }
 
 fn rand64() -> u64 {

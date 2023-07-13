@@ -16,8 +16,8 @@ pub fn other_player(player: Player) -> Player {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, EnumIter, Enum)]
 pub enum CastlingSide {
-    KingSide,
-    QueenSide,
+    Kingside,
+    Queenside,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, EnumIter, Enum)]

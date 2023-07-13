@@ -70,8 +70,8 @@ pub fn jump_moves(
     piece: JumpingPiece,
 ) -> impl Iterator<Item = ErrorResult<Move>> {
     let potential = match piece {
-        JumpingPiece::Knight => knight_move_bitboard(piece_index),
-        JumpingPiece::King => king_move_bitobard(piece_index),
+        JumpingPiece::Knight => KNIGHT_MOVE_BITBOARD[piece_index],
+        JumpingPiece::King => KING_MOVE_BITBOARD[piece_index],
     };
     moves_from_bitboards(player, piece_index, potential, bitboards)
 }

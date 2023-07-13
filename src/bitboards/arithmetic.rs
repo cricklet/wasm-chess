@@ -1,4 +1,4 @@
-use memoize::memoize;
+use lazy_static::*;
 
 pub type Bitboard = u64;
 
@@ -35,21 +35,21 @@ pub fn rotate_toward_index_63(bb: Bitboard, n: isize) -> Bitboard {
     bb.rotate_left(n as u32)
 }
 
-#[memoize]
-fn reverse_bits_cache() -> [u8; 256] {
-    let mut result: [u8; 256] = [0; 256];
-    for i in 0..=255 {
-        let mut reversed: u8 = 0;
-        for bit in 0..8 {
-            reversed |= ((i >> bit) & 1) << (7 - bit);
+lazy_static! {
+    static ref REVERSE_BITS_CACHE: [u8; 256] = {
+        let mut result: [u8; 256] = [0; 256];
+        for i in 0..=255 {
+            let mut reversed: u8 = 0;
+            for bit in 0..8 {
+                reversed |= ((i >> bit) & 1) << (7 - bit);
+            }
+            result[i as usize] = reversed;
         }
-        result[i as usize] = reversed;
-    }
-    result
+        result
+    };
 }
-
 pub fn reverse_bits(v: u8) -> u8 {
-    return reverse_bits_cache()[v as usize];
+    return REVERSE_BITS_CACHE[v as usize];
 }
 
 pub fn single_bitboard(index: usize) -> Bitboard {

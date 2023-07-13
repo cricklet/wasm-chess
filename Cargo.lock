@@ -24,6 +24,8 @@ name = "crab-chess"
 version = "0.1.0"
 dependencies = [
  "enum-map",
+ "id-arena",
+ "lazy_static",
  "memoize",
  "rand",
  "strum",
@@ -74,6 +76,12 @@ name = "heck"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95505c38b4572b2d910cecb0281560f54b440a19336cbbcb27bf6ce6adc6f5a8"
+
+[[package]]
+name = "id-arena"
+version = "2.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25a2bc672d1148e28034f176e01fffebb08b35768468cc954630da77a1449005"
 
 [[package]]
 name = "lazy_static"

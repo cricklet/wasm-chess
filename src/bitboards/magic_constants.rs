@@ -1,8 +1,5 @@
-use memoize::memoize;
-
 use super::*;
 
-#[memoize]
 pub fn precomputed_magic_value_for_index_and_piece(
     piece_index: usize,
     piece_for_magic: WalkingPieces,

@@ -1,3 +1,4 @@
+use lazy_static::lazy_static;
 use memoize::memoize;
 
 use crate::{helpers::ErrorResult, types::Player};
@@ -38,16 +39,15 @@ pub fn pawn_push_offset_for_player(player: Player) -> isize {
     }
 }
 
-pub fn pawn_capture_offsets_for_player(player: Player) -> [isize; 2] {
+pub fn pawn_capture_offsets_for_player(player: Player) -> &'static [isize; 2] {
     match player {
-        Player::White => [NE, NW],
-        Player::Black => [SE, SW],
+        Player::White => &[NE, NW],
+        Player::Black => &[SE, SW],
     }
 }
 
-#[memoize]
-pub fn pawn_promotion_bitboard() -> Bitboard {
-    bitboard_from_string(
+lazy_static! {
+    pub static ref PAWN_PROMOTION_BITBOARD: Bitboard = bitboard_from_string(
         "11111111\n\
          ........\n\
          ........\n\
@@ -57,7 +57,7 @@ pub fn pawn_promotion_bitboard() -> Bitboard {
          ........\n\
          11111111"
             .to_string(),
-    )
+    );
 }
 
 pub const ALL_ZEROS: Bitboard = 0;
@@ -129,11 +129,15 @@ pub fn pre_move_mask(offset: isize) -> ErrorResult<Bitboard> {
     }
 }
 
-#[memoize]
-pub fn starting_pawns_mask(player: Player) -> Bitboard {
+lazy_static! {
+    static ref STARTING_PAWN_MASK_WHITE: Bitboard = !zeros_for(&['2']).unwrap();
+    static ref STARTING_PAWN_MASK_BLACK: Bitboard = !zeros_for(&['7']).unwrap();
+}
+
+pub fn starting_pawns_mask(player: Player) -> &'static Bitboard {
     match player {
-        Player::White => !zeros_for(&['2']).unwrap(),
-        Player::Black => !zeros_for(&['7']).unwrap(),
+        Player::White => &STARTING_PAWN_MASK_WHITE,
+        Player::Black => &STARTING_PAWN_MASK_BLACK,
     }
 }
 
@@ -218,7 +222,7 @@ fn test_pre_move_mask() {
 #[test]
 fn test_starting_pawns_mask() {
     assert_eq!(
-        bitboard_string(starting_pawns_mask(Player::White)),
+        bitboard_string(*starting_pawns_mask(Player::White)),
         "\
         ........\n\
         ........\n\
@@ -231,7 +235,7 @@ fn test_starting_pawns_mask() {
             .to_string()
     );
     assert_eq!(
-        bitboard_string(starting_pawns_mask(Player::Black)),
+        bitboard_string(*starting_pawns_mask(Player::Black)),
         "\
         ........\n\
         11111111\n\
@@ -245,31 +249,39 @@ fn test_starting_pawns_mask() {
     );
 }
 
-#[memoize]
-pub fn knight_move_bitboard(index: usize) -> Bitboard {
-    let mut mask = ALL_ZEROS;
+lazy_static! {
+    pub static ref KNIGHT_MOVE_BITBOARD: [Bitboard; 64] = {
+        let mut result = [ALL_ZEROS; 64];
+        for index in 0..64 {
+            let mut mask = ALL_ZEROS;
 
-    let bb = single_bitboard(index);
+            let bb = single_bitboard(index);
 
-    for offset in KNIGHT_DIRS.iter() {
-        let filtered_bb = bb & pre_move_mask(*offset).unwrap();
-        let offset_bb = rotate_toward_index_63(filtered_bb, *offset);
-        mask |= offset_bb;
-    }
-    mask
-}
+            for offset in KNIGHT_DIRS.iter() {
+                let filtered_bb = bb & pre_move_mask(*offset).unwrap();
+                let offset_bb = rotate_toward_index_63(filtered_bb, *offset);
+                mask |= offset_bb;
+            }
+            result[index] = mask;
+        }
+        result
+    };
+    pub static ref KING_MOVE_BITBOARD: [Bitboard; 64] = {
+        let mut result = [ALL_ZEROS; 64];
+        for index in 0..64 {
+            let mut mask = ALL_ZEROS;
 
-pub fn king_move_bitobard(index: usize) -> Bitboard {
-    let mut mask = ALL_ZEROS;
+            let bb = single_bitboard(index);
 
-    let bb = single_bitboard(index);
-
-    for offset in KING_DIRS.iter() {
-        let filtered_bb = bb & pre_move_mask(*offset).unwrap();
-        let offset_bb = rotate_toward_index_63(filtered_bb, *offset);
-        mask |= offset_bb;
-    }
-    mask
+            for offset in KING_DIRS.iter() {
+                let filtered_bb = bb & pre_move_mask(*offset).unwrap();
+                let offset_bb = rotate_toward_index_63(filtered_bb, *offset);
+                mask |= offset_bb;
+            }
+            result[index] = mask;
+        }
+        result
+    };
 }
 
 #[test]
@@ -288,7 +300,7 @@ pub fn test_knight_move_bitboard() {
             .to_string()
     );
     assert_eq!(
-        bitboard_string(knight_move_bitboard(9)),
+        bitboard_string(KNIGHT_MOVE_BITBOARD[9]),
         "\
         ........\n\
         ........\n\
@@ -318,7 +330,7 @@ pub fn test_king_move_bitboard() {
             .to_string()
     );
     assert_eq!(
-        bitboard_string(king_move_bitobard(9)),
+        bitboard_string(KING_MOVE_BITBOARD[9]),
         "\
         ........\n\
         ........\n\
@@ -344,7 +356,7 @@ pub fn test_king_move_bitboard() {
             .to_string()
     );
     assert_eq!(
-        bitboard_string(king_move_bitobard(47)),
+        bitboard_string(KING_MOVE_BITBOARD[47]),
         "\
         ........\n\
         ......11\n\
