@@ -16,32 +16,34 @@ pub fn moves_from_bitboards(
 
     let start_index = piece_index;
 
-    each_index_of_one(quiet)
-        .map(move |end_index| {
-            Ok(Move {
+    let quiet_moves = each_index_of_one(quiet).map(move |end_index| {
+        Ok(Move {
+            player,
+            start_index,
+            end_index,
+            move_type: MoveType::Quiet(Quiet::Move),
+        })
+    });
+
+    let capture_moves = each_index_of_one(capture).map(move |end_index| {
+        let start_index = piece_index;
+        let taken_piece = bitboards.piece_at_index(end_index);
+
+        match taken_piece {
+            Some(taken_piece) => Ok(Move {
                 player,
                 start_index,
                 end_index,
-                move_type: MoveType::Quiet(Quiet::Move),
-            })
-        })
-        .chain(each_index_of_one(capture).map(move |end_index| {
-            let start_index = piece_index;
-            let taken_piece = bitboards.piece_at_index(end_index);
+                move_type: MoveType::Capture(Capture::Take { taken_piece }),
+            }),
+            None => Err(format!(
+                "no piece at index {:} but marked as capture",
+                end_index
+            )),
+        }
+    });
 
-            match taken_piece {
-                Some(taken_piece) => Ok(Move {
-                    player,
-                    start_index,
-                    end_index,
-                    move_type: MoveType::Capture(Capture::Take { taken_piece }),
-                }),
-                None => Err(format!(
-                    "no piece at index {:} but marked as capture",
-                    end_index
-                )),
-            }
-        }))
+    quiet_moves.chain(capture_moves)
 }
 
 pub fn walk_moves(
@@ -100,17 +102,54 @@ pub fn pawn_pushes(player: Player, bitboards: Bitboards) -> impl Iterator<Item =
     let pawns = bitboards.pieces[player][Piece::Pawn];
     let pawn_offset = pawn_push_offset_for_player(player);
 
-    let unblocked_pawns = pawns & pre_move_mask(pawn_offset).unwrap();
-    let potential = shift_toward_index_63(unblocked_pawns, pawn_offset);
-    let moves = unblocked_pawns & !bitboards.all_occupied();
+    let push_moves = {
+        let masked_pawns = pawns & pre_move_mask(pawn_offset).unwrap();
+        let pushed_pawns =
+            shift_toward_index_63(masked_pawns, pawn_offset) & !bitboards.all_occupied();
 
-    each_index_of_one(moves)
-        .map(move |end_index| {
-            let start_index = end_index - pawn_offset;
-            Ok(Move {
+        each_index_of_one(pushed_pawns).map(move |end_index| {
+            let start_index = (end_index as isize - pawn_offset) as usize;
+            Move {
                 player,
                 start_index,
                 end_index,
                 move_type: MoveType::Quiet(Quiet::Move),
+            }
+        })
+    };
+    let skip_moves = {
+        let masked_pawns = pawns & starting_pawns_mask(player);
+        let push1 = shift_toward_index_63(masked_pawns, pawn_offset) & !bitboards.all_occupied();
+        let push2 = shift_toward_index_63(push1, pawn_offset) & !bitboards.all_occupied();
+
+        each_index_of_one(push2).map(move |end_index| {
+            let start_index = (end_index as isize - pawn_offset) as usize;
+            Move {
+                player,
+                start_index,
+                end_index,
+                move_type: MoveType::Quiet(Quiet::Move),
+            }
+        })
+    };
+    let capture_moves = {
+        let offsets = pawn_capture_offsets_for_player(player);
+        offsets.iter().flat_map(move |offset| {
+            let masked_pawns = pawns & pre_move_mask(*offset).unwrap();
+            let moved_pawns = shift_toward_index_63(masked_pawns, *offset);
+            let capture_bb = moved_pawns & bitboards.occupied[other_player(player)];
+
+            each_index_of_one(capture_bb).map(move |end_index| {
+                let start_index = (end_index as isize - pawn_offset) as usize;
+                Move {
+                    player,
+                    start_index,
+                    end_index,
+                    move_type: MoveType::Quiet(Quiet::Move),
+                }
             })
+        })
+    };
+
+    push_moves.chain(skip_moves).chain(capture_moves)
 }

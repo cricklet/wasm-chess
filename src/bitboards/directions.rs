@@ -38,7 +38,7 @@ pub fn pawn_push_offset_for_player(player: Player) -> isize {
     }
 }
 
-pub fn pawn_capture_offset_for_player(player: Player) -> [isize; 2] {
+pub fn pawn_capture_offsets_for_player(player: Player) -> [isize; 2] {
     match player {
         Player::White => [NE, NW],
         Player::Black => [SE, SW],
