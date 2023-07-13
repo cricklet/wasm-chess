@@ -2,5 +2,5 @@
     "rust-analyzer.linkedProjects": [
         "./Cargo.toml"
     ],
-    "github.copilot.inlineSuggest.enable": false
+    "github.copilot.inlineSuggest.enable": true
 }

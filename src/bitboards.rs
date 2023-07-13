@@ -18,3 +18,6 @@ pub use castling::*;
 
 pub mod magic;
 pub use magic::*;
+
+pub mod magic_constants;
+pub use magic_constants::*;

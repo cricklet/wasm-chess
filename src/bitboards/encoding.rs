@@ -20,6 +20,10 @@ pub fn bitboard_string(bb: Bitboard) -> String {
     result.join("\n")
 }
 
+pub fn pretty_bitboard(bb: Bitboard) -> String {
+    bitboard_string(bb).replace(".", ". ").replace("1", "1 ")
+}
+
 pub fn binary_string(bb: Bitboard) -> String {
     format!("{:064b}", bb)
 }
