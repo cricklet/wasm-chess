@@ -1,3 +1,5 @@
+use std::iter;
+
 use crate::{bitboards::*, game::Game, helpers::*, types::*};
 
 #[derive(Debug, Copy, Clone)]
@@ -74,17 +76,15 @@ pub fn moves_from_bitboards(
         }
     });
 
-    let quiet_moves = each_index_of_one(quiet).map(move |end_index| {
-        Ok(Move {
-            player,
-            start_index,
-            end_index,
-            move_type: MoveType::Quiet(Quiet::Move),
-        })
+    let quiet_moves = each_index_of_one(quiet).map(move |end_index| Move {
+        player,
+        start_index,
+        end_index,
+        move_type: MoveType::Quiet(Quiet::Move),
     });
 
     match only_captures {
-        OnlyCaptures::NO => Box::new(capture_moves.chain(quiet_moves)),
+        OnlyCaptures::NO => Box::new(capture_moves.chain(quiet_moves.map(Ok))),
         OnlyCaptures::YES => Box::new(capture_moves),
     }
 }
@@ -96,22 +96,27 @@ pub fn walk_moves(
     only_captures: OnlyCaptures,
 ) -> Box<dyn Iterator<Item = ErrorResult<Move>>> {
     let walk_types = walk_type_for_piece(piece);
-    let walk_types = flatten_iter_result(walk_types.map(|walk_type| walk_type.iter()));
 
-    let moves = map_successes(walk_types, move |walk_type| {
-        each_index_of_one(bitboards.pieces[player][piece])
-            .map(move |piece_index| {
-                let potential = moves_bb_for_piece_and_blockers(
-                    piece_index,
-                    *walk_type,
-                    bitboards.all_occupied(),
-                );
-                moves_from_bitboards(player, piece_index, potential, bitboards, only_captures)
-            })
-            .flatten()
-    })
-    .flatten()
-    .flatten();
+    let walk_types = match walk_types {
+        Err(err) => return Box::new(iter::once(Err(err))),
+        Ok(walk_types) => walk_types,
+    };
+
+    let moves = walk_types
+        .iter()
+        .map(move |walk_type| {
+            each_index_of_one(bitboards.pieces[player][piece])
+                .map(move |piece_index| {
+                    let potential = moves_bb_for_piece_and_blockers(
+                        piece_index,
+                        *walk_type,
+                        bitboards.all_occupied(),
+                    );
+                    moves_from_bitboards(player, piece_index, potential, bitboards, only_captures)
+                })
+                .flatten()
+        })
+        .flatten();
 
     Box::new(moves)
 }
