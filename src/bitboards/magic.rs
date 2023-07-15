@@ -38,7 +38,7 @@ pub fn test_piece_enum_iter() {
     }
 }
 
-const OFFSETS_FOR_MAGIC: [&[isize]; 2] = [&ROOK_DIRS, &BISHOP_DIRS];
+const DIRECTIONS_FOR_MAGIC: [&[Direction]; 2] = [&ROOK_DIRS, &BISHOP_DIRS];
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct MagicValue {
@@ -106,14 +106,15 @@ pub fn magic_move_table(
 }
 
 #[memoize]
-pub fn generate_walk_bb(piece_index: usize, blocker_bb: Bitboard, offset: isize) -> Bitboard {
+pub fn generate_walk_bb(piece_index: usize, blocker_bb: Bitboard, dir: Direction) -> Bitboard {
     let mut walk_bb = Bitboard::default();
 
-    let premove_mask = pre_move_mask(offset).unwrap();
+    let premove_mask = pre_move_mask(dir);
     let mut last_location_bb = single_bitboard(piece_index);
 
     while last_location_bb != 0 {
-        let next_location_bb = rotate_toward_index_63(last_location_bb & premove_mask, offset);
+        let next_location_bb =
+            rotate_toward_index_63(last_location_bb & premove_mask, dir.offset());
 
         let quiet_bb = next_location_bb & !blocker_bb;
         let capture_bb = next_location_bb & blocker_bb;
@@ -146,8 +147,8 @@ pub fn test_generate_walk_bb() {
     );
     {
         let blocker_bb = Bitboard::default();
-        let offset = NE;
-        let walk_bb = generate_walk_bb(start_index, blocker_bb, offset);
+        let dir = Direction::NE;
+        let walk_bb = generate_walk_bb(start_index, blocker_bb, dir);
 
         assert_eq!(
             bitboard_string(walk_bb),
@@ -176,8 +177,8 @@ pub fn test_generate_walk_bb() {
             ........"
                 .to_string(),
         );
-        let offset = NE;
-        let walk_bb = generate_walk_bb(start_index, blocker_bb, offset);
+        let dir = Direction::NE;
+        let walk_bb = generate_walk_bb(start_index, blocker_bb, dir);
 
         assert_eq!(
             bitboard_string(walk_bb),
@@ -198,9 +199,9 @@ pub fn test_generate_walk_bb() {
 pub fn generate_mask_blockers_bb(start_index: usize, piece: WalkType) -> Bitboard {
     let mut mask_blockers_bb = Bitboard::default();
 
-    for &offset in OFFSETS_FOR_MAGIC[piece as usize] {
-        let walk_bb = generate_walk_bb(start_index, mask_blockers_bb, offset);
-        let walk_bb_filtered = walk_bb & pre_move_mask(offset).unwrap();
+    for &dir in DIRECTIONS_FOR_MAGIC[piece as usize] {
+        let walk_bb = generate_walk_bb(start_index, mask_blockers_bb, dir);
+        let walk_bb_filtered = walk_bb & pre_move_mask(dir);
 
         mask_blockers_bb |= walk_bb_filtered;
     }
@@ -344,7 +345,7 @@ pub fn potential_moves_for_piece(piece_index: usize, piece: WalkType) -> Rc<Vec<
         let specific_blocker_bb = generate_specific_blocker_bb(mask_blockers_bb, seed);
 
         let mut potential_moves_bb = Bitboard::default();
-        for &offset in OFFSETS_FOR_MAGIC[piece as usize] {
+        for &offset in DIRECTIONS_FOR_MAGIC[piece as usize] {
             potential_moves_bb |= generate_walk_bb(piece_index, specific_blocker_bb, offset);
         }
 

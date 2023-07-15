@@ -102,21 +102,13 @@ pub fn walk_moves(
         Ok(walk_types) => walk_types,
     };
 
-    let moves = walk_types
-        .iter()
-        .map(move |walk_type| {
-            each_index_of_one(bitboards.pieces[player][piece])
-                .map(move |piece_index| {
-                    let potential = moves_bb_for_piece_and_blockers(
-                        piece_index,
-                        *walk_type,
-                        bitboards.all_occupied(),
-                    );
-                    moves_from_bitboards(player, piece_index, potential, bitboards, only_captures)
-                })
-                .flatten()
+    let moves = walk_types.iter().flat_map(move |walk_type| {
+        each_index_of_one(bitboards.pieces[player][piece]).flat_map(move |piece_index| {
+            let potential =
+                moves_bb_for_piece_and_blockers(piece_index, *walk_type, bitboards.all_occupied());
+            moves_from_bitboards(player, piece_index, potential, bitboards, only_captures)
         })
-        .flatten();
+    });
 
     Box::new(moves)
 }
@@ -135,12 +127,10 @@ pub fn jump_moves(
         JumpingPiece::Knight => Piece::Knight,
         JumpingPiece::King => Piece::King,
     };
-    each_index_of_one(bitboards.pieces[player][piece])
-        .map(move |piece_index| {
-            let potential = lookup[piece_index];
-            moves_from_bitboards(player, piece_index, potential, bitboards, only_captures)
-        })
-        .flatten()
+    each_index_of_one(bitboards.pieces[player][piece]).flat_map(move |piece_index| {
+        let potential = lookup[piece_index];
+        moves_from_bitboards(player, piece_index, potential, bitboards, only_captures)
+    })
 }
 
 pub fn pawn_moves(
@@ -149,17 +139,17 @@ pub fn pawn_moves(
     only_captures: OnlyCaptures,
 ) -> Box<dyn Iterator<Item = Move>> {
     let pawns = bitboards.pieces[player][Piece::Pawn];
-    let pawn_offset = pawn_push_offset_for_player(player);
+    let pawn_dir = pawn_push_direction_for_player(player);
 
     let capture_moves = {
-        let offsets = pawn_capture_offsets_for_player(player);
-        offsets.iter().flat_map(move |offset| {
-            let masked_pawns = pawns & pre_move_mask(*offset).unwrap();
-            let moved_pawns = shift_toward_index_63(masked_pawns, *offset);
+        let offsets = pawn_capture_directions_for_player(player);
+        offsets.iter().flat_map(move |dir| {
+            let masked_pawns = pawns & pre_move_mask(*dir);
+            let moved_pawns = shift_toward_index_63(masked_pawns, dir.offset());
             let capture_bb = moved_pawns & bitboards.occupied[other_player(player)];
 
             each_index_of_one(capture_bb).map(move |end_index| {
-                let start_index = (end_index as isize - pawn_offset) as usize;
+                let start_index = (end_index as isize - pawn_dir.offset()) as usize;
                 Move {
                     player,
                     start_index,
@@ -175,12 +165,12 @@ pub fn pawn_moves(
     }
 
     let push_moves = {
-        let masked_pawns = pawns & pre_move_mask(pawn_offset).unwrap();
+        let masked_pawns = pawns & pre_move_mask(pawn_dir);
         let pushed_pawns =
-            shift_toward_index_63(masked_pawns, pawn_offset) & !bitboards.all_occupied();
+            shift_toward_index_63(masked_pawns, pawn_dir.offset()) & !bitboards.all_occupied();
 
         each_index_of_one(pushed_pawns).map(move |end_index| {
-            let start_index = (end_index as isize - pawn_offset) as usize;
+            let start_index = (end_index as isize - pawn_dir.offset()) as usize;
             Move {
                 player,
                 start_index,
@@ -191,11 +181,12 @@ pub fn pawn_moves(
     };
     let skip_moves = {
         let masked_pawns = pawns & starting_pawns_mask(player);
-        let push1 = shift_toward_index_63(masked_pawns, pawn_offset) & !bitboards.all_occupied();
-        let push2 = shift_toward_index_63(push1, pawn_offset) & !bitboards.all_occupied();
+        let push1 =
+            shift_toward_index_63(masked_pawns, pawn_dir.offset()) & !bitboards.all_occupied();
+        let push2 = shift_toward_index_63(push1, pawn_dir.offset()) & !bitboards.all_occupied();
 
         each_index_of_one(push2).map(move |end_index| {
-            let start_index = (end_index as isize - pawn_offset) as usize;
+            let start_index = (end_index as isize - pawn_dir.offset()) as usize;
             Move {
                 player,
                 start_index,
@@ -218,16 +209,16 @@ pub fn en_passant_move(
     if let Some(en_passant_index) = en_passant_index {
         let en_passant_bb = single_bitboard(en_passant_index);
 
-        for (move_offset, target_offset) in en_passant_move_and_target_offsets(player) {
-            let moved_pawns = shift_toward_index_63(pawns, *move_offset);
+        for (dir, target_dir) in en_passant_move_and_target_offsets(player) {
+            let moved_pawns = shift_toward_index_63(pawns, dir.offset());
 
             if moved_pawns & en_passant_bb != 0 {
                 return Some(Move {
                     player,
-                    start_index: (en_passant_index as isize - move_offset) as usize,
+                    start_index: (en_passant_index as isize - dir.offset()) as usize,
                     end_index: en_passant_index,
                     move_type: MoveType::Capture(Capture::EnPassant {
-                        taken_index: (en_passant_index as isize - target_offset) as usize,
+                        taken_index: (en_passant_index as isize - target_dir.offset()) as usize,
                     }),
                 });
             }
