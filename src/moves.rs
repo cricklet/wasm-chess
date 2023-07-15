@@ -1,11 +1,4 @@
-use std::iter::{self, Once};
-
-use crate::{
-    bitboards::{self, *},
-    game::Game,
-    helpers::*,
-    types::*,
-};
+use crate::{bitboards::*, game::Game, helpers::*, types::*};
 
 #[derive(Debug, Copy, Clone)]
 pub enum OnlyCaptures {
@@ -96,18 +89,6 @@ pub fn moves_from_bitboards(
     }
 }
 
-pub fn flatten_result<T>(
-    result: ErrorResult<&[T]>,
-) -> Box<dyn Iterator<Item = ErrorResult<&T>> + '_> {
-    result.map_or_else(
-        |err| -> Box<dyn Iterator<Item = ErrorResult<&T>> + '_> {
-            let err_iter = Box::new(iter::once(Err(err)));
-            err_iter
-        },
-        |t| -> Box<dyn Iterator<Item = ErrorResult<&T>> + '_> { Box::new(t.iter().map(Ok)) },
-    )
-}
-
 pub fn walk_moves(
     player: Player,
     bitboards: Bitboards,
@@ -115,25 +96,22 @@ pub fn walk_moves(
     only_captures: OnlyCaptures,
 ) -> Box<dyn Iterator<Item = ErrorResult<Move>>> {
     let walk_types = walk_type_for_piece(piece);
+    let walk_types = flatten_iter_result(walk_types.map(|walk_type| walk_type.iter()));
 
-    let x = walk_types.iter();
-
-    let moves = walk_types
-        .unwrap()
-        .iter()
-        .map(move |walk_type| {
-            each_index_of_one(bitboards.pieces[player][piece])
-                .map(move |piece_index| {
-                    let potential = moves_bb_for_piece_and_blockers(
-                        piece_index,
-                        *walk_type,
-                        bitboards.all_occupied(),
-                    );
-                    moves_from_bitboards(player, piece_index, potential, bitboards, only_captures)
-                })
-                .flatten()
-        })
-        .flatten();
+    let moves = map_successes(walk_types, move |walk_type| {
+        each_index_of_one(bitboards.pieces[player][piece])
+            .map(move |piece_index| {
+                let potential = moves_bb_for_piece_and_blockers(
+                    piece_index,
+                    *walk_type,
+                    bitboards.all_occupied(),
+                );
+                moves_from_bitboards(player, piece_index, potential, bitboards, only_captures)
+            })
+            .flatten()
+    })
+    .flatten()
+    .flatten();
 
     Box::new(moves)
 }
