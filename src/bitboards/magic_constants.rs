@@ -2,7 +2,7 @@ use super::*;
 
 pub fn precomputed_magic_value_for_index_and_piece(
     piece_index: usize,
-    piece_for_magic: WalkingPieces,
+    piece_for_magic: WalkType,
 ) -> MagicValue {
     MagicValue {
         magic: DEFAULT_MAGICS[piece_for_magic as usize][piece_index as usize],

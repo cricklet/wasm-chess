@@ -6,7 +6,7 @@ use crate::{helpers::*, types::*};
 
 use super::*;
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct PieceBitboards {
     pub pawns: Bitboard,
     pub rooks: Bitboard,
@@ -57,7 +57,7 @@ impl std::ops::IndexMut<Piece> for PieceBitboards {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct ForPlayer<T> {
     pub white: T,
     pub black: T,
@@ -89,7 +89,7 @@ impl<T> std::ops::IndexMut<Player> for ForPlayer<T> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct Bitboards {
     pub pieces: ForPlayer<PieceBitboards>,
     pub occupied: ForPlayer<Bitboard>,
