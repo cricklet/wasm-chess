@@ -1,5 +1,7 @@
 use std::iter;
 
+use rand::seq::index;
+
 use crate::{bitboards::*, game::Game, helpers::*, types::*};
 
 #[derive(Debug, Copy, Clone)]
@@ -41,7 +43,7 @@ pub enum JumpingPiece {
     King,
 }
 
-pub fn moves_from_bitboards(
+pub fn potential_bb_to_moves(
     player: Player,
     piece_index: usize,
     potential: Bitboard,
@@ -89,28 +91,53 @@ pub fn moves_from_bitboards(
     }
 }
 
+pub fn walk_potential_bb(
+    index: usize,
+    bitboards: Bitboards,
+    piece: Piece,
+) -> ErrorResult<Bitboard> {
+    let walk_types = walk_type_for_piece(piece);
+
+    let walk_types = match walk_types {
+        Err(err) => return Err(err),
+        Ok(walk_types) => walk_types,
+    };
+
+    let mut danger_bb = 0;
+
+    for walk_type in walk_types.iter() {
+        danger_bb |= moves_bb_for_piece_and_blockers(index, *walk_type, bitboards.all_occupied());
+    }
+
+    Ok(danger_bb)
+}
+
 pub fn walk_moves(
     player: Player,
     bitboards: Bitboards,
     piece: Piece,
     only_captures: OnlyCaptures,
 ) -> Box<dyn Iterator<Item = ErrorResult<Move>>> {
-    let walk_types = walk_type_for_piece(piece);
+    let moves = each_index_of_one(bitboards.pieces[player][piece]).flat_map(move |piece_index| {
+        let potential_bb = walk_potential_bb(piece_index, bitboards, piece);
 
-    let walk_types = match walk_types {
-        Err(err) => return Box::new(iter::once(Err(err))),
-        Ok(walk_types) => walk_types,
-    };
-
-    let moves = walk_types.iter().flat_map(move |walk_type| {
-        each_index_of_one(bitboards.pieces[player][piece]).flat_map(move |piece_index| {
-            let potential =
-                moves_bb_for_piece_and_blockers(piece_index, *walk_type, bitboards.all_occupied());
-            moves_from_bitboards(player, piece_index, potential, bitboards, only_captures)
-        })
+        match potential_bb {
+            Err(err) => Box::new(iter::once(Err(err))),
+            Ok(potential) => {
+                potential_bb_to_moves(player, piece_index, potential, bitboards, only_captures)
+            }
+        }
     });
 
     Box::new(moves)
+}
+
+pub fn jumping_bitboard(index: usize, jumping_piece: JumpingPiece) -> Bitboard {
+    let lookup: &[Bitboard; 64] = match jumping_piece {
+        JumpingPiece::Knight => &KNIGHT_MOVE_BITBOARD,
+        JumpingPiece::King => &KING_MOVE_BITBOARD,
+    };
+    lookup[index]
 }
 
 pub fn jump_moves(
@@ -119,18 +146,20 @@ pub fn jump_moves(
     jumping_piece: JumpingPiece,
     only_captures: OnlyCaptures,
 ) -> impl Iterator<Item = ErrorResult<Move>> {
-    let lookup: &[Bitboard; 64] = match jumping_piece {
-        JumpingPiece::Knight => &KNIGHT_MOVE_BITBOARD,
-        JumpingPiece::King => &KING_MOVE_BITBOARD,
-    };
     let piece = match jumping_piece {
         JumpingPiece::Knight => Piece::Knight,
         JumpingPiece::King => Piece::King,
     };
     each_index_of_one(bitboards.pieces[player][piece]).flat_map(move |piece_index| {
-        let potential = lookup[piece_index];
-        moves_from_bitboards(player, piece_index, potential, bitboards, only_captures)
+        let potential = jumping_bitboard(piece_index, jumping_piece);
+        potential_bb_to_moves(player, piece_index, potential, bitboards, only_captures)
     })
+}
+
+pub fn pawn_attacking_bb(start_bb: Bitboard, capture_dir: Direction) -> Bitboard {
+    let start_bb = start_bb & pre_move_mask(capture_dir);
+    let attacking_bb = shift_toward_index_63(start_bb, capture_dir.offset());
+    attacking_bb
 }
 
 pub fn pawn_moves(
@@ -144,9 +173,8 @@ pub fn pawn_moves(
     let capture_moves = {
         let offsets = pawn_capture_directions_for_player(player);
         offsets.iter().flat_map(move |dir| {
-            let masked_pawns = pawns & pre_move_mask(*dir);
-            let moved_pawns = shift_toward_index_63(masked_pawns, dir.offset());
-            let capture_bb = moved_pawns & bitboards.occupied[other_player(player)];
+            let attacking_bb = pawn_attacking_bb(pawns, *dir);
+            let capture_bb = attacking_bb & bitboards.occupied[other_player(player)];
 
             each_index_of_one(capture_bb).map(move |end_index| {
                 let start_index = (end_index as isize - pawn_dir.offset()) as usize;
@@ -251,4 +279,66 @@ pub fn all_moves(
         .chain(bishop_moves)
         .chain(rook_moves)
         .chain(queen_moves)
+}
+
+pub fn index_in_danger(player: Player, target: usize, state: &Game) -> Result<bool> {
+    let enemy = other_player(player);
+
+    let target_bb = single_bitboard(target);
+
+    let pawn_dangers = pawn_capture_directions_for_player(player).iter().fold(
+        0,
+        move |danger_bb, capture_dir| -> Bitboard {
+            danger_bb | pawn_attacking_bb(target_bb, *capture_dir)
+        },
+    );
+
+    let knight_dangers = jumping_bitboard(target, JumpingPiece::Knight);
+    let king_dangers = jumping_bitboard(target, JumpingPiece::King);
+
+    let bishop_dangers = walk_potential_bb(target, state.board, Piece::Bishop);
+    let rook_dangers = walk_potential_bb(target, state.board, Piece::Rook);
+    let queen_dangers = bishop_dangers | rook_dangers;
+
+    if walk_potential_bb(target, state.board, Piece::Queen) != queen_dangers {
+        return Err(format!(
+            "queen danger mismatch: {:b} != {:b}",
+            walk_potential_bb(target, state.board, Piece::Queen),
+            queen_dangers
+        ));
+    }
+
+    let bishop_dangers = match bishop_dangers {
+        Err(err) => return Err(err),
+        Ok(bishop_dangers) => bishop_dangers,
+    };
+
+    let rook_dangers = match rook_dangers {
+        Err(err) => return Err(err),
+        Ok(rook_dangers) => rook_dangers,
+    };
+
+    let queen_dangers = match queen_dangers {
+        Err(err) => return Err(err),
+        Ok(queen_dangers) => queen_dangers,
+    };
+
+    let enemy_pawns = state.board.pieces[enemy][Piece::Pawn];
+    let enemy_knights = state.board.pieces[enemy][Piece::Knight];
+    let enemy_kings = state.board.pieces[enemy][Piece::King];
+    let enemy_bishops = state.board.pieces[enemy][Piece::Bishop];
+    let enemy_rooks = state.board.pieces[enemy][Piece::Rook];
+    let enemy_queens = state.board.pieces[enemy][Piece::Queen];
+
+    if enemy_pawns & pawn_dangers != 0
+        || enemy_knights & knight_dangers != 0
+        || enemy_kings & king_dangers != 0
+        || enemy_bishops & bishop_dangers != 0
+        || enemy_rooks & rook_dangers != 0
+        || enemy_queens & queen_dangers != 0
+    {
+        Ok(true)
+    } else {
+        Ok(false)
+    }
 }
