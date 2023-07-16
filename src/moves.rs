@@ -276,9 +276,8 @@ pub fn castling_moves(
         return true;
     });
 
-    let safe_castling_moves = empty_castling_sides.flat_map(move |req| {
+    let safe_castling_sides = empty_castling_sides.flat_map(move |req| {
         let require_safe = req.require_safe.iter();
-
         let potential_castles = require_safe.filter_map(move |&safe_index| {
             match index_in_danger(player, safe_index, state) {
                 Err(err) => {
@@ -289,22 +288,22 @@ pub fn castling_moves(
             }
         });
 
-        let moves = potential_castles.map(move |req_result| {
-            req_result.map(|req| Move {
-                player,
-                start_index: req.king_start,
-                end_index: req.king_end,
-                move_type: MoveType::Quiet(Quiet::Castle {
-                    rook_start: req.rook_start,
-                    rook_end: req.rook_end,
-                }),
-            })
-        });
-
-        moves
+        potential_castles
     });
 
-    safe_castling_moves
+    let moves = safe_castling_sides.map(move |req_result| {
+        req_result.map(|req| Move {
+            player,
+            start_index: req.king_start,
+            end_index: req.king_end,
+            move_type: MoveType::Quiet(Quiet::Castle {
+                rook_start: req.rook_start,
+                rook_end: req.rook_end,
+            }),
+        })
+    });
+
+    moves
 }
 
 pub fn all_moves(
