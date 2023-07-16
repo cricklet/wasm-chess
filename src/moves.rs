@@ -1,6 +1,6 @@
 use std::iter;
 
-use rand::seq::index;
+use strum::IntoEnumIterator;
 
 use crate::{bitboards::*, game::Game, helpers::*, types::*};
 
@@ -256,9 +256,54 @@ pub fn en_passant_move(
     None
 }
 
-// pub fn castling_moves(player: Player) -> impl Iterator<Item = Move> {
+pub fn castling_moves(
+    player: Player,
+    state: &Game,
+) -> impl Iterator<Item = ErrorResult<Move>> + '_ {
+    let castling_sides = CastlingSide::iter();
+    let allowed_castling_sides = castling_sides
+        .filter(move |castling_side| state.can_castle_on_side_for_player[player][*castling_side]);
 
-// }
+    let castling_requirements = allowed_castling_sides
+        .map(move |castling_side| castling_requirements(player, castling_side));
+
+    let empty_castling_sides = castling_requirements.filter(move |&req| {
+        for &empty_index in &req.require_empty {
+            if state.board.piece_at_index(empty_index).is_some() {
+                return false;
+            }
+        }
+        return true;
+    });
+
+    let safe_castling_moves = empty_castling_sides.flat_map(move |req| {
+        let require_safe = req.require_safe.iter();
+
+        let safe_moves = require_safe.filter_map(move |&safe_index| -> Option<ErrorResult<Move>> {
+            match index_in_danger(player, safe_index, state) {
+                Err(err) => {
+                    return Some(Err(format!("error checking castling safety: {:?}", err)));
+                }
+                Ok(true) => return None,
+                Ok(false) => {
+                    return Some(Ok(Move {
+                        player,
+                        start_index: req.king_start,
+                        end_index: req.king_end,
+                        move_type: MoveType::Quiet(Quiet::Castle {
+                            rook_start: req.rook_start,
+                            rook_end: req.rook_end,
+                        }),
+                    }))
+                }
+            }
+        });
+
+        safe_moves
+    });
+
+    safe_castling_moves
+}
 
 pub fn all_moves(
     player: Player,
@@ -281,7 +326,7 @@ pub fn all_moves(
         .chain(queen_moves)
 }
 
-pub fn index_in_danger(player: Player, target: usize, state: &Game) -> Result<bool> {
+pub fn index_in_danger(player: Player, target: usize, state: &Game) -> ErrorResult<bool> {
     let enemy = other_player(player);
 
     let target_bb = single_bitboard(target);
@@ -298,16 +343,6 @@ pub fn index_in_danger(player: Player, target: usize, state: &Game) -> Result<bo
 
     let bishop_dangers = walk_potential_bb(target, state.board, Piece::Bishop);
     let rook_dangers = walk_potential_bb(target, state.board, Piece::Rook);
-    let queen_dangers = bishop_dangers | rook_dangers;
-
-    if walk_potential_bb(target, state.board, Piece::Queen) != queen_dangers {
-        return Err(format!(
-            "queen danger mismatch: {:b} != {:b}",
-            walk_potential_bb(target, state.board, Piece::Queen),
-            queen_dangers
-        ));
-    }
-
     let bishop_dangers = match bishop_dangers {
         Err(err) => return Err(err),
         Ok(bishop_dangers) => bishop_dangers,
@@ -318,10 +353,7 @@ pub fn index_in_danger(player: Player, target: usize, state: &Game) -> Result<bo
         Ok(rook_dangers) => rook_dangers,
     };
 
-    let queen_dangers = match queen_dangers {
-        Err(err) => return Err(err),
-        Ok(queen_dangers) => queen_dangers,
-    };
+    let queen_dangers = bishop_dangers | rook_dangers;
 
     let enemy_pawns = state.board.pieces[enemy][Piece::Pawn];
     let enemy_knights = state.board.pieces[enemy][Piece::Knight];

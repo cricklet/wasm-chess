@@ -157,6 +157,19 @@ pub fn index_from_file_rank_str(file_rank_str: &str) -> Option<usize> {
     Some(index_from_file_rank(file, rank))
 }
 
+pub fn unwrap_index_from_file_rank_str(file_rank_str: &str) -> usize {
+    index_from_file_rank_str(file_rank_str).unwrap()
+}
+
+pub fn map_index_from_file_rank_strs<'s>(
+    file_rank_strs: impl IntoIterator<Item = &'s str>,
+) -> Vec<usize> {
+    file_rank_strs
+        .into_iter()
+        .map(unwrap_index_from_file_rank_str)
+        .collect()
+}
+
 pub fn file_rank_to_str(file: usize, rank: usize) -> String {
     let file_char = match file {
         0 => 'a',
