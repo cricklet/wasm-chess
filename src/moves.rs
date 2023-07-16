@@ -279,27 +279,29 @@ pub fn castling_moves(
     let safe_castling_moves = empty_castling_sides.flat_map(move |req| {
         let require_safe = req.require_safe.iter();
 
-        let safe_moves = require_safe.filter_map(move |&safe_index| -> Option<ErrorResult<Move>> {
+        let potential_castles = require_safe.filter_map(move |&safe_index| {
             match index_in_danger(player, safe_index, state) {
                 Err(err) => {
                     return Some(Err(format!("error checking castling safety: {:?}", err)));
                 }
                 Ok(true) => return None,
-                Ok(false) => {
-                    return Some(Ok(Move {
-                        player,
-                        start_index: req.king_start,
-                        end_index: req.king_end,
-                        move_type: MoveType::Quiet(Quiet::Castle {
-                            rook_start: req.rook_start,
-                            rook_end: req.rook_end,
-                        }),
-                    }))
-                }
+                Ok(false) => return Some(Ok(req)),
             }
         });
 
-        safe_moves
+        let moves = potential_castles.map(move |req_result| {
+            req_result.map(|req| Move {
+                player,
+                start_index: req.king_start,
+                end_index: req.king_end,
+                move_type: MoveType::Quiet(Quiet::Castle {
+                    rook_start: req.rook_start,
+                    rook_end: req.rook_end,
+                }),
+            })
+        });
+
+        moves
     });
 
     safe_castling_moves
