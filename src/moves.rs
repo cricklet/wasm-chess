@@ -31,10 +31,11 @@ pub enum MoveType {
 
 #[derive(Debug, Copy, Clone)]
 pub struct Move {
-    player: Player,
-    start_index: usize,
-    end_index: usize,
-    move_type: MoveType,
+    pub player: Player,
+    pub piece: Piece,
+    pub start_index: usize,
+    pub end_index: usize,
+    pub move_type: MoveType,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -44,7 +45,7 @@ pub enum JumpingPiece {
 }
 
 pub fn potential_bb_to_moves(
-    player: Player,
+    (player, piece): PlayerPiece,
     piece_index: usize,
     potential: Bitboard,
     bitboards: Bitboards,
@@ -67,6 +68,7 @@ pub fn potential_bb_to_moves(
         match taken_piece {
             Some(taken_piece) => Ok(Move {
                 player,
+                piece,
                 start_index,
                 end_index,
                 move_type: MoveType::Capture(Capture::Take { taken_piece }),
@@ -80,6 +82,7 @@ pub fn potential_bb_to_moves(
 
     let quiet_moves = each_index_of_one(quiet).map(move |end_index| Move {
         player,
+        piece,
         start_index,
         end_index,
         move_type: MoveType::Quiet(Quiet::Move),
@@ -113,9 +116,8 @@ pub fn walk_potential_bb(
 }
 
 pub fn walk_moves(
-    player: Player,
+    (player, piece): PlayerPiece,
     bitboards: Bitboards,
-    piece: Piece,
     only_captures: OnlyCaptures,
 ) -> Box<dyn Iterator<Item = ErrorResult<Move>>> {
     let moves = each_index_of_one(bitboards.pieces[player][piece]).flat_map(move |piece_index| {
@@ -123,9 +125,13 @@ pub fn walk_moves(
 
         match potential_bb {
             Err(err) => Box::new(iter::once(Err(err))),
-            Ok(potential) => {
-                potential_bb_to_moves(player, piece_index, potential, bitboards, only_captures)
-            }
+            Ok(potential) => potential_bb_to_moves(
+                (player, piece),
+                piece_index,
+                potential,
+                bitboards,
+                only_captures,
+            ),
         }
     });
 
@@ -152,7 +158,13 @@ pub fn jump_moves(
     };
     each_index_of_one(bitboards.pieces[player][piece]).flat_map(move |piece_index| {
         let potential = jumping_bitboard(piece_index, jumping_piece);
-        potential_bb_to_moves(player, piece_index, potential, bitboards, only_captures)
+        potential_bb_to_moves(
+            (player, piece),
+            piece_index,
+            potential,
+            bitboards,
+            only_captures,
+        )
     })
 }
 
@@ -180,6 +192,7 @@ pub fn pawn_moves(
                 let start_index = (end_index as isize - pawn_dir.offset()) as usize;
                 Move {
                     player,
+                    piece: Piece::Pawn,
                     start_index,
                     end_index,
                     move_type: MoveType::Quiet(Quiet::Move),
@@ -201,6 +214,7 @@ pub fn pawn_moves(
             let start_index = (end_index as isize - pawn_dir.offset()) as usize;
             Move {
                 player,
+                piece: Piece::Pawn,
                 start_index,
                 end_index,
                 move_type: MoveType::Quiet(Quiet::Move),
@@ -217,6 +231,7 @@ pub fn pawn_moves(
             let start_index = (end_index as isize - pawn_dir.offset()) as usize;
             Move {
                 player,
+                piece: Piece::Pawn,
                 start_index,
                 end_index,
                 move_type: MoveType::Quiet(Quiet::Move),
@@ -243,6 +258,7 @@ pub fn en_passant_move(
             if moved_pawns & en_passant_bb != 0 {
                 return Some(Move {
                     player,
+                    piece: Piece::Pawn,
                     start_index: (en_passant_index as isize - dir.offset()) as usize,
                     end_index: en_passant_index,
                     move_type: MoveType::Capture(Capture::EnPassant {
@@ -256,13 +272,13 @@ pub fn en_passant_move(
     None
 }
 
-pub fn castling_moves(
+pub fn castling_moves<'game>(
     player: Player,
-    state: &Game,
-) -> impl Iterator<Item = ErrorResult<Move>> + '_ {
-    let castling_sides = CastlingSide::iter();
-    let allowed_castling_sides = castling_sides
-        .filter(move |castling_side| state.can_castle_on_side_for_player[player][*castling_side]);
+    state: &'game Game,
+) -> impl Iterator<Item = ErrorResult<Move>> + 'game {
+    let castling_sides: CastlingSideIter = CastlingSide::iter();
+    let allowed_castling_sides =
+        castling_sides.filter(move |castling_side| state.can_castle[player][*castling_side]);
 
     let castling_requirements = allowed_castling_sides
         .map(move |castling_side| castling_requirements(player, castling_side));
@@ -294,6 +310,7 @@ pub fn castling_moves(
     let moves = safe_castling_sides.map(move |req_result| {
         req_result.map(|req| Move {
             player,
+            piece: Piece::King,
             start_index: req.king_start,
             end_index: req.king_end,
             move_type: MoveType::Quiet(Quiet::Castle {
@@ -306,18 +323,19 @@ pub fn castling_moves(
     moves
 }
 
-pub fn all_moves(
+pub fn all_moves<'game>(
     player: Player,
-    state: &Game,
+    state: &'game Game,
     only_captures: OnlyCaptures,
-) -> impl Iterator<Item = ErrorResult<Move>> {
+) -> impl Iterator<Item = ErrorResult<Move>> + 'game {
     let pawn = pawn_moves(player, state.board, only_captures).map(Ok);
     let en_passant = en_passant_move(player, state.board, state.en_passant).map(Ok);
     let knight_moves = jump_moves(player, state.board, JumpingPiece::Knight, only_captures);
     let king_moves = jump_moves(player, state.board, JumpingPiece::King, only_captures);
-    let bishop_moves = walk_moves(player, state.board, Piece::Bishop, only_captures);
-    let rook_moves = walk_moves(player, state.board, Piece::Rook, only_captures);
-    let queen_moves = walk_moves(player, state.board, Piece::Queen, only_captures);
+    let bishop_moves = walk_moves((player, Piece::Bishop), state.board, only_captures);
+    let rook_moves = walk_moves((player, Piece::Rook), state.board, only_captures);
+    let queen_moves = walk_moves((player, Piece::Queen), state.board, only_captures);
+    let castling_moves = castling_moves(player, state);
 
     pawn.chain(en_passant)
         .chain(knight_moves)
@@ -325,6 +343,7 @@ pub fn all_moves(
         .chain(bishop_moves)
         .chain(rook_moves)
         .chain(queen_moves)
+        .chain(castling_moves)
 }
 
 pub fn index_in_danger(player: Player, target: usize, state: &Game) -> ErrorResult<bool> {

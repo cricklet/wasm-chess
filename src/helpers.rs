@@ -36,9 +36,9 @@ where
     }
 }
 
-pub fn iter_results_from_result_iter<'t, T: 't>(
-    result_iter: ErrorResult<impl Iterator<Item = T> + 't>,
-) -> Box<dyn Iterator<Item = ErrorResult<T>> + 't>
+pub fn iter_results_from_result_iter<'iter, T: 'iter>(
+    result_iter: ErrorResult<impl Iterator<Item = T> + 'iter>,
+) -> Box<dyn Iterator<Item = ErrorResult<T>> + 'iter>
 where
     T: Copy,
 {
@@ -50,9 +50,9 @@ where
     Box::new(result_iter)
 }
 
-pub fn map_successes<'t, T: 't, U>(
-    results: impl Iterator<Item = ErrorResult<T>> + 't,
-    callback: impl Fn(T) -> U + 't,
-) -> impl Iterator<Item = ErrorResult<U>> + 't {
+pub fn map_successes<'iter, T: 'iter, U>(
+    results: impl Iterator<Item = ErrorResult<T>> + 'iter,
+    callback: impl Fn(T) -> U + 'iter,
+) -> impl Iterator<Item = ErrorResult<U>> + 'iter {
     results.map(move |result| result.map(&callback))
 }

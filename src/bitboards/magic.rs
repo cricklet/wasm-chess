@@ -174,8 +174,7 @@ pub fn test_generate_walk_bb() {
             ........\n\
             ........\n\
             ........\n\
-            ........"
-                .to_string(),
+            ........",
         );
         let dir = Direction::NE;
         let walk_bb = generate_walk_bb(start_index, blocker_bb, dir);
@@ -501,8 +500,7 @@ pub fn test_moves_for_piece_and_blockers() {
     .....1..\n\
     ........\n\
     .1...1..\n\
-    ........"
-            .to_string(),
+    ........",
     );
 
     let piece_bb = bitboard_from_string(
@@ -514,8 +512,7 @@ pub fn test_moves_for_piece_and_blockers() {
     ........\n\
     ........\n\
     ........\n\
-    ........"
-            .to_string(),
+    ........",
     );
 
     {
@@ -536,7 +533,6 @@ pub fn test_moves_for_piece_and_blockers() {
     ..1.....\n\
     .1......\n\
     ........"
-                .to_string()
         );
     }
 
@@ -558,7 +554,6 @@ pub fn test_moves_for_piece_and_blockers() {
             ........\n\
             ........\n\
             ........"
-                .to_string()
         );
     }
 }

@@ -1,6 +1,12 @@
 use lazy_static::*;
 
+use crate::helpers::ErrorResult;
+
 pub type Bitboard = u64;
+
+pub fn bb_contains(bb: Bitboard, index: usize) -> bool {
+    bb & single_bitboard(index) != 0
+}
 
 pub fn least_significant_one(bb: Bitboard) -> Bitboard {
     bb & bb.wrapping_neg()
@@ -127,34 +133,34 @@ pub fn is_file(c: char) -> bool {
     }
 }
 
-pub fn index_from_file_rank_str(file_rank_str: &str) -> Option<usize> {
+pub fn index_from_file_rank_str(file_rank_str: &str) -> ErrorResult<usize> {
     let mut chars = file_rank_str.chars();
 
     if file_rank_str.len() != 2 {
-        return None;
+        return Err(format!("Invalid file rank string: {}", file_rank_str));
     }
 
     let file_char = match chars.next() {
         Some(c) => c,
-        None => return None,
+        None => return Err(format!("Invalid file: {}", file_rank_str)),
     };
 
     let rank_char = match chars.next() {
         Some(c) => c,
-        None => return None,
+        None => return Err(format!("Invalid rank: {}", file_rank_str)),
     };
 
     let file = match file_from_char(file_char) {
         Some(f) => f,
-        None => return None,
+        None => return Err(format!("Invalid file: {}", file_rank_str)),
     };
 
     let rank = match rank_from_char(rank_char) {
         Some(r) => r,
-        None => return None,
+        None => return Err(format!("Invalid rank: {}", file_rank_str)),
     };
 
-    Some(index_from_file_rank(file, rank))
+    Ok(index_from_file_rank(file, rank))
 }
 
 pub fn unwrap_index_from_file_rank_str(file_rank_str: &str) -> usize {

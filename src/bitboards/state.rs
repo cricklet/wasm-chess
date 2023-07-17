@@ -105,7 +105,34 @@ impl Bitboards {
         }
     }
 
-    pub fn from_fen(fen: String) -> ErrorResult<Bitboards> {
+    pub fn to_fen(&self) -> String {
+        let mut fen = String::new();
+        for rank in (0..8).rev() {
+            let mut empty_count = 0;
+            for file in 0..8 {
+                let index = index_from_file_rank(file, rank);
+                if let Some(piece) = self.piece_at_index(index) {
+                    if empty_count > 0 {
+                        fen.push_str(&empty_count.to_string());
+                        empty_count = 0;
+                    }
+                    fen.push_str(&player_and_piece_to_fen_char(piece).to_string());
+                } else {
+                    empty_count += 1;
+                }
+            }
+            if empty_count > 0 {
+                fen.push_str(&empty_count.to_string());
+            }
+            if rank > 0 {
+                fen.push('/');
+            }
+        }
+
+        fen
+    }
+
+    pub fn from_fen(fen: &str) -> ErrorResult<Bitboards> {
         let mut bb = Bitboards::new();
 
         let mut rank = 7;
@@ -282,7 +309,7 @@ impl Bitboards {
 
 #[test]
 pub fn test_starting_board() {
-    let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR".to_string();
+    let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
     let mut bb = Bitboards::from_fen(fen).unwrap();
     assert_eq!(
         bb.pretty(),

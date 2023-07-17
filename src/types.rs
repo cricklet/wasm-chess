@@ -7,6 +7,19 @@ pub enum Player {
     Black,
 }
 
+impl Player {
+    pub fn other(self) -> Self {
+        other_player(self)
+    }
+
+    pub fn to_fen(self) -> &'static str {
+        match self {
+            Player::White => "w",
+            Player::Black => "b",
+        }
+    }
+}
+
 pub fn other_player(player: Player) -> Player {
     match player {
         Player::White => Player::Black,
@@ -49,4 +62,21 @@ pub fn player_and_piece_from_fen_char(c: char) -> Option<PlayerPiece> {
     };
 
     Some((player, piece))
+}
+
+pub fn player_and_piece_to_fen_char(player_piece: PlayerPiece) -> char {
+    let (player, piece) = player_piece;
+    let fen_char = match piece {
+        Piece::Pawn => 'P',
+        Piece::Rook => 'R',
+        Piece::Knight => 'N',
+        Piece::Bishop => 'B',
+        Piece::Queen => 'Q',
+        Piece::King => 'K',
+    };
+
+    match player {
+        Player::White => fen_char,
+        Player::Black => fen_char.to_ascii_lowercase(),
+    }
 }

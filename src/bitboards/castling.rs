@@ -1,4 +1,5 @@
 use lazy_static::*;
+use memoize::memoize;
 
 use crate::types::*;
 
@@ -68,4 +69,15 @@ pub fn castling_requirements(
             CastlingSide::Queenside => &BLACK_QUEENSIDE_CASTLING,
         },
     }
+}
+
+#[memoize]
+pub fn castling_allowed_after_move(
+    player: Player,
+    castling_side: CastlingSide,
+    start_index: usize,
+) -> bool {
+    let castling_requirements = castling_requirements(player, castling_side);
+    let castling_piece_moved = bb_contains(castling_requirements.castling_pieces, start_index);
+    !castling_piece_moved
 }

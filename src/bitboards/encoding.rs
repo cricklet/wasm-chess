@@ -28,7 +28,7 @@ pub fn binary_string(bb: Bitboard) -> String {
     format!("{:064b}", bb)
 }
 
-pub fn bitboard_from_string(str: String) -> Bitboard {
+pub fn bitboard_from_string(str: &str) -> Bitboard {
     let mut bb: Bitboard = 0;
     for (inverse_rank, line) in str.split("\n").enumerate() {
         let rank = 7 - inverse_rank;
@@ -81,7 +81,7 @@ fn test_bitboard_string_zero_roundtrip() {
             ........\n\
             ........";
 
-    let bb = bitboard_from_string(start.to_string());
+    let bb = bitboard_from_string(start);
     let end = bitboard_string(bb);
 
     assert_eq!(start, end);
@@ -98,7 +98,7 @@ fn test_bitboard_string_simple_roundtrip() {
             ........\n\
             ........";
 
-    let bb = bitboard_from_string(start.to_string());
+    let bb = bitboard_from_string(start);
     let end = bitboard_string(bb);
 
     assert_eq!(start, end);
@@ -115,7 +115,7 @@ fn test_bitboard_string_many_roundtrip() {
             ....111.\n\
             .......1";
 
-    let bb = bitboard_from_string(start.to_string());
+    let bb = bitboard_from_string(start);
     let end = bitboard_string(bb);
 
     assert_eq!(start, end);
