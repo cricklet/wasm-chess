@@ -2,7 +2,10 @@ use lazy_static::lazy_static;
 use memoize::memoize;
 use strum::EnumIter;
 
-use crate::{helpers::ErrorResult, types::Player};
+use crate::{
+    helpers::{err, ErrorResult},
+    types::Player,
+};
 
 use super::*;
 
@@ -166,7 +169,7 @@ pub fn zeros_for(cs: &[char]) -> ErrorResult<Bitboard> {
         } else if is_rank(*c) {
             bb &= zeros_for_rank(*c);
         } else {
-            return Err(format!("Invalid char: {}", c));
+            return err(&format!("Invalid char: {}", c));
         }
     }
     Ok(bb)

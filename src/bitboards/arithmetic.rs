@@ -1,6 +1,6 @@
 use lazy_static::*;
 
-use crate::helpers::ErrorResult;
+use crate::helpers::{err, ErrorResult};
 
 pub type Bitboard = u64;
 
@@ -137,27 +137,27 @@ pub fn index_from_file_rank_str(file_rank_str: &str) -> ErrorResult<usize> {
     let mut chars = file_rank_str.chars();
 
     if file_rank_str.len() != 2 {
-        return Err(format!("Invalid file rank string: {}", file_rank_str));
+        return err(&format!("Invalid file rank string: {}", file_rank_str));
     }
 
     let file_char = match chars.next() {
         Some(c) => c,
-        None => return Err(format!("Invalid file: {}", file_rank_str)),
+        None => return err(&format!("Invalid file: {}", file_rank_str)),
     };
 
     let rank_char = match chars.next() {
         Some(c) => c,
-        None => return Err(format!("Invalid rank: {}", file_rank_str)),
+        None => return err(&format!("Invalid rank: {}", file_rank_str)),
     };
 
     let file = match file_from_char(file_char) {
         Some(f) => f,
-        None => return Err(format!("Invalid file: {}", file_rank_str)),
+        None => return err(&format!("Invalid file: {}", file_rank_str)),
     };
 
     let rank = match rank_from_char(rank_char) {
         Some(r) => r,
-        None => return Err(format!("Invalid rank: {}", file_rank_str)),
+        None => return err(&format!("Invalid rank: {}", file_rank_str)),
     };
 
     Ok(index_from_file_rank(file, rank))

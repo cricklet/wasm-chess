@@ -37,11 +37,11 @@ fn test_fen_start_board() {
 }
 
 fn traverse_game(game: &Game, depth: u8) {
+    println!("depth: {}, game: {}", depth, game.pretty());
+
     if depth == 0 {
         return;
     }
-
-    println!("depth: {}, game: {}", depth, game.pretty());
 
     let moves = all_moves(game.player, game, OnlyCaptures::NO);
     for m in moves {
@@ -52,10 +52,10 @@ fn traverse_game(game: &Game, depth: u8) {
                     Ok(next_game) => {
                         traverse_game(next_game, depth - 1);
                     }
-                    Err(e) => panic!("error: {}", e),
+                    Err(e) => e.throw(),
                 }
             }
-            Err(e) => panic!("error: {}", e),
+            Err(e) => e.throw(),
         }
     }
 }
@@ -64,8 +64,6 @@ fn assert_perft_matches(fen: &str, expected_counts: &[u64]) {
     let game = Game::from_fen(fen).unwrap();
 
     assert_eq!(game.to_fen(), fen);
-
-    println!("game: {}", game.pretty());
 
     traverse_game(&game, 1);
 

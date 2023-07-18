@@ -140,7 +140,7 @@ impl Bitboards {
         for c in fen.chars() {
             if c == '/' {
                 if file != 8 {
-                    return Err(format!(
+                    return err(&format!(
                         "not enough squares in rank ({:}, fen {:}",
                         file_rank_to_str(file, rank),
                         fen
@@ -151,7 +151,7 @@ impl Bitboards {
             } else if let Some(d) = c.to_digit(10) {
                 file += d as usize;
                 if file > 8 {
-                    return Err(format!(
+                    return err(&format!(
                         "too many squares in rank ({:}, fen {:})",
                         file_rank_to_str(file, rank),
                         fen
@@ -162,7 +162,7 @@ impl Bitboards {
                 bb.set_square(index, player, piece_type);
                 file += 1;
             } else {
-                return Err(format!(
+                return err(&format!(
                     "unknown character {:} ({:}, fen {:})",
                     c,
                     file_rank_to_str(file, rank),
@@ -189,24 +189,24 @@ impl Bitboards {
                 if let Some((player, piece)) = piece {
                     match player {
                         Player::White => match piece {
-                            Piece::Pawn => s.push_str("♙"),
-                            Piece::Rook => s.push_str("♖"),
-                            Piece::Knight => s.push_str("♘"),
-                            Piece::Bishop => s.push_str("♗"),
-                            Piece::Queen => s.push_str("♕"),
-                            Piece::King => s.push_str("♔"),
+                            Piece::Pawn => s.push_str("♙ "),
+                            Piece::Rook => s.push_str("♖ "),
+                            Piece::Knight => s.push_str("♘ "),
+                            Piece::Bishop => s.push_str("♗ "),
+                            Piece::Queen => s.push_str("♕ "),
+                            Piece::King => s.push_str("♔ "),
                         },
                         Player::Black => match piece {
-                            Piece::Pawn => s.push_str("♟"),
-                            Piece::Rook => s.push_str("♜"),
-                            Piece::Knight => s.push_str("♞"),
-                            Piece::Bishop => s.push_str("♝"),
-                            Piece::Queen => s.push_str("♛"),
-                            Piece::King => s.push_str("♚"),
+                            Piece::Pawn => s.push_str("♟ "),
+                            Piece::Rook => s.push_str("♜ "),
+                            Piece::Knight => s.push_str("♞ "),
+                            Piece::Bishop => s.push_str("♝ "),
+                            Piece::Queen => s.push_str("♛ "),
+                            Piece::King => s.push_str("♚ "),
                         },
                     }
                 } else {
-                    s.push_str("·");
+                    s.push_str("· ");
                 }
             }
             s.push_str("\n");
@@ -244,7 +244,7 @@ impl Bitboards {
                 }
 
                 if found.len() > 1 {
-                    return Err(format!(
+                    return err(&format!(
                         "more than one piece at {:} -- {:?}",
                         file_rank_to_str(file, rank),
                         found,
@@ -253,7 +253,7 @@ impl Bitboards {
 
                 if found.len() == 0 {
                     if self.is_occupied(index) {
-                        return Err(format!(
+                        return err(&format!(
                             "no piece at {:} but occupied -- {:?}",
                             file_rank_to_str(file, rank),
                             found,
@@ -264,13 +264,13 @@ impl Bitboards {
 
                 let (player, piece) = found.iter().next().unwrap();
                 if self.is_occupied_by_player(index, other_player(*player)) {
-                    return Err(format!(
+                    return err(&format!(
                         "piece at {:} but occupied by other player -- {:?}",
                         file_rank_to_str(file, rank),
                         found,
                     ));
                 } else if !self.is_occupied_by_player(index, *player) {
-                    return Err(format!(
+                    return err(&format!(
                         "piece at {:} but not occupied by player -- {:?}",
                         file_rank_to_str(file, rank),
                         found,
@@ -278,7 +278,7 @@ impl Bitboards {
                 }
 
                 if self.piece_at_index(index) != Some((*player, *piece)) {
-                    return Err(format!(
+                    return err(&format!(
                         "piece at {:} but not found in piece_at_index -- {:?}",
                         file_rank_to_str(file, rank),
                         found,

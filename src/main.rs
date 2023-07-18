@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+
 pub mod bitboards;
 pub mod game;
 pub mod helpers;

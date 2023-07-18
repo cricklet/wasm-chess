@@ -1,6 +1,9 @@
 use std::rc::Rc;
 
-use crate::{helpers::ErrorResult, types::Piece};
+use crate::{
+    helpers::{err, ErrorResult},
+    types::Piece,
+};
 
 use super::*;
 use memoize::memoize;
@@ -18,7 +21,7 @@ pub fn walk_type_for_piece(piece: Piece) -> ErrorResult<&'static [WalkType]> {
         Piece::Rook => Ok(&[WalkType::Rook]),
         Piece::Bishop => Ok(&[WalkType::Bishop]),
         Piece::Queen => Ok(&[WalkType::Rook, WalkType::Bishop]),
-        _ => Err(format!("piece {:?} does not walk", piece)),
+        _ => err(&format!("piece {:?} does not walk", piece)),
     }
 }
 

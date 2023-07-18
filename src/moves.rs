@@ -38,6 +38,18 @@ pub struct Move {
     pub move_type: MoveType,
 }
 
+impl Move {
+    pub fn pretty(&self) -> String {
+        format!(
+            "{} {} {} {:?}",
+            player_and_piece_to_fen_char((self.player, self.piece)),
+            self.start_index,
+            self.end_index,
+            self.move_type,
+        )
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum JumpingPiece {
     Knight,
@@ -62,7 +74,6 @@ pub fn potential_bb_to_moves(
     let start_index = piece_index;
 
     let capture_moves = each_index_of_one(capture).map(move |end_index| {
-        let start_index = piece_index;
         let taken_piece = bitboards.piece_at_index(end_index);
 
         match taken_piece {
@@ -73,7 +84,7 @@ pub fn potential_bb_to_moves(
                 end_index,
                 move_type: MoveType::Capture(Capture::Take { taken_piece }),
             }),
-            None => Err(format!(
+            None => err(&format!(
                 "no piece at index {:} but marked as capture",
                 end_index
             )),
@@ -228,7 +239,7 @@ pub fn pawn_moves(
         let push2 = shift_toward_index_63(push1, pawn_dir.offset()) & !bitboards.all_occupied();
 
         each_index_of_one(push2).map(move |end_index| {
-            let start_index = (end_index as isize - pawn_dir.offset()) as usize;
+            let start_index = (end_index as isize - 2 * pawn_dir.offset()) as usize;
             Move {
                 player,
                 piece: Piece::Pawn,
@@ -297,7 +308,7 @@ pub fn castling_moves<'game>(
         let potential_castles = require_safe.filter_map(move |&safe_index| {
             match index_in_danger(player, safe_index, state) {
                 Err(err) => {
-                    return Some(Err(format!("error checking castling safety: {:?}", err)));
+                    return Some(Err(err));
                 }
                 Ok(true) => return None,
                 Ok(false) => return Some(Ok(req)),

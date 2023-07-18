@@ -2,9 +2,9 @@ use strum::IntoEnumIterator;
 
 use crate::bitboards::{self, castling_allowed_after_move, index_to_file_rank_str, Bitboards};
 use crate::bitboards::{index_from_file_rank_str, ForPlayer};
-use crate::helpers::ErrorResult;
+use crate::helpers::{err, ErrorResult};
 use crate::moves::{Move, MoveType, Quiet};
-use crate::types::{self, CastlingSide, Piece};
+use crate::types::{self, player_and_piece_to_fen_char, CastlingSide, Piece};
 
 #[derive(Debug, Default, Copy, Clone)]
 pub struct CanCastleOnSide {
@@ -49,7 +49,7 @@ impl ForPlayer<CanCastleOnSide> {
                         'Q' => can_castle_on_side_for_player.white.queenside = true,
                         'k' => can_castle_on_side_for_player.black.kingside = true,
                         'q' => can_castle_on_side_for_player.black.queenside = true,
-                        _ => return Err(format!("invalid castling side {}", c)),
+                        _ => return err(&format!("invalid castling side {}", c)),
                     }
                 }
                 can_castle_on_side_for_player
@@ -104,6 +104,10 @@ impl Game {
         }
     }
 
+    pub fn err(&self, msg: &str) -> ErrorResult<Game> {
+        err(&format!("{}\n\n{}", msg, self.pretty()))
+    }
+
     pub fn pretty(&self) -> String {
         format!("{}\n{}", self.to_fen(), self.board.pretty())
     }
@@ -130,13 +134,13 @@ impl Game {
         // parse a string like "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 
         if split.len() <= 0 {
-            return Err(format!("empty fen {}", fen));
+            return err(&format!("empty fen {}", fen));
         }
 
         let board = Bitboards::from_fen(split[0]);
         game.board = match board {
             Ok(board) => board,
-            Err(e) => return Err(format!("error parsing board: {}", e)),
+            Err(e) => return Err(e),
         };
 
         if split.len() <= 1 {
@@ -146,7 +150,7 @@ impl Game {
         game.player = match split[1] {
             "w" => types::Player::White,
             "b" => types::Player::Black,
-            _ => return Err(format!("invalid player {}", split[1])),
+            _ => return err(&format!("invalid player {}", split[1])),
         };
 
         if split.len() <= 2 {
@@ -156,7 +160,7 @@ impl Game {
         let can_castle_on_side_for_player = ForPlayer::<CanCastleOnSide>::from_str(split[2]);
         game.can_castle = match can_castle_on_side_for_player {
             Ok(can_castle_on_side_for_player) => can_castle_on_side_for_player,
-            Err(e) => return Err(format!("error parsing castling: {}", e)),
+            Err(e) => return Err(e),
         };
 
         if split.len() <= 3 {
@@ -168,7 +172,7 @@ impl Game {
             "-" => None,
             _ => match index_from_file_rank_str(en_passant_str) {
                 Ok(index) => Some(index),
-                Err(e) => return Err(format!("error parsing en passant: {}", e)),
+                Err(e) => return Err(e),
             },
         };
 
@@ -179,7 +183,7 @@ impl Game {
         game.half_moves_since_pawn_or_capture = match split[4].parse::<usize>() {
             Ok(half_moves_since_pawn_or_capture) => half_moves_since_pawn_or_capture,
             Err(e) => {
-                return Err(format!(
+                return err(&format!(
                     "error parsing half moves since pawn or capture: {}",
                     e
                 ))
@@ -192,11 +196,11 @@ impl Game {
 
         game.full_moves_total = match split[5].parse::<usize>() {
             Ok(full_moves_total) => full_moves_total,
-            Err(e) => return Err(format!("error parsing full moves total: {}", e)),
+            Err(e) => return err(&format!("error parsing full moves total: {}", e)),
         };
 
         if split.len() > 6 {
-            return Err(format!("invalid fen {}", fen));
+            return err(&format!("invalid fen {}", fen));
         }
 
         Ok(game)
@@ -217,10 +221,17 @@ impl Game {
         match m.move_type {
             MoveType::Quiet(q) => {
                 if next.board.is_occupied(m.end_index) {
-                    return Err("invalid quiet move: end index is occupied".to_string());
+                    return self.err(&format!(
+                        "invalid quiet move: end index {} is occupied",
+                        index_to_file_rank_str(m.end_index)
+                    ));
                 }
                 if next.board.piece_at_index(m.start_index) != Some((player, m.piece)) {
-                    return Err("invalid quiet move: piece isn't at start index".to_string());
+                    return self.err(&format!(
+                        "invalid quiet move: piece {} isn't at start index {}",
+                        player_and_piece_to_fen_char((player, m.piece)),
+                        index_to_file_rank_str(m.start_index)
+                    ));
                 }
 
                 match q {
@@ -233,10 +244,10 @@ impl Game {
                         rook_end,
                     } => {
                         if m.piece != Piece::King {
-                            return Err("invalid castle move, piece isn't king".to_string());
+                            return self.err("invalid castle move, piece isn't king");
                         }
                         if next.board.piece_at_index(rook_start) != Some((player, Piece::Rook)) {
-                            return Err("invalid castle move, rook isn't at rook start".to_string());
+                            return self.err("invalid castle move, rook isn't at rook start");
                         }
 
                         next.board.clear_square(m.start_index, player, m.piece);
@@ -256,7 +267,7 @@ impl Game {
             MoveType::Capture(c) => match c {
                 crate::moves::Capture::EnPassant { taken_index } => {
                     if next.board.piece_at_index(taken_index) != Some((enemy, Piece::Pawn)) {
-                        return Err("invalid en-passant: taken piece isn't enemy pawn".to_string());
+                        return self.err("invalid en-passant: taken piece isn't enemy pawn");
                     }
                     next.board.clear_square(taken_index, enemy, Piece::Pawn);
 
@@ -266,7 +277,7 @@ impl Game {
                 crate::moves::Capture::Take { taken_piece } => {
                     let (taken_player, taken_piece) = taken_piece;
                     if taken_player != enemy {
-                        return Err("invalid capture: taken piece isn't enemy piece".to_string());
+                        return self.err("invalid capture: taken piece isn't enemy piece");
                     }
                     next.board
                         .clear_square(m.end_index, taken_player, taken_piece);
