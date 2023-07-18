@@ -1,6 +1,6 @@
 use crate::{
     game::Game,
-    moves::{all_moves, OnlyCaptures},
+    moves::{all_moves, OnlyCaptures, OnlyQueenPromotion},
 };
 
 fn assert_fen_matches(expected_fen: &str) {
@@ -43,7 +43,7 @@ fn traverse_game(game: &Game, depth: u8) {
         return;
     }
 
-    let moves = all_moves(game.player, game, OnlyCaptures::NO);
+    let moves = all_moves(game.player, game, OnlyCaptures::NO, OnlyQueenPromotion::NO);
     for m in moves {
         match m {
             Ok(m) => {

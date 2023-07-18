@@ -262,6 +262,16 @@ impl Game {
 
                         next.en_passant = Some(skipped_index);
                     }
+                    Quiet::PawnPromotion { promotion_piece } => {
+                        if !types::PROMOTION_PIECES.contains(&promotion_piece) {
+                            return self.err(format!(
+                                "invalid pawn promotion: promotion piece {} isn't a promotion piece",
+                                player_and_piece_to_fen_char((player, promotion_piece))
+                            ).as_str());
+                        }
+                        next.board.clear_square(m.start_index, player, m.piece);
+                        next.board.set_square(m.end_index, player, promotion_piece);
+                    }
                 }
             }
             MoveType::Capture(c) => match c {

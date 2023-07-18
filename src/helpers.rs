@@ -1,7 +1,4 @@
-use std::{
-    backtrace::{self, Backtrace},
-    iter,
-};
+use std::{backtrace::Backtrace, iter};
 
 #[derive(Debug)]
 pub struct Error {

@@ -11,9 +11,25 @@ pub enum OnlyCaptures {
 }
 
 #[derive(Debug, Copy, Clone)]
+pub enum OnlyQueenPromotion {
+    NO,
+    YES,
+}
+
+impl OnlyQueenPromotion {
+    pub fn pieces(&self) -> Box<dyn Iterator<Item = Piece>> {
+        match self {
+            OnlyQueenPromotion::NO => Box::new(PROMOTION_PIECES.into_iter()),
+            OnlyQueenPromotion::YES => Box::new(iter::once(Piece::Queen)),
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
 pub enum Quiet {
     Castle { rook_start: usize, rook_end: usize },
     PawnSkip { skipped_index: usize },
+    PawnPromotion { promotion_piece: Piece },
     Move,
 }
 
@@ -189,6 +205,7 @@ pub fn pawn_moves(
     player: Player,
     bitboards: Bitboards,
     only_captures: OnlyCaptures,
+    only_queen_promotion: OnlyQueenPromotion,
 ) -> Box<dyn Iterator<Item = Move>> {
     let pawns = bitboards.pieces[player][Piece::Pawn];
     let pawn_dir = pawn_push_direction_for_player(player);
@@ -218,10 +235,13 @@ pub fn pawn_moves(
 
     let push_moves = {
         let masked_pawns = pawns & pre_move_mask(pawn_dir);
-        let pushed_pawns =
+        let moved_pawns =
             shift_toward_index_63(masked_pawns, pawn_dir.offset()) & !bitboards.all_occupied();
 
-        each_index_of_one(pushed_pawns).map(move |end_index| {
+        let pushed_pawns = moved_pawns & !*PAWN_PROMOTION_BITBOARD;
+        let promotion_pawns = moved_pawns & *PAWN_PROMOTION_BITBOARD;
+
+        let pushed_pawns = each_index_of_one(pushed_pawns).map(move |end_index| {
             let start_index = (end_index as isize - pawn_dir.offset()) as usize;
             Move {
                 player,
@@ -230,7 +250,22 @@ pub fn pawn_moves(
                 end_index,
                 move_type: MoveType::Quiet(Quiet::Move),
             }
-        })
+        });
+
+        let promotion_pawns = each_index_of_one(promotion_pawns).flat_map(move |end_index| {
+            let start_index = (end_index as isize - pawn_dir.offset()) as usize;
+            only_queen_promotion.pieces().map(move |promo_piece| Move {
+                player,
+                piece: Piece::Pawn,
+                start_index,
+                end_index,
+                move_type: MoveType::Quiet(Quiet::PawnPromotion {
+                    promotion_piece: promo_piece,
+                }),
+            })
+        });
+
+        pushed_pawns.chain(promotion_pawns)
     };
     let skip_moves = {
         let masked_pawns = pawns & starting_pawns_mask(player);
@@ -338,8 +373,9 @@ pub fn all_moves<'game>(
     player: Player,
     state: &'game Game,
     only_captures: OnlyCaptures,
+    only_queen_promotion: OnlyQueenPromotion,
 ) -> impl Iterator<Item = ErrorResult<Move>> + 'game {
-    let pawn = pawn_moves(player, state.board, only_captures).map(Ok);
+    let pawn = pawn_moves(player, state.board, only_captures, only_queen_promotion).map(Ok);
     let en_passant = en_passant_move(player, state.board, state.en_passant).map(Ok);
     let knight_moves = jump_moves(player, state.board, JumpingPiece::Knight, only_captures);
     let king_moves = jump_moves(player, state.board, JumpingPiece::King, only_captures);

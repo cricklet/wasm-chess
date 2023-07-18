@@ -43,6 +43,8 @@ pub enum Piece {
     King,
 }
 
+pub const PROMOTION_PIECES: [Piece; 4] = [Piece::Rook, Piece::Knight, Piece::Bishop, Piece::Queen];
+
 pub type PlayerPiece = (Player, Piece);
 
 pub fn player_and_piece_from_fen_char(c: char) -> Option<PlayerPiece> {
