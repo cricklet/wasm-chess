@@ -132,73 +132,34 @@ fn test_perft_start_board() {
 //     Box::new(once)
 // }
 
-/*
-
-struct InfiniteTraversalValue {
-    val: String,
-}
-
-struct InfiniteTraversal {
-    current: InfiniteTraversalValue,
-    next: Box<dyn Iterator<Item = InfiniteTraversal>>,
-}
-
-fn traverse_iter(depth: i32) -> InfiniteTraversal {
-    InfiniteTraversal {
-        current: InfiniteTraversalValue {
-            val: "x".to_string(),
-        },
-        next: Box::new(std::iter::empty()),
-    }
-}
-
-fn flatten_traverse_iter<'a>(
-    t: &'a InfiniteTraversal,
-) -> Box<dyn Iterator<Item = &'a InfiniteTraversalValue>> {
-    let once = std::iter::once(&t.current);
-    let future = t.next.map(|t| flatten_traverse_iter(&t));
-    let future = future.flatten();
-
-    let all = once.chain(future);
-
-    Box::new(all)
-}
-
-#[test]
-fn test_understand_traversal_iter() {
-    let iter = traverse_iter(0);
-    for v in flatten_traverse_iter(&iter) {
-        format!("{}", v.val);
-    }
-}
-*/
-
-struct InfiniteTraversal {
+struct InfiniteStrings {
     current: String,
-    next: Box<dyn Iterator<Item = InfiniteTraversal>>,
+    next: Box<dyn Iterator<Item = InfiniteStrings>>,
 }
 
-fn traverse_iter() -> InfiniteTraversal {
-    InfiniteTraversal {
-        current: "x".to_string(),
-        next: Box::new(std::iter::empty()),
+impl InfiniteStrings {
+    fn new() -> InfiniteStrings {
+        InfiniteStrings {
+            current: "x".to_string(),
+            next: Box::new(std::iter::empty()),
+        }
     }
-}
 
-fn flatten_traverse_iter(t: InfiniteTraversal) -> Box<dyn Iterator<Item = String>> {
-    let once = std::iter::once(t.current);
-    let future = t.next.map(flatten_traverse_iter);
-    let future = future.flatten();
+    fn traverse(self) -> Box<dyn Iterator<Item = String>> {
+        let once = std::iter::once(self.current);
+        let future = self.next.map(|s| s.traverse());
+        let future = future.flatten();
 
-    let all = once.chain(future);
+        let all = once.chain(future);
 
-    Box::new(all)
+        Box::new(all)
+    }
 }
 
 #[test]
 fn test_understand_traversal_iter_string() {
-    let iter = traverse_iter();
-    for s in flatten_traverse_iter(iter) {
+    let infinite = InfiniteStrings::new();
+    for s in infinite.traverse() {
         println!("{}", s);
     }
 }
