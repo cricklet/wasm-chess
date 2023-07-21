@@ -10,9 +10,9 @@ pub fn bitboard_string(bb: Bitboard) -> String {
         let mut sub = bb;
 
         // clip everything above this rank
-        sub = shift_toward_index_63(sub, bits_after);
+        sub = rotate_toward_index_63(sub, bits_after);
         // clip everything before this rank
-        sub = shift_toward_index_0(sub, bits_before + bits_after);
+        sub = rotate_toward_index_0(sub, bits_before + bits_after);
 
         result[7 - rank as usize] = format!("{:08b}", reverse_bits(sub as u8)).replace("0", ".");
     }

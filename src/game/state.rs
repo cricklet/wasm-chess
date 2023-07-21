@@ -138,10 +138,7 @@ impl Game {
         }
 
         let board = Bitboards::from_fen(split[0]);
-        game.board = match board {
-            Ok(board) => board,
-            Err(e) => return Err(e),
-        };
+        game.board = board?;
 
         if split.len() <= 1 {
             return Ok(game);
@@ -158,10 +155,7 @@ impl Game {
         }
 
         let can_castle_on_side_for_player = ForPlayer::<CanCastleOnSide>::from_str(split[2]);
-        game.can_castle = match can_castle_on_side_for_player {
-            Ok(can_castle_on_side_for_player) => can_castle_on_side_for_player,
-            Err(e) => return Err(e),
-        };
+        game.can_castle = can_castle_on_side_for_player?;
 
         if split.len() <= 3 {
             return Ok(game);
@@ -170,10 +164,7 @@ impl Game {
         let en_passant_str = split[3];
         game.en_passant = match en_passant_str {
             "-" => None,
-            _ => match index_from_file_rank_str(en_passant_str) {
-                Ok(index) => Some(index),
-                Err(e) => return Err(e),
-            },
+            _ => Some(index_from_file_rank_str(en_passant_str)?),
         };
 
         if split.len() <= 4 {

@@ -128,10 +128,7 @@ pub fn walk_potential_bb(
 ) -> ErrorResult<Bitboard> {
     let walk_types = walk_type_for_piece(piece);
 
-    let walk_types = match walk_types {
-        Err(err) => return Err(err),
-        Ok(walk_types) => walk_types,
-    };
+    let walk_types = walk_types?;
 
     let mut danger_bb = 0;
 
@@ -197,7 +194,7 @@ pub fn jump_moves(
 
 pub fn pawn_attacking_bb(start_bb: Bitboard, capture_dir: Direction) -> Bitboard {
     let start_bb = start_bb & pre_move_mask(capture_dir);
-    let attacking_bb = shift_toward_index_63(start_bb, capture_dir.offset());
+    let attacking_bb = rotate_toward_index_63(start_bb, capture_dir.offset());
     attacking_bb
 }
 
@@ -235,8 +232,9 @@ pub fn pawn_moves(
 
     let push_moves = {
         let masked_pawns = pawns & pre_move_mask(pawn_dir);
+
         let moved_pawns =
-            shift_toward_index_63(masked_pawns, pawn_dir.offset()) & !bitboards.all_occupied();
+            rotate_toward_index_63(masked_pawns, pawn_dir.offset()) & !bitboards.all_occupied();
 
         let pushed_pawns = moved_pawns & !*PAWN_PROMOTION_BITBOARD;
         let promotion_pawns = moved_pawns & *PAWN_PROMOTION_BITBOARD;
@@ -270,8 +268,8 @@ pub fn pawn_moves(
     let skip_moves = {
         let masked_pawns = pawns & starting_pawns_mask(player);
         let push1 =
-            shift_toward_index_63(masked_pawns, pawn_dir.offset()) & !bitboards.all_occupied();
-        let push2 = shift_toward_index_63(push1, pawn_dir.offset()) & !bitboards.all_occupied();
+            rotate_toward_index_63(masked_pawns, pawn_dir.offset()) & !bitboards.all_occupied();
+        let push2 = rotate_toward_index_63(push1, pawn_dir.offset()) & !bitboards.all_occupied();
 
         each_index_of_one(push2).map(move |end_index| {
             let start_index = (end_index as isize - 2 * pawn_dir.offset()) as usize;
@@ -299,7 +297,7 @@ pub fn en_passant_move(
         let en_passant_bb = single_bitboard(en_passant_index);
 
         for (dir, target_dir) in en_passant_move_and_target_offsets(player) {
-            let moved_pawns = shift_toward_index_63(pawns, dir.offset());
+            let moved_pawns = rotate_toward_index_63(pawns, dir.offset());
 
             if moved_pawns & en_passant_bb != 0 {
                 return Some(Move {
@@ -410,15 +408,9 @@ pub fn index_in_danger(player: Player, target: usize, state: &Game) -> ErrorResu
 
     let bishop_dangers = walk_potential_bb(target, state.board, Piece::Bishop);
     let rook_dangers = walk_potential_bb(target, state.board, Piece::Rook);
-    let bishop_dangers = match bishop_dangers {
-        Err(err) => return Err(err),
-        Ok(bishop_dangers) => bishop_dangers,
-    };
 
-    let rook_dangers = match rook_dangers {
-        Err(err) => return Err(err),
-        Ok(rook_dangers) => rook_dangers,
-    };
+    let bishop_dangers = bishop_dangers?;
+    let rook_dangers = rook_dangers?;
 
     let queen_dangers = bishop_dangers | rook_dangers;
 

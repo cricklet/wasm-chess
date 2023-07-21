@@ -25,12 +25,21 @@ fn test_least_significant_one() {
     assert_eq!(least_significant_one(binary), single_bitboard(4));
 }
 
-pub fn shift_toward_index_0(bb: Bitboard, n: isize) -> Bitboard {
-    bb >> n
-}
-
-pub fn shift_toward_index_63(bb: Bitboard, n: isize) -> Bitboard {
-    bb << n
+#[test]
+fn test_understanding_shift_overflows() {
+    let bb: u64 = 0b0100000000000000000000000000000000000000000000000000000000000000;
+    assert_eq!(
+        bb >> 1,
+        0b0010000000000000000000000000000000000000000000000000000000000000
+    );
+    assert_eq!(
+        bb << 1,
+        0b1000000000000000000000000000000000000000000000000000000000000000
+    );
+    assert_eq!(
+        rotate_toward_index_63(bb, -1),
+        0b0010000000000000000000000000000000000000000000000000000000000000
+    );
 }
 
 pub fn rotate_toward_index_0(bb: Bitboard, n: isize) -> Bitboard {
@@ -59,7 +68,7 @@ pub fn reverse_bits(v: u8) -> u8 {
 }
 
 pub fn single_bitboard(index: usize) -> Bitboard {
-    shift_toward_index_63(1, index as isize)
+    rotate_toward_index_63(1, index as isize)
 }
 
 #[test]

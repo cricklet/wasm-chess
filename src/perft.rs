@@ -1,6 +1,10 @@
+use std::iter;
+
 use crate::{
     game::Game,
-    moves::{all_moves, OnlyCaptures, OnlyQueenPromotion},
+    helpers::ErrorResult,
+    moves::{all_moves, index_in_danger, OnlyCaptures, OnlyQueenPromotion},
+    types::Piece,
 };
 
 fn assert_fen_matches(expected_fen: &str) {
@@ -36,28 +40,57 @@ fn test_fen_start_board() {
     assert_fen_matches(fen);
 }
 
-fn traverse_game(game: &Game, depth: u8) {
-    println!("depth: {}, game: {}", depth, game.pretty());
+// fn traverse_game_iter(game: &Game, depth: u8, max_depth: u8) -> GameTraversal {
+//     if depth >= max_depth {
+//         // return Ok(Box::new(iter::empty()));
+//         todo!()
+//     }
 
-    if depth == 0 {
-        return;
+//     let moves =
+//         all_moves(game.player, &game, OnlyCaptures::NO, OnlyQueenPromotion::NO).map(|m| m.unwrap());
+//     let future = moves.map(move |m| game.make_move(m)).map(|g| g.unwrap());
+//     let legal_futures = future.filter(|next_game| {
+//         let king_index = next_game.board.index_of_piece(game.player, Piece::King);
+//         let illegal_move = index_in_danger(game.player, king_index, next_game).unwrap();
+//         !illegal_move
+//     });
+//     let legal_futures =
+//         legal_futures.map(move |next_game| traverse_game_iter(&next_game, depth + 1, max_depth));
+
+//     let traversal = GameTraversal {
+//         game,
+//         future: Box::new(legal_futures),
+//     };
+
+//     traversal
+// }
+
+fn traverse_game(game: &Game, depth: u8, max_depth: u8) -> usize {
+    if depth >= max_depth {
+        return 1;
     }
 
-    let moves = all_moves(game.player, game, OnlyCaptures::NO, OnlyQueenPromotion::NO);
+    let mut result = 0;
+
+    let player = game.player;
+
+    let moves = all_moves(player, game, OnlyCaptures::NO, OnlyQueenPromotion::NO);
     for m in moves {
-        match m {
-            Ok(m) => {
-                let ref next_game = game.make_move(m);
-                match next_game {
-                    Ok(next_game) => {
-                        traverse_game(next_game, depth - 1);
-                    }
-                    Err(e) => e.throw(),
-                }
-            }
-            Err(e) => e.throw(),
+        let m = m.unwrap();
+        let ref next_game = game.make_move(m);
+        let next_game = next_game.as_ref().unwrap();
+
+        let king_index = next_game.board.index_of_piece(player, Piece::King);
+        let illegal_move = index_in_danger(player, king_index, next_game).unwrap();
+
+        if illegal_move {
+            continue;
         }
+
+        result += traverse_game(next_game, depth + 1, max_depth);
     }
+
+    result
 }
 
 fn assert_perft_matches(fen: &str, expected_counts: &[u64]) {
@@ -65,7 +98,7 @@ fn assert_perft_matches(fen: &str, expected_counts: &[u64]) {
 
     assert_eq!(game.to_fen(), fen);
 
-    traverse_game(&game, 1);
+    traverse_game(&game, 0, 2);
 
     // let mut perft = perft::Perft::new(game);
     // for (depth, expected_count) in expected_counts.iter().enumerate() {
@@ -84,4 +117,88 @@ fn test_perft_start_board() {
         // 3195901860,
     ];
     assert_perft_matches(fen, &expected_count);
+}
+
+// struct GameTraversal {
+//     current: Game,
+//     future: Box<dyn Iterator<Item = GameTraversal>>,
+// }
+
+// fn game_traversal_iter(traversal: &GameTraversal) -> Box<dyn Iterator<Item = &Game>> {
+//     let once = iter::once(&traversal.current);
+//     let future = traversal.future.map(|t| game_traversal_iter(&t));
+//     let future = future.flatten();
+
+//     Box::new(once)
+// }
+
+/*
+
+struct InfiniteTraversalValue {
+    val: String,
+}
+
+struct InfiniteTraversal {
+    current: InfiniteTraversalValue,
+    next: Box<dyn Iterator<Item = InfiniteTraversal>>,
+}
+
+fn traverse_iter(depth: i32) -> InfiniteTraversal {
+    InfiniteTraversal {
+        current: InfiniteTraversalValue {
+            val: "x".to_string(),
+        },
+        next: Box::new(std::iter::empty()),
+    }
+}
+
+fn flatten_traverse_iter<'a>(
+    t: &'a InfiniteTraversal,
+) -> Box<dyn Iterator<Item = &'a InfiniteTraversalValue>> {
+    let once = std::iter::once(&t.current);
+    let future = t.next.map(|t| flatten_traverse_iter(&t));
+    let future = future.flatten();
+
+    let all = once.chain(future);
+
+    Box::new(all)
+}
+
+#[test]
+fn test_understand_traversal_iter() {
+    let iter = traverse_iter(0);
+    for v in flatten_traverse_iter(&iter) {
+        format!("{}", v.val);
+    }
+}
+*/
+
+struct InfiniteTraversal {
+    current: String,
+    next: Box<dyn Iterator<Item = InfiniteTraversal>>,
+}
+
+fn traverse_iter() -> InfiniteTraversal {
+    InfiniteTraversal {
+        current: "x".to_string(),
+        next: Box::new(std::iter::empty()),
+    }
+}
+
+fn flatten_traverse_iter(t: InfiniteTraversal) -> Box<dyn Iterator<Item = String>> {
+    let once = std::iter::once(t.current);
+    let future = t.next.map(flatten_traverse_iter);
+    let future = future.flatten();
+
+    let all = once.chain(future);
+
+    Box::new(all)
+}
+
+#[test]
+fn test_understand_traversal_iter_string() {
+    let iter = traverse_iter();
+    for s in flatten_traverse_iter(iter) {
+        println!("{}", s);
+    }
 }

@@ -178,6 +178,11 @@ impl Bitboards {
         self.piece_at_index[index]
     }
 
+    pub fn index_of_piece(&self, player: Player, piece: Piece) -> usize {
+        let bb = self.pieces[player][piece];
+        first_index_of_one(bb)
+    }
+
     pub fn pretty(&self) -> String {
         let mut s = String::new();
 
