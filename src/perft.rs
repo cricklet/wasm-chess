@@ -1,4 +1,4 @@
-use std::iter;
+use std::{iter, rc::Rc};
 
 use crate::{
     game::Game,
@@ -40,30 +40,59 @@ fn test_fen_start_board() {
     assert_fen_matches(fen);
 }
 
-// fn traverse_game_iter(game: &Game, depth: u8, max_depth: u8) -> GameTraversal {
-//     if depth >= max_depth {
-//         // return Ok(Box::new(iter::empty()));
-//         todo!()
-//     }
+struct GameTraversal<'a> {
+    current: Game,
+    next: Box<dyn Iterator<Item = GameTraversal<'a>> + 'a>,
+}
 
-//     let moves =
-//         all_moves(game.player, &game, OnlyCaptures::NO, OnlyQueenPromotion::NO).map(|m| m.unwrap());
-//     let future = moves.map(move |m| game.make_move(m)).map(|g| g.unwrap());
-//     let legal_futures = future.filter(|next_game| {
-//         let king_index = next_game.board.index_of_piece(game.player, Piece::King);
-//         let illegal_move = index_in_danger(game.player, king_index, next_game).unwrap();
-//         !illegal_move
-//     });
-//     let legal_futures =
-//         legal_futures.map(move |next_game| traverse_game_iter(&next_game, depth + 1, max_depth));
+impl<'a> GameTraversal<'a> {
+    fn traverse(self) -> Box<dyn Iterator<Item = Game> + 'a> {
+        let once = std::iter::once(self.current);
+        let future = self.next.map(|s| s.traverse());
+        let future = future.flatten();
 
-//     let traversal = GameTraversal {
-//         game,
-//         future: Box::new(legal_futures),
-//     };
+        let all = once.chain(future);
 
-//     traversal
-// }
+        Box::new(all)
+    }
+
+    // fn new(start: Game, depth: u8, max_depth: u8) -> GameTraversal<'a> {
+    //     if depth >= max_depth {
+    //         // return Ok(Box::new(iter::empty()));
+    //         todo!()
+    //     }
+
+    //     let moves = all_moves(
+    //         start.player,
+    //         &start,
+    //         OnlyCaptures::NO,
+    //         OnlyQueenPromotion::NO,
+    //     )
+    //     .map(|m| m.unwrap());
+
+    //     // let future = moves.map(|m| start.make_move(m)).map(|g| g.unwrap());
+
+    //     // let legal_futures = future.filter(|next_game| {
+    //     //     let king_index = next_game.board.index_of_piece(start.player, Piece::King);
+    //     //     let illegal_move = index_in_danger(start.player, king_index, next_game).unwrap();
+    //     //     !illegal_move
+    //     // });
+
+    //     // // legal_futures.map(move |next| GameTraversal::new(&next, depth + 1, max_depth));
+
+    //     // let legal_futures =
+    //     //     legal_futures.map(|next| GameTraversal::new(next, depth + 1, max_depth));
+
+    //     GameTraversal {
+    //         current: start,
+    //         // next: Box::new(legal_futures),
+    //         next: Box::new(moves.map(move |m| GameTraversal {
+    //             current: start.make_move(m).unwrap(),
+    //             next: Box::new(iter::empty()),
+    //         })),
+    //     }
+    // }
+}
 
 fn traverse_game(game: &Game, depth: u8, max_depth: u8) -> usize {
     if depth >= max_depth {
@@ -119,19 +148,6 @@ fn test_perft_start_board() {
     assert_perft_matches(fen, &expected_count);
 }
 
-// struct GameTraversal {
-//     current: Game,
-//     future: Box<dyn Iterator<Item = GameTraversal>>,
-// }
-
-// fn game_traversal_iter(traversal: &GameTraversal) -> Box<dyn Iterator<Item = &Game>> {
-//     let once = iter::once(&traversal.current);
-//     let future = traversal.future.map(|t| game_traversal_iter(&t));
-//     let future = future.flatten();
-
-//     Box::new(once)
-// }
-
 struct InfiniteStrings {
     current: String,
     next: Box<dyn Iterator<Item = InfiniteStrings>>,
@@ -161,5 +177,20 @@ fn test_understand_traversal_iter_string() {
     let infinite = InfiniteStrings::new();
     for s in infinite.traverse() {
         println!("{}", s);
+    }
+}
+
+fn add_iter(x: i32) -> Box<dyn Iterator<Item = i32>> {
+    // fails because x will go out of scope
+    // Box::new((0..).map(|i| i + x))
+
+    // works because x is moved into the closure
+    Box::new((0..).map(move |i| i + x))
+}
+
+fn test_understand_iter_from_params() {
+    let x = add_iter(5);
+    for i in x {
+        println!("{}", i);
     }
 }
