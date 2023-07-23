@@ -104,8 +104,8 @@ impl Game {
         }
     }
 
-    pub fn err(&self, msg: &str) -> ErrorResult<Game> {
-        err(&format!("{}\n\n{}", msg, self.pretty()))
+    pub fn err<T>(&self, msg: &str) -> ErrorResult<T> {
+        err::<T>(&format!("{}\n\n{}", msg, self.pretty()))
     }
 
     pub fn pretty(&self) -> String {
@@ -197,27 +197,26 @@ impl Game {
         Ok(game)
     }
 
-    pub fn make_move(&self, m: Move) -> ErrorResult<Game> {
-        let mut next = *self;
+    pub fn make_move(&mut self, m: Move) -> ErrorResult<()> {
         let player = m.player;
         let enemy = player.other();
 
         for castling_side in CastlingSide::iter() {
-            next.can_castle[player][castling_side] &=
+            self.can_castle[player][castling_side] &=
                 castling_allowed_after_move(player, castling_side, m.start_index);
         }
 
-        next.en_passant = None;
+        self.en_passant = None;
 
         match m.move_type {
             MoveType::Quiet(q) => {
-                if next.board.is_occupied(m.end_index) {
+                if self.board.is_occupied(m.end_index) {
                     return self.err(&format!(
                         "invalid quiet move: end index {} is occupied",
                         index_to_file_rank_str(m.end_index)
                     ));
                 }
-                if next.board.piece_at_index(m.start_index) != Some((player, m.piece)) {
+                if self.board.piece_at_index(m.start_index) != Some((player, m.piece)) {
                     return self.err(&format!(
                         "invalid quiet move: piece {} isn't at start index {}",
                         player_and_piece_to_fen_char((player, m.piece)),
@@ -227,8 +226,8 @@ impl Game {
 
                 match q {
                     Quiet::Move => {
-                        next.board.clear_square(m.start_index, player, m.piece);
-                        next.board.set_square(m.end_index, player, m.piece);
+                        self.board.clear_square(m.start_index, player, m.piece);
+                        self.board.set_square(m.end_index, player, m.piece);
                     }
                     Quiet::Castle {
                         rook_start,
@@ -237,21 +236,21 @@ impl Game {
                         if m.piece != Piece::King {
                             return self.err("invalid castle move, piece isn't king");
                         }
-                        if next.board.piece_at_index(rook_start) != Some((player, Piece::Rook)) {
+                        if self.board.piece_at_index(rook_start) != Some((player, Piece::Rook)) {
                             return self.err("invalid castle move, rook isn't at rook start");
                         }
 
-                        next.board.clear_square(m.start_index, player, m.piece);
-                        next.board.set_square(m.end_index, player, m.piece);
+                        self.board.clear_square(m.start_index, player, m.piece);
+                        self.board.set_square(m.end_index, player, m.piece);
 
-                        next.board.clear_square(rook_start, player, Piece::Rook);
-                        next.board.set_square(rook_end, player, Piece::Rook);
+                        self.board.clear_square(rook_start, player, Piece::Rook);
+                        self.board.set_square(rook_end, player, Piece::Rook);
                     }
                     Quiet::PawnSkip { skipped_index } => {
-                        next.board.clear_square(m.start_index, player, m.piece);
-                        next.board.set_square(m.end_index, player, m.piece);
+                        self.board.clear_square(m.start_index, player, m.piece);
+                        self.board.set_square(m.end_index, player, m.piece);
 
-                        next.en_passant = Some(skipped_index);
+                        self.en_passant = Some(skipped_index);
                     }
                     Quiet::PawnPromotion { promotion_piece } => {
                         if !types::PROMOTION_PIECES.contains(&promotion_piece) {
@@ -260,41 +259,41 @@ impl Game {
                                 player_and_piece_to_fen_char((player, promotion_piece))
                             ).as_str());
                         }
-                        next.board.clear_square(m.start_index, player, m.piece);
-                        next.board.set_square(m.end_index, player, promotion_piece);
+                        self.board.clear_square(m.start_index, player, m.piece);
+                        self.board.set_square(m.end_index, player, promotion_piece);
                     }
                 }
             }
             MoveType::Capture(c) => match c {
                 crate::moves::Capture::EnPassant { taken_index } => {
-                    if next.board.piece_at_index(taken_index) != Some((enemy, Piece::Pawn)) {
+                    if self.board.piece_at_index(taken_index) != Some((enemy, Piece::Pawn)) {
                         return self.err("invalid en-passant: taken piece isn't enemy pawn");
                     }
-                    next.board.clear_square(taken_index, enemy, Piece::Pawn);
+                    self.board.clear_square(taken_index, enemy, Piece::Pawn);
 
-                    next.board.clear_square(m.start_index, player, m.piece);
-                    next.board.set_square(m.end_index, player, m.piece);
+                    self.board.clear_square(m.start_index, player, m.piece);
+                    self.board.set_square(m.end_index, player, m.piece);
                 }
                 crate::moves::Capture::Take { taken_piece } => {
                     let (taken_player, taken_piece) = taken_piece;
                     if taken_player != enemy {
                         return self.err("invalid capture: taken piece isn't enemy piece");
                     }
-                    next.board
+                    self.board
                         .clear_square(m.end_index, taken_player, taken_piece);
 
-                    next.board.clear_square(m.start_index, player, m.piece);
-                    next.board.set_square(m.end_index, player, m.piece);
+                    self.board.clear_square(m.start_index, player, m.piece);
+                    self.board.set_square(m.end_index, player, m.piece);
                 }
             },
         }
 
-        next.player = enemy;
-        next.half_moves_since_pawn_or_capture += 1;
-        if next.player == types::Player::White {
-            next.full_moves_total += 1;
+        self.player = enemy;
+        self.half_moves_since_pawn_or_capture += 1;
+        if self.player == types::Player::White {
+            self.full_moves_total += 1;
         }
 
-        Ok(next)
+        Ok(())
     }
 }

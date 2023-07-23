@@ -184,3 +184,47 @@ pub fn map_successes<'iter, T: 'iter, U>(
 ) -> impl Iterator<Item = ErrorResult<U>> + 'iter {
     results.map(move |result| result.map(&callback))
 }
+
+struct RecursiveStrings {
+    current: String,
+    next: Box<dyn Iterator<Item = RecursiveStrings>>,
+}
+
+impl RecursiveStrings {
+    fn new() -> RecursiveStrings {
+        RecursiveStrings {
+            current: "x".to_string(),
+            next: Box::new(std::iter::empty()),
+        }
+    }
+
+    fn traverse(self) -> Box<dyn Iterator<Item = String>> {
+        let once = std::iter::once(self.current);
+        let future = self.next.map(|s| s.traverse());
+        let future = future.flatten();
+
+        let all = once.chain(future);
+
+        Box::new(all)
+    }
+}
+
+#[test]
+fn test_understand_traversal_iter_string() {
+    let rec = RecursiveStrings::new();
+    for _ in rec.traverse() {}
+}
+
+fn add_iter(x: i32) -> Box<dyn Iterator<Item = i32>> {
+    // fails because x will go out of scope
+    // Box::new((0..).map(|i| i + x))
+
+    // works because x is moved into the closure
+    Box::new((0..).map(move |i| i + x).take(x as usize))
+}
+
+#[test]
+fn test_understand_iter_from_params() {
+    let x = add_iter(5);
+    for _ in x {}
+}

@@ -25,7 +25,7 @@ impl OnlyQueenPromotion {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Quiet {
     Castle { rook_start: usize, rook_end: usize },
     PawnSkip { skipped_index: usize },
@@ -33,19 +33,19 @@ pub enum Quiet {
     Move,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Capture {
     EnPassant { taken_index: usize },
     Take { taken_piece: PlayerPiece },
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum MoveType {
     Quiet(Quiet),
     Capture(Capture),
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Move {
     pub player: Player,
     pub piece: Piece,
@@ -59,8 +59,8 @@ impl Move {
         format!(
             "{} {} {} {:?}",
             player_and_piece_to_fen_char((self.player, self.piece)),
-            self.start_index,
-            self.end_index,
+            index_to_file_rank_str(self.start_index),
+            index_to_file_rank_str(self.end_index),
             self.move_type,
         )
     }
