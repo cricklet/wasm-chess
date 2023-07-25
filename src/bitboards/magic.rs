@@ -49,27 +49,7 @@ pub struct MagicValue {
     pub bits_required: usize,
 }
 
-pub struct MagicMoveTable {
-    // Each of the 64 indices on a board have a magic-lookup precomputed,
-    // allowing us to look up a bitboard of possible moves given the
-    // current occupancy of the board.
-    //
-    // eg
-    // let blocker_bb = magic_table.mask_blockerss[piece_index] & all_occupied_bb
-    // let magic_values = magic_table.magics[piece_index]
-    // let magic_index = compute_magic_index(magic_values.magic, blocker_bb, magic_values.bits_required)
-    //
-    // let potential_bb = magic_table.moves[magic_index][piece_index]
-    // let move_bb = potential & ^self_occupied_bb
-    //
-    // let quiet_bb = potential & ^all_occupied_bb
-    // let capture_bb = potential & ^quiet_bb
-    magics: [MagicValue; 64],
-    mask_blocker_bbs: [Bitboard; 64],
-    moves_table: [[Bitboard; 64]],
-}
-
-pub fn magic_index_for_specific_blocker_bb(magic: MagicValue, blocker_bb: Bitboard) -> usize {
+pub fn magic_index_for_specific_blocker_bb(magic: &MagicValue, blocker_bb: Bitboard) -> usize {
     let magic_index = (blocker_bb.wrapping_mul(magic.magic)) >> (64 - magic.bits_required);
     magic_index as usize
 }
@@ -80,10 +60,47 @@ pub struct PotentialMoves {
     specific_blocker_bb: Bitboard,
 }
 
-pub fn magic_move_table(
+pub type ForPieceIndex<T> = [T; 64];
+
+#[derive(Default)]
+pub struct ForWalkType<T: Clone> {
+    pub rook: T,
+    pub bishop: T,
+}
+
+impl<T: Clone> ForWalkType<T> {
+    pub fn new(t: T) -> ForWalkType<T> {
+        ForWalkType {
+            rook: t.clone(),
+            bishop: t.clone(),
+        }
+    }
+}
+
+impl<T: Clone> std::ops::Index<WalkType> for ForWalkType<T> {
+    type Output = T;
+
+    fn index(&self, index: WalkType) -> &Self::Output {
+        match index {
+            WalkType::Rook => &self.rook,
+            WalkType::Bishop => &self.bishop,
+        }
+    }
+}
+
+impl<T: Clone> std::ops::IndexMut<WalkType> for ForWalkType<T> {
+    fn index_mut(&mut self, index: WalkType) -> &mut Self::Output {
+        match index {
+            WalkType::Rook => &mut self.rook,
+            WalkType::Bishop => &mut self.bishop,
+        }
+    }
+}
+
+pub fn generate_magic_moves(
     piece_index: BoardIndex,
     piece: WalkType,
-    magic_value: MagicValue,
+    magic_value: &MagicValue,
 ) -> Option<Vec<Bitboard>> {
     let potential_moves = potential_moves_for_piece(piece_index, piece);
 
@@ -414,7 +431,7 @@ pub fn find_magic_value(piece_index: BoardIndex, piece: WalkType) -> Option<Magi
             bits_required,
         };
 
-        let magic_move_table = magic_move_table(piece_index, piece, magic_value);
+        let magic_move_table = generate_magic_moves(piece_index, piece, &magic_value);
 
         if magic_move_table.is_some() {
             println!(
@@ -433,24 +450,14 @@ pub fn moves_bb_for_piece_and_blockers(
     piece: WalkType,
     occupancy_bb: Bitboard,
 ) -> Bitboard {
-    let magic_value = precomputed_magic_value_for_index_and_piece(piece_index, piece);
-    // let magic_value = find_magic_value(piece_index, piece).unwrap();
-    let magic_moves_table = magic_move_table(piece_index, piece, magic_value).unwrap();
+    let magic_value = &MAGIC_MOVE_TABLE.magics[piece][piece_index.i];
+    let magic_moves = &MAGIC_MOVE_TABLE.moves_table[piece][piece_index.i];
+    let mask_blockers_bb = &MAGIC_MOVE_TABLE.mask_blocker_bbs[piece][piece_index.i];
 
-    let mask_blockers_bb = generate_mask_blockers_bb(piece_index, piece);
     let specific_blocker_bb = mask_blockers_bb & occupancy_bb;
-
     let magic_index = magic_index_for_specific_blocker_bb(magic_value, specific_blocker_bb);
 
-    let moves_bb = magic_moves_table[magic_index];
-
-    // println!("occupancy_bb\n{}", pretty_bitboard(occupancy_bb));
-    // println!("mask_blockers_bb\n{}", pretty_bitboard(mask_blockers_bb));
-    // println!(
-    //     "specific_blocker_bb\n{}",
-    //     pretty_bitboard(specific_blocker_bb)
-    // );
-    // println!("moves_bb\n{}", pretty_bitboard(moves_bb));
+    let moves_bb = magic_moves[magic_index];
 
     moves_bb
 }
@@ -484,17 +491,6 @@ pub fn test_find_best_magic() {
 
     // println!("{:?}", magics_for_piece);
     // println!("{:?}", bits_required_for_piece);
-}
-
-#[test]
-pub fn test_precomputed_magic_values() {
-    for piece in WalkType::iter() {
-        for piece_index in 0..64 {
-            let magic_value =
-                precomputed_magic_value_for_index_and_piece(BoardIndex::from(piece_index), piece);
-            magic_move_table(BoardIndex::from(piece_index), piece, magic_value).unwrap();
-        }
-    }
 }
 
 #[test]

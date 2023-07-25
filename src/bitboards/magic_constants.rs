@@ -1,6 +1,9 @@
 use super::*;
+use array_init::array_init;
+use lazy_static::lazy_static;
+use strum::IntoEnumIterator;
 
-pub fn precomputed_magic_value_for_index_and_piece(
+fn precomputed_magic_value_for_index_and_piece(
     piece_index: BoardIndex,
     piece_for_magic: WalkType,
 ) -> MagicValue {
@@ -8,6 +11,42 @@ pub fn precomputed_magic_value_for_index_and_piece(
         magic: DEFAULT_MAGICS[piece_for_magic as usize][piece_index.i as usize],
         bits_required: DEFAULT_BITS_REQUIRED[piece_for_magic as usize][piece_index.i as usize],
     }
+}
+
+pub struct MagicMoveTable {
+    // Each of the 64 indices on a board have a magic-lookup precomputed,
+    // allowing us to look up a bitboard of possible moves given the
+    // current occupancy of the board.
+    pub magics: ForWalkType<ForPieceIndex<MagicValue>>,
+    pub mask_blocker_bbs: ForWalkType<ForPieceIndex<Bitboard>>,
+    pub moves_table: ForWalkType<ForPieceIndex<Vec<Bitboard>>>,
+}
+
+lazy_static! {
+    pub static ref MAGIC_MOVE_TABLE: MagicMoveTable = {
+        let mut result = MagicMoveTable {
+            magics: ForWalkType::new([MagicValue::default(); 64]),
+            mask_blocker_bbs: ForWalkType::new([Bitboard::default(); 64]),
+            moves_table: ForWalkType::new(array_init(|_| Vec::new())),
+        };
+
+        for walk_type in WalkType::iter() {
+            for index in 0..64 {
+                let index = BoardIndex::from(index);
+
+                let magic_value = precomputed_magic_value_for_index_and_piece(index, walk_type);
+                result.magics[walk_type][index.i] = magic_value;
+
+                let magic_moves = generate_magic_moves(index, walk_type, &magic_value).unwrap();
+                result.moves_table[walk_type][index.i] = magic_moves;
+
+                let mask_blockers_bb = generate_mask_blockers_bb(index, walk_type);
+                result.mask_blocker_bbs[walk_type][index.i] = mask_blockers_bb;
+            }
+        }
+
+        result
+    };
 }
 
 const DEFAULT_MAGICS: [[u64; 64]; 2] = [
@@ -157,3 +196,14 @@ const DEFAULT_BITS_REQUIRED: [[usize; 64]; 2] = [
         5, 5, 5, 6,
     ],
 ];
+
+#[test]
+pub fn test_precomputed_magic_values() {
+    for piece in WalkType::iter() {
+        for piece_index in 0..64 {
+            let magic_value =
+                precomputed_magic_value_for_index_and_piece(BoardIndex::from(piece_index), piece);
+            generate_magic_moves(BoardIndex::from(piece_index), piece, &magic_value).unwrap();
+        }
+    }
+}

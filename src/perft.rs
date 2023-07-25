@@ -1,6 +1,9 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fs::File, io::Write};
+
+use pprof::protos::Message;
 
 use crate::{
+    bitboards::{magic_constants, MAGIC_MOVE_TABLE},
     game::Game,
     moves::{all_moves, index_in_danger, Move, OnlyCaptures, OnlyQueenPromotion},
     types::Piece,
@@ -151,14 +154,32 @@ fn assert_perft_matches(fen: &str, expected_counts: &[usize]) {
 
 #[test]
 fn test_perft_start_board() {
+    let guard = pprof::ProfilerGuardBuilder::default()
+        .frequency(1000)
+        .blocklist(&["libc", "libgcc", "pthread", "vdso", "backtrace"])
+        .build()
+        .unwrap();
+
     let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
     let expected_count = [
-        1, 20, 400, 8902, 197281,
-        // 4865609,
+        1, 20, 400, 8902, 197281, 4865609,
         // 119060324,
         // 3195901860,
     ];
     assert_perft_matches(fen, &expected_count);
+
+    match guard.report().build() {
+        Ok(report) => {
+            let mut file = File::create("profile.pb").unwrap();
+            let profile = report.pprof().unwrap();
+
+            let mut content = Vec::new();
+            profile.write_to_vec(&mut content).unwrap();
+
+            file.write_all(&content).unwrap();
+        }
+        Err(_) => {}
+    };
 }
 
 fn measure_time(f: impl FnOnce()) -> std::time::Duration {
