@@ -187,6 +187,7 @@ impl Bitboards {
         let mut s = String::new();
 
         for rank in (0..8).rev() {
+            s.push_str(format!("{} ", rank_to_char(rank)).as_str());
             for file in 0..8 {
                 let index = index_from_file_rank(file, rank);
 
@@ -216,6 +217,12 @@ impl Bitboards {
             }
             s.push_str("\n");
         }
+
+        s.push_str("  ");
+        for file in 0..8 {
+            s.push_str(format!("{} ", file_to_char(file)).as_str());
+        }
+        s.push_str("\n");
 
         s
     }

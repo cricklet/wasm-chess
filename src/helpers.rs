@@ -1,6 +1,5 @@
 use std::{backtrace::Backtrace, iter};
 
-#[derive(Debug)]
 pub struct Error {
     pub msg: String,
 }
@@ -17,6 +16,12 @@ impl std::fmt::Display for Error {
     }
 }
 
+impl std::fmt::Debug for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Error {{\n{}}}", indent(self.msg.trim(), 2))
+    }
+}
+
 pub type ErrorResult<T> = Result<T, Error>;
 
 pub type VoidResult = Result<(), Error>;
@@ -27,6 +32,17 @@ pub fn err<T>(msg: &str) -> ErrorResult<T> {
     let mut backtrace_lines = backtrace_str.lines().collect::<Vec<_>>();
 
     let project_name = module_path!().split("::").next().unwrap();
+
+    let first_line_without_helpers_err = {
+        let mut first_line_without_helpers_err = None;
+        for (i, line) in backtrace_lines.iter().enumerate() {
+            if line.contains("helpers::err") {
+                first_line_without_helpers_err = Some(i);
+                break;
+            }
+        }
+        first_line_without_helpers_err
+    };
 
     let last_line_with_project_name = {
         let mut last_line_with_project_name = None;
@@ -40,6 +56,12 @@ pub fn err<T>(msg: &str) -> ErrorResult<T> {
 
     if let Some(i) = last_line_with_project_name {
         backtrace_lines = backtrace_lines[..i + 1].to_vec();
+    }
+
+    if let Some(i) = first_line_without_helpers_err {
+        if i + 2 < backtrace_lines.len() {
+            backtrace_lines = backtrace_lines[i + 2..].to_vec();
+        }
     }
 
     let backtrace_str = pretty_backtrace(&backtrace_lines);

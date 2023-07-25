@@ -212,13 +212,15 @@ impl Game {
             MoveType::Quiet(q) => {
                 if self.board.is_occupied(m.end_index) {
                     return self.err(&format!(
-                        "invalid quiet move: end index {} is occupied",
+                        "invalid quiet move ({:?}): end index {} is occupied",
+                        m,
                         index_to_file_rank_str(m.end_index)
                     ));
                 }
                 if self.board.piece_at_index(m.start_index) != Some((player, m.piece)) {
                     return self.err(&format!(
-                        "invalid quiet move: piece {} isn't at start index {}",
+                        "invalid quiet move ({:?}): piece {} isn't at start index {}",
+                        m,
                         player_and_piece_to_fen_char((player, m.piece)),
                         index_to_file_rank_str(m.start_index)
                     ));
@@ -234,10 +236,14 @@ impl Game {
                         rook_end,
                     } => {
                         if m.piece != Piece::King {
-                            return self.err("invalid castle move, piece isn't king");
+                            return self
+                                .err(&format!("invalid castle move ({:?}), piece isn't king", m));
                         }
                         if self.board.piece_at_index(rook_start) != Some((player, Piece::Rook)) {
-                            return self.err("invalid castle move, rook isn't at rook start");
+                            return self.err(&format!(
+                                "invalid castle move ({:?}), rook isn't at rook start",
+                                m
+                            ));
                         }
 
                         self.board.clear_square(m.start_index, player, m.piece);

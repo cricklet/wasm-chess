@@ -1,11 +1,7 @@
-use std::{collections::HashMap, iter, rc::Rc};
-
-use fallible_streaming_iterator::FallibleStreamingIterator;
-use scopeguard::defer;
+use std::collections::HashMap;
 
 use crate::{
     game::Game,
-    helpers::{Error, ErrorResult},
     moves::{all_moves, index_in_danger, Move, OnlyCaptures, OnlyQueenPromotion},
     types::Piece,
 };
@@ -74,15 +70,15 @@ fn traverse_game(game: &Game, depth: u8, max_depth: u8) -> usize {
 struct TraverseGameCallbackParams<'game> {
     moves_stack: &'game Vec<Move>,
     game: &'game Game,
-    depth: u8,
-    max_depth: u8,
+    depth: usize,
+    max_depth: usize,
 }
 
 fn traverse_game_callback(
     moves_stack: &mut Vec<Move>,
     game: &Game,
-    depth: u8,
-    max_depth: u8,
+    depth: usize,
+    max_depth: usize,
     callback: &mut dyn FnMut(&TraverseGameCallbackParams),
 ) {
     callback(&TraverseGameCallbackParams {
@@ -118,13 +114,13 @@ fn traverse_game_callback(
     }
 }
 
-fn assert_perft_matches(fen: &str, expected_counts: &[u64]) {
+fn assert_perft_matches(fen: &str, expected_counts: &[usize]) {
     let game = Game::from_fen(fen).unwrap();
 
     assert_eq!(game.to_fen(), fen);
 
-    for max_depth in 1..3 {
-        let mut perft_per_move: HashMap<Move, u64> = HashMap::new();
+    for &max_depth in expected_counts[1..].iter() {
+        let mut perft_per_move: HashMap<Move, usize> = HashMap::new();
         let mut perft_overall = 0;
 
         traverse_game_callback(&mut vec![], &game, 0, max_depth, &mut |params| {
@@ -159,3 +155,40 @@ fn test_perft_start_board() {
     ];
     assert_perft_matches(fen, &expected_count);
 }
+
+fn measure_time(f: impl FnOnce()) -> std::time::Duration {
+    let start_time = std::time::Instant::now();
+    f();
+    let end_time = std::time::Instant::now();
+    end_time - start_time
+}
+
+// #[test]
+// fn test_copy_vs_ref() {
+//     let n = 1000000;
+//     let start = &mut Game::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w").unwrap();
+
+//     let m = Move {
+//         player: Player::White,
+//         start_index: index_from_file_rank_str("e2").unwrap(),
+//         end_index: index_from_file_rank_str("e3").unwrap(),
+//         piece: Piece::Pawn,
+//         move_type: MoveType::Quiet(Quiet::Move),
+//     };
+
+//     let copy_time = measure_time(|| {
+//         for _ in 0..n {
+//             let mut game = *start;
+//         }
+//     });
+
+//     let ref_time = measure_time(|| {
+//         for _ in 0..n {
+//             let game = &mut *start;
+//         }
+//     });
+
+//     println!("{:?} {:?}", copy_time, ref_time);
+//     // assert_eq!(true, copy_time < ref_time.mul_f32(1.6));
+//     // assert_eq!(true, copy_time > ref_time.mul_f32(1.3));
+// }

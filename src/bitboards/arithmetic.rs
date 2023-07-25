@@ -185,8 +185,8 @@ pub fn map_index_from_file_rank_strs<'s>(
         .collect()
 }
 
-pub fn file_rank_to_str(file: usize, rank: usize) -> String {
-    let file_char = match file {
+pub fn file_to_char(file: usize) -> char {
+    match file {
         0 => 'a',
         1 => 'b',
         2 => 'c',
@@ -195,10 +195,12 @@ pub fn file_rank_to_str(file: usize, rank: usize) -> String {
         5 => 'f',
         6 => 'g',
         7 => 'h',
-        _ => return "??".to_string(),
-    };
+        _ => return '?',
+    }
+}
 
-    let rank_char = match rank {
+pub fn rank_to_char(rank: usize) -> char {
+    match rank {
         0 => '1',
         1 => '2',
         2 => '3',
@@ -207,8 +209,14 @@ pub fn file_rank_to_str(file: usize, rank: usize) -> String {
         5 => '6',
         6 => '7',
         7 => '8',
-        _ => return "??".to_string(),
-    };
+        _ => return '?',
+    }
+}
+
+pub fn file_rank_to_str(file: usize, rank: usize) -> String {
+    let file_char = file_to_char(file);
+
+    let rank_char = rank_to_char(rank);
 
     format!("{}{}", file_char, rank_char)
 }
