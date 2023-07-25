@@ -4,7 +4,7 @@ use crate::bitboards::{self, castling_allowed_after_move, Bitboards, BoardIndex}
 use crate::bitboards::{index_from_file_rank_str, ForPlayer};
 use crate::helpers::{err, ErrorResult};
 use crate::moves::{Move, MoveType, Quiet};
-use crate::types::{self, player_and_piece_to_fen_char, CastlingSide, Piece};
+use crate::types::{self, CastlingSide, Piece, PlayerPiece};
 
 #[derive(Debug, Default, Copy, Clone)]
 pub struct CanCastleOnSide {
@@ -198,7 +198,7 @@ impl Game {
     }
 
     pub fn make_move(&mut self, m: Move) -> ErrorResult<()> {
-        let player = m.player;
+        let player = m.piece.player;
         let enemy = player.other();
 
         for castling_side in CastlingSide::iter() {
@@ -216,79 +216,81 @@ impl Game {
                         m, m.end_index
                     ));
                 }
-                if self.board.piece_at_index(m.start_index) != Some((player, m.piece)) {
+                if self.board.piece_at_index(m.start_index) != Some(m.piece) {
                     return self.err(&format!(
-                        "invalid quiet move ({:?}): piece {} isn't at start index {}",
-                        m,
-                        player_and_piece_to_fen_char((player, m.piece)),
-                        m.start_index
+                        "invalid quiet move ({:?}): piece isn't at start index {}",
+                        m, m.start_index
                     ));
                 }
 
                 match q {
                     Quiet::Move => {
-                        self.board.clear_square(m.start_index, player, m.piece);
-                        self.board.set_square(m.end_index, player, m.piece);
+                        self.board.clear_square(m.start_index, m.piece);
+                        self.board.set_square(m.end_index, m.piece);
                     }
                     Quiet::Castle {
                         rook_start,
                         rook_end,
                     } => {
-                        if m.piece != Piece::King {
+                        if m.piece.piece != Piece::King {
                             return self
                                 .err(&format!("invalid castle move ({:?}), piece isn't king", m));
                         }
-                        if self.board.piece_at_index(rook_start) != Some((player, Piece::Rook)) {
+                        if self.board.piece_at_index(rook_start)
+                            != Some(PlayerPiece::new(player, Piece::Rook))
+                        {
                             return self.err(&format!(
                                 "invalid castle move ({:?}), rook isn't at rook start",
                                 m
                             ));
                         }
 
-                        self.board.clear_square(m.start_index, player, m.piece);
-                        self.board.set_square(m.end_index, player, m.piece);
+                        self.board.clear_square(m.start_index, m.piece);
+                        self.board.set_square(m.end_index, m.piece);
 
-                        self.board.clear_square(rook_start, player, Piece::Rook);
-                        self.board.set_square(rook_end, player, Piece::Rook);
+                        self.board
+                            .clear_square(rook_start, PlayerPiece::new(player, Piece::Rook));
+                        self.board
+                            .set_square(rook_end, PlayerPiece::new(player, Piece::Rook));
                     }
                     Quiet::PawnSkip { skipped_index } => {
-                        self.board.clear_square(m.start_index, player, m.piece);
-                        self.board.set_square(m.end_index, player, m.piece);
+                        self.board.clear_square(m.start_index, m.piece);
+                        self.board.set_square(m.end_index, m.piece);
 
                         self.en_passant = Some(skipped_index);
                     }
                     Quiet::PawnPromotion { promotion_piece } => {
-                        if !types::PROMOTION_PIECES.contains(&promotion_piece) {
+                        let promotion_piece = PlayerPiece::new(player, promotion_piece);
+                        if !types::PROMOTION_PIECES.contains(&promotion_piece.piece) {
                             return self.err(format!(
                                 "invalid pawn promotion: promotion piece {} isn't a promotion piece",
-                                player_and_piece_to_fen_char((player, promotion_piece))
+                                promotion_piece,
                             ).as_str());
                         }
-                        self.board.clear_square(m.start_index, player, m.piece);
-                        self.board.set_square(m.end_index, player, promotion_piece);
+                        self.board.clear_square(m.start_index, m.piece);
+                        self.board.set_square(m.end_index, promotion_piece);
                     }
                 }
             }
             MoveType::Capture(c) => match c {
                 crate::moves::Capture::EnPassant { taken_index } => {
-                    if self.board.piece_at_index(taken_index) != Some((enemy, Piece::Pawn)) {
+                    let taken_piece = PlayerPiece::new(enemy, Piece::Pawn);
+                    if self.board.piece_at_index(taken_index) != Some(taken_piece) {
                         return self.err("invalid en-passant: taken piece isn't enemy pawn");
                     }
-                    self.board.clear_square(taken_index, enemy, Piece::Pawn);
+                    self.board.clear_square(taken_index, taken_piece);
 
-                    self.board.clear_square(m.start_index, player, m.piece);
-                    self.board.set_square(m.end_index, player, m.piece);
+                    self.board.clear_square(m.start_index, m.piece);
+                    self.board.set_square(m.end_index, m.piece);
                 }
                 crate::moves::Capture::Take { taken_piece } => {
-                    let (taken_player, taken_piece) = taken_piece;
-                    if taken_player != enemy {
+                    if taken_piece.player != enemy {
                         return self.err("invalid capture: taken piece isn't enemy piece");
                     }
-                    self.board
-                        .clear_square(m.end_index, taken_player, taken_piece);
+                    self.board.clear_square(m.end_index, taken_piece);
 
-                    self.board.clear_square(m.start_index, player, m.piece);
-                    self.board.set_square(m.end_index, player, m.piece);
+                    self.board.clear_square(m.start_index, m.piece);
+                    self.board.set_square(m.end_index, m.piece);
                 }
             },
         }

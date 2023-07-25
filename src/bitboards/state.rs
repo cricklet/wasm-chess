@@ -116,7 +116,7 @@ impl Bitboards {
                         fen.push_str(&empty_count.to_string());
                         empty_count = 0;
                     }
-                    fen.push_str(&player_and_piece_to_fen_char(piece).to_string());
+                    fen.push_str(piece.to_fen_char().to_string().as_str());
                 } else {
                     empty_count += 1;
                 }
@@ -157,9 +157,9 @@ impl Bitboards {
                         fen
                     ));
                 }
-            } else if let Some((player, piece_type)) = player_and_piece_from_fen_char(c) {
+            } else if let Some(piece) = PlayerPiece::from(c) {
                 let index = index_from_file_rank(file, rank);
-                bb.set_square(index, player, piece_type);
+                bb.set_square(index, piece);
                 file += 1;
             } else {
                 return err(&format!(
@@ -174,7 +174,7 @@ impl Bitboards {
         Ok(bb)
     }
 
-    pub fn piece_at_index(&self, index: BoardIndex) -> Option<(Player, Piece)> {
+    pub fn piece_at_index(&self, index: BoardIndex) -> Option<PlayerPiece> {
         self.piece_at_index[index.i]
     }
 
@@ -191,8 +191,8 @@ impl Bitboards {
             for file in 0..8 {
                 let index = index_from_file_rank(file, rank);
 
-                let piece: Option<(Player, Piece)> = self.piece_at_index(index);
-                if let Some((player, piece)) = piece {
+                let piece: Option<PlayerPiece> = self.piece_at_index(index);
+                if let Some(PlayerPiece { player, piece }) = piece {
                     match player {
                         Player::White => match piece {
                             Piece::Pawn => s.push_str("♙ "),
@@ -250,7 +250,7 @@ impl Bitboards {
                 for piece in Piece::iter() {
                     for player in Player::iter() {
                         if single & self.pieces[player][piece] != 0 {
-                            found.insert((player, piece));
+                            found.insert(PlayerPiece::new(player, piece));
                         }
                     }
                 }
@@ -274,14 +274,14 @@ impl Bitboards {
                     continue;
                 }
 
-                let (player, piece) = found.iter().next().unwrap();
-                if self.is_occupied_by_player(index, other_player(*player)) {
+                let piece = found.iter().next().unwrap();
+                if self.is_occupied_by_player(index, other_player(piece.player)) {
                     return err(&format!(
                         "piece at {:} but occupied by other player -- {:?}",
                         FileRank { file, rank },
                         found,
                     ));
-                } else if !self.is_occupied_by_player(index, *player) {
+                } else if !self.is_occupied_by_player(index, piece.player) {
                     return err(&format!(
                         "piece at {:} but not occupied by player -- {:?}",
                         FileRank { file, rank },
@@ -289,7 +289,7 @@ impl Bitboards {
                     ));
                 }
 
-                if self.piece_at_index(index) != Some((*player, *piece)) {
+                if self.piece_at_index(index) != Some(*piece) {
                     return err(&format!(
                         "piece at {:} but not found in piece_at_index -- {:?}",
                         FileRank { file, rank },
@@ -302,20 +302,20 @@ impl Bitboards {
         Ok(())
     }
 
-    pub fn clear_square(&mut self, index: BoardIndex, player: Player, piece: Piece) {
+    pub fn clear_square(&mut self, index: BoardIndex, piece: PlayerPiece) {
         let bb = single_bitboard(index);
 
-        self.pieces[player][piece] &= !bb;
-        self.occupied[player] &= !bb;
+        self.pieces[piece.player][piece.piece] &= !bb;
+        self.occupied[piece.player] &= !bb;
         self.piece_at_index[index.i] = None;
     }
 
-    pub fn set_square(&mut self, index: BoardIndex, player: Player, piece: Piece) {
+    pub fn set_square(&mut self, index: BoardIndex, piece: PlayerPiece) {
         let bb = single_bitboard(index);
 
-        self.pieces[player][piece] |= bb;
-        self.occupied[player] |= bb;
-        self.piece_at_index[index.i] = Some((player, piece));
+        self.pieces[piece.player][piece.piece] |= bb;
+        self.occupied[piece.player] |= bb;
+        self.piece_at_index[index.i] = Some(piece);
     }
 }
 
@@ -338,7 +338,7 @@ pub fn test_starting_board() {
     bb.verify().unwrap();
 
     let i = index_from_file_rank_str("e2").unwrap();
-    bb.clear_square(i, Player::White, Piece::Pawn);
+    bb.clear_square(i, PlayerPiece::new(Player::White, Piece::Pawn));
 
     assert_eq!(
         bb.pretty(),

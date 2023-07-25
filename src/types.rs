@@ -7,6 +7,66 @@ pub enum Player {
     Black,
 }
 
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
+pub struct PlayerPiece {
+    pub player: Player,
+    pub piece: Piece,
+}
+
+impl PlayerPiece {
+    pub fn new(player: Player, piece: Piece) -> Self {
+        Self { player, piece }
+    }
+
+    pub fn from(c: char) -> Option<PlayerPiece> {
+        let piece = match c.to_ascii_uppercase() {
+            'P' => Piece::Pawn,
+            'R' => Piece::Rook,
+            'N' => Piece::Knight,
+            'B' => Piece::Bishop,
+            'Q' => Piece::Queen,
+            'K' => Piece::King,
+            _ => return None,
+        };
+
+        let player = match c.is_uppercase() {
+            true => Player::White,
+            false => Player::Black,
+        };
+
+        Some(PlayerPiece::new(player, piece))
+    }
+
+    pub fn to_fen_char(self) -> char {
+        let PlayerPiece { player, piece } = self;
+        let fen_char = match piece {
+            Piece::Pawn => 'P',
+            Piece::Rook => 'R',
+            Piece::Knight => 'N',
+            Piece::Bishop => 'B',
+            Piece::Queen => 'Q',
+            Piece::King => 'K',
+        };
+
+        match player {
+            Player::White => fen_char,
+            Player::Black => fen_char.to_ascii_lowercase(),
+        }
+    }
+}
+
+impl std::fmt::Display for PlayerPiece {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_fen_char())
+    }
+}
+
+impl std::fmt::Debug for PlayerPiece {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_fen_char())
+    }
+}
+
 impl Player {
     pub fn other(self) -> Self {
         other_player(self)
@@ -44,41 +104,3 @@ pub enum Piece {
 }
 
 pub const PROMOTION_PIECES: [Piece; 4] = [Piece::Rook, Piece::Knight, Piece::Bishop, Piece::Queen];
-
-pub type PlayerPiece = (Player, Piece);
-
-pub fn player_and_piece_from_fen_char(c: char) -> Option<PlayerPiece> {
-    let piece = match c.to_ascii_uppercase() {
-        'P' => Piece::Pawn,
-        'R' => Piece::Rook,
-        'N' => Piece::Knight,
-        'B' => Piece::Bishop,
-        'Q' => Piece::Queen,
-        'K' => Piece::King,
-        _ => return None,
-    };
-
-    let player = match c.is_uppercase() {
-        true => Player::White,
-        false => Player::Black,
-    };
-
-    Some((player, piece))
-}
-
-pub fn player_and_piece_to_fen_char(player_piece: PlayerPiece) -> char {
-    let (player, piece) = player_piece;
-    let fen_char = match piece {
-        Piece::Pawn => 'P',
-        Piece::Rook => 'R',
-        Piece::Knight => 'N',
-        Piece::Bishop => 'B',
-        Piece::Queen => 'Q',
-        Piece::King => 'K',
-    };
-
-    match player {
-        Player::White => fen_char,
-        Player::Black => fen_char.to_ascii_lowercase(),
-    }
-}
