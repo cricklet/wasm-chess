@@ -219,7 +219,7 @@ pub fn starting_pawns_mask(player: Player) -> &'static Bitboard {
 
 #[test]
 fn test_bitwise_not() {
-    let bb = single_bitboard(0);
+    let bb = single_bitboard(BoardIndex::from(0));
     assert_eq!(
         bitboard_string(bb),
         "\
@@ -331,7 +331,7 @@ lazy_static! {
         for index in 0..64 {
             let mut mask = ALL_ZEROS;
 
-            let bb = single_bitboard(index);
+            let bb = single_bitboard(BoardIndex::from(index));
 
             for dir in KNIGHT_DIRS.iter() {
                 let filtered_bb = bb & pre_move_mask(*dir);
@@ -347,7 +347,7 @@ lazy_static! {
         for index in 0..64 {
             let mut mask = ALL_ZEROS;
 
-            let bb = single_bitboard(index);
+            let bb = single_bitboard(BoardIndex::from(index));
 
             for dir in KING_DIRS.iter() {
                 let filtered_bb = bb & pre_move_mask(*dir);
@@ -363,7 +363,7 @@ lazy_static! {
 #[test]
 pub fn test_knight_move_bitboard() {
     assert_eq!(
-        bitboard_string(single_bitboard(9)),
+        bitboard_string(single_bitboard(BoardIndex::from(9))),
         "\
         ........\n\
         ........\n\
@@ -393,7 +393,7 @@ pub fn test_knight_move_bitboard() {
 #[test]
 pub fn test_king_move_bitboard() {
     assert_eq!(
-        bitboard_string(single_bitboard(9)),
+        bitboard_string(single_bitboard(BoardIndex::from(9))),
         "\
         ........\n\
         ........\n\
@@ -419,7 +419,7 @@ pub fn test_king_move_bitboard() {
             .to_string()
     );
     assert_eq!(
-        bitboard_string(single_bitboard(47)),
+        bitboard_string(single_bitboard(BoardIndex::from(47))),
         "\
         ........\n\
         ........\n\

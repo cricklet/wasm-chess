@@ -7,12 +7,12 @@ use super::*;
 
 #[derive(Debug, Clone)]
 pub struct CastlingRequirements {
-    pub require_safe: Vec<usize>,
-    pub require_empty: Vec<usize>,
-    pub king_start: usize,
-    pub king_end: usize,
-    pub rook_start: usize,
-    pub rook_end: usize,
+    pub require_safe: Vec<BoardIndex>,
+    pub require_empty: Vec<BoardIndex>,
+    pub king_start: BoardIndex,
+    pub king_end: BoardIndex,
+    pub rook_start: BoardIndex,
+    pub rook_end: BoardIndex,
     pub castling_pieces: Bitboard,
 }
 
@@ -75,7 +75,7 @@ pub fn castling_requirements(
 pub fn castling_allowed_after_move(
     player: Player,
     castling_side: CastlingSide,
-    start_index: usize,
+    start_index: BoardIndex,
 ) -> bool {
     let castling_requirements = castling_requirements(player, castling_side);
     let castling_piece_moved = bb_contains(castling_requirements.castling_pieces, start_index);

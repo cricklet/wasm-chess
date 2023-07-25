@@ -1,12 +1,12 @@
 use super::*;
 
 pub fn precomputed_magic_value_for_index_and_piece(
-    piece_index: usize,
+    piece_index: BoardIndex,
     piece_for_magic: WalkType,
 ) -> MagicValue {
     MagicValue {
-        magic: DEFAULT_MAGICS[piece_for_magic as usize][piece_index as usize],
-        bits_required: DEFAULT_BITS_REQUIRED[piece_for_magic as usize][piece_index as usize],
+        magic: DEFAULT_MAGICS[piece_for_magic as usize][piece_index.i as usize],
+        bits_required: DEFAULT_BITS_REQUIRED[piece_for_magic as usize][piece_index.i as usize],
     }
 }
 

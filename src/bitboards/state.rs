@@ -142,7 +142,7 @@ impl Bitboards {
                 if file != 8 {
                     return err(&format!(
                         "not enough squares in rank ({:}, fen {:}",
-                        file_rank_to_str(file, rank),
+                        FileRank { file, rank },
                         fen
                     ));
                 }
@@ -153,7 +153,7 @@ impl Bitboards {
                 if file > 8 {
                     return err(&format!(
                         "too many squares in rank ({:}, fen {:})",
-                        file_rank_to_str(file, rank),
+                        FileRank { file, rank },
                         fen
                     ));
                 }
@@ -165,7 +165,7 @@ impl Bitboards {
                 return err(&format!(
                     "unknown character {:} ({:}, fen {:})",
                     c,
-                    file_rank_to_str(file, rank),
+                    FileRank { file, rank },
                     fen
                 ));
             }
@@ -174,11 +174,11 @@ impl Bitboards {
         Ok(bb)
     }
 
-    pub fn piece_at_index(&self, index: usize) -> Option<(Player, Piece)> {
-        self.piece_at_index[index]
+    pub fn piece_at_index(&self, index: BoardIndex) -> Option<(Player, Piece)> {
+        self.piece_at_index[index.i]
     }
 
-    pub fn index_of_piece(&self, player: Player, piece: Piece) -> usize {
+    pub fn index_of_piece(&self, player: Player, piece: Piece) -> BoardIndex {
         let bb = self.pieces[player][piece];
         first_index_of_one(bb)
     }
@@ -227,11 +227,11 @@ impl Bitboards {
         s
     }
 
-    pub fn is_occupied_by_player(&self, index: usize, player: Player) -> bool {
+    pub fn is_occupied_by_player(&self, index: BoardIndex, player: Player) -> bool {
         self.occupied[player] & single_bitboard(index) != 0
     }
 
-    pub fn is_occupied(&self, index: usize) -> bool {
+    pub fn is_occupied(&self, index: BoardIndex) -> bool {
         self.occupied[Player::White] & single_bitboard(index) != 0
             || self.occupied[Player::Black] & single_bitboard(index) != 0
     }
@@ -258,7 +258,7 @@ impl Bitboards {
                 if found.len() > 1 {
                     return err(&format!(
                         "more than one piece at {:} -- {:?}",
-                        file_rank_to_str(file, rank),
+                        FileRank { file, rank },
                         found,
                     ));
                 }
@@ -267,7 +267,7 @@ impl Bitboards {
                     if self.is_occupied(index) {
                         return err(&format!(
                             "no piece at {:} but occupied -- {:?}",
-                            file_rank_to_str(file, rank),
+                            FileRank { file, rank },
                             found,
                         ));
                     }
@@ -278,13 +278,13 @@ impl Bitboards {
                 if self.is_occupied_by_player(index, other_player(*player)) {
                     return err(&format!(
                         "piece at {:} but occupied by other player -- {:?}",
-                        file_rank_to_str(file, rank),
+                        FileRank { file, rank },
                         found,
                     ));
                 } else if !self.is_occupied_by_player(index, *player) {
                     return err(&format!(
                         "piece at {:} but not occupied by player -- {:?}",
-                        file_rank_to_str(file, rank),
+                        FileRank { file, rank },
                         found,
                     ));
                 }
@@ -292,7 +292,7 @@ impl Bitboards {
                 if self.piece_at_index(index) != Some((*player, *piece)) {
                     return err(&format!(
                         "piece at {:} but not found in piece_at_index -- {:?}",
-                        file_rank_to_str(file, rank),
+                        FileRank { file, rank },
                         found,
                     ));
                 }
@@ -302,20 +302,20 @@ impl Bitboards {
         Ok(())
     }
 
-    pub fn clear_square(&mut self, index: usize, player: Player, piece: Piece) {
+    pub fn clear_square(&mut self, index: BoardIndex, player: Player, piece: Piece) {
         let bb = single_bitboard(index);
 
         self.pieces[player][piece] &= !bb;
         self.occupied[player] &= !bb;
-        self.piece_at_index[index] = None;
+        self.piece_at_index[index.i] = None;
     }
 
-    pub fn set_square(&mut self, index: usize, player: Player, piece: Piece) {
+    pub fn set_square(&mut self, index: BoardIndex, player: Player, piece: Piece) {
         let bb = single_bitboard(index);
 
         self.pieces[player][piece] |= bb;
         self.occupied[player] |= bb;
-        self.piece_at_index[index] = Some((player, piece));
+        self.piece_at_index[index.i] = Some((player, piece));
     }
 }
 

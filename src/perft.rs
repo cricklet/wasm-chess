@@ -119,7 +119,8 @@ fn assert_perft_matches(fen: &str, expected_counts: &[usize]) {
 
     assert_eq!(game.to_fen(), fen);
 
-    for &max_depth in expected_counts[1..].iter() {
+    for (max_depth, &expected_count) in expected_counts.iter().enumerate() {
+        println!("calculating perft for max_depth: {}", max_depth);
         let mut perft_per_move: HashMap<Move, usize> = HashMap::new();
         let mut perft_overall = 0;
 
@@ -127,12 +128,16 @@ fn assert_perft_matches(fen: &str, expected_counts: &[usize]) {
             if params.depth == max_depth {
                 perft_overall += 1;
 
+                if params.depth == 0 {
+                    return;
+                }
+
                 let count = perft_per_move.entry(params.moves_stack[0]).or_insert(0);
                 *count += 1;
             }
         });
 
-        assert_eq!(expected_counts[max_depth as usize], perft_overall);
+        assert_eq!(expected_count, perft_overall);
     }
 
     // traverse

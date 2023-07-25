@@ -81,7 +81,7 @@ pub struct PotentialMoves {
 }
 
 pub fn magic_move_table(
-    piece_index: usize,
+    piece_index: BoardIndex,
     piece: WalkType,
     magic_value: MagicValue,
 ) -> Option<Vec<Bitboard>> {
@@ -109,7 +109,7 @@ pub fn magic_move_table(
 }
 
 #[memoize]
-pub fn generate_walk_bb(piece_index: usize, blocker_bb: Bitboard, dir: Direction) -> Bitboard {
+pub fn generate_walk_bb(piece_index: BoardIndex, blocker_bb: Bitboard, dir: Direction) -> Bitboard {
     let mut walk_bb = Bitboard::default();
 
     let premove_mask = pre_move_mask(dir);
@@ -133,7 +133,7 @@ pub fn generate_walk_bb(piece_index: usize, blocker_bb: Bitboard, dir: Direction
 #[test]
 pub fn test_generate_walk_bb() {
     let start_index = 10;
-    let start_bb = single_bitboard(start_index);
+    let start_bb = single_bitboard(BoardIndex::from(start_index));
 
     assert_eq!(
         bitboard_string(start_bb),
@@ -151,7 +151,7 @@ pub fn test_generate_walk_bb() {
     {
         let blocker_bb = Bitboard::default();
         let dir = Direction::NE;
-        let walk_bb = generate_walk_bb(start_index, blocker_bb, dir);
+        let walk_bb = generate_walk_bb(BoardIndex::from(start_index), blocker_bb, dir);
 
         assert_eq!(
             bitboard_string(walk_bb),
@@ -180,7 +180,7 @@ pub fn test_generate_walk_bb() {
             ........",
         );
         let dir = Direction::NE;
-        let walk_bb = generate_walk_bb(start_index, blocker_bb, dir);
+        let walk_bb = generate_walk_bb(BoardIndex::from(start_index), blocker_bb, dir);
 
         assert_eq!(
             bitboard_string(walk_bb),
@@ -198,7 +198,7 @@ pub fn test_generate_walk_bb() {
     }
 }
 
-pub fn generate_mask_blockers_bb(start_index: usize, piece: WalkType) -> Bitboard {
+pub fn generate_mask_blockers_bb(start_index: BoardIndex, piece: WalkType) -> Bitboard {
     let mut mask_blockers_bb = Bitboard::default();
 
     for &dir in DIRECTIONS_FOR_MAGIC[piece as usize] {
@@ -214,7 +214,7 @@ pub fn generate_mask_blockers_bb(start_index: usize, piece: WalkType) -> Bitboar
 #[test]
 pub fn test_generate_overall_blocker_bb() {
     let start_index = 10 as usize;
-    let start_bb = single_bitboard(start_index);
+    let start_bb = single_bitboard(BoardIndex::from(start_index));
 
     assert_eq!(
         bitboard_string(start_bb),
@@ -230,7 +230,8 @@ pub fn test_generate_overall_blocker_bb() {
             .to_string()
     );
     {
-        let mask_blockers_bb = generate_mask_blockers_bb(start_index, WalkType::Bishop);
+        let mask_blockers_bb =
+            generate_mask_blockers_bb(BoardIndex::from(start_index), WalkType::Bishop);
 
         assert_eq!(
             bitboard_string(mask_blockers_bb),
@@ -258,7 +259,7 @@ pub fn generate_specific_blocker_bb(mask_blockers_bb: Bitboard, seed: usize) -> 
             // Find the ith one bit in blockerMask and set the corresponding bit to one in result.
             for (j, bit_index) in each_index_of_one(mask_blockers_bb).enumerate() {
                 if i == j {
-                    specific_blocker_bb |= single_bitboard(bit_index as usize);
+                    specific_blocker_bb |= single_bitboard(bit_index);
                 }
             }
         }
@@ -270,7 +271,7 @@ pub fn generate_specific_blocker_bb(mask_blockers_bb: Bitboard, seed: usize) -> 
 #[test]
 pub fn test_generate_specific_blocker_bb() {
     let start_index = 15;
-    let start_bb = single_bitboard(start_index);
+    let start_bb = single_bitboard(BoardIndex::from(start_index));
 
     assert_eq!(
         bitboard_string(start_bb),
@@ -285,7 +286,7 @@ pub fn test_generate_specific_blocker_bb() {
         ........"
             .to_string()
     );
-    let mask_blockers_bb = generate_mask_blockers_bb(start_index, WalkType::Rook);
+    let mask_blockers_bb = generate_mask_blockers_bb(BoardIndex::from(start_index), WalkType::Rook);
 
     assert_eq!(
         bitboard_string(mask_blockers_bb),
@@ -337,7 +338,10 @@ pub fn test_generate_specific_blocker_bb() {
 }
 
 #[memoize]
-pub fn potential_moves_for_piece(piece_index: usize, piece: WalkType) -> Rc<Vec<PotentialMoves>> {
+pub fn potential_moves_for_piece(
+    piece_index: BoardIndex,
+    piece: WalkType,
+) -> Rc<Vec<PotentialMoves>> {
     let mask_blockers_bb = generate_mask_blockers_bb(piece_index, piece);
     let num_seeds = 1 << mask_blockers_bb.count_ones();
 
@@ -392,14 +396,14 @@ const BISHOP_BITS: [[usize; 8]; 8] = [
     [6, 5, 5, 5, 5, 5, 5, 6],
 ];
 
-pub fn bits_required(piece_index: usize, piece: WalkType) -> usize {
+pub fn bits_required(piece_index: BoardIndex, piece: WalkType) -> usize {
     match piece {
-        WalkType::Rook => ROOK_BITS[piece_index as usize / 8][piece_index as usize % 8],
-        WalkType::Bishop => BISHOP_BITS[piece_index as usize / 8][piece_index as usize % 8],
+        WalkType::Rook => ROOK_BITS[piece_index.i as usize / 8][piece_index.i as usize % 8],
+        WalkType::Bishop => BISHOP_BITS[piece_index.i as usize / 8][piece_index.i as usize % 8],
     }
 }
 
-pub fn find_magic_value(piece_index: usize, piece: WalkType) -> Option<MagicValue> {
+pub fn find_magic_value(piece_index: BoardIndex, piece: WalkType) -> Option<MagicValue> {
     let bits_required = bits_required(piece_index, piece);
 
     for _ in 0..100000000 {
@@ -425,7 +429,7 @@ pub fn find_magic_value(piece_index: usize, piece: WalkType) -> Option<MagicValu
 }
 
 pub fn moves_bb_for_piece_and_blockers(
-    piece_index: usize,
+    piece_index: BoardIndex,
     piece: WalkType,
     occupancy_bb: Bitboard,
 ) -> Bitboard {
@@ -457,7 +461,7 @@ pub fn test_find_best_magic() {
     let mut bits_required_for_piece: [[usize; 64]; 2] = [[0; 64]; 2];
     for piece in WalkType::iter() {
         for piece_index in 0..64 as usize {
-            let magic = find_magic_value(piece_index, piece);
+            let magic = find_magic_value(BoardIndex::from(piece_index), piece);
             assert!(magic.is_some());
 
             magics_for_piece[piece as usize][piece_index as usize] = magic.unwrap().magic;
@@ -486,8 +490,9 @@ pub fn test_find_best_magic() {
 pub fn test_precomputed_magic_values() {
     for piece in WalkType::iter() {
         for piece_index in 0..64 {
-            let magic_value = precomputed_magic_value_for_index_and_piece(piece_index, piece);
-            magic_move_table(piece_index, piece, magic_value).unwrap();
+            let magic_value =
+                precomputed_magic_value_for_index_and_piece(BoardIndex::from(piece_index), piece);
+            magic_move_table(BoardIndex::from(piece_index), piece, magic_value).unwrap();
         }
     }
 }

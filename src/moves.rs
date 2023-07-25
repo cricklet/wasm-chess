@@ -27,15 +27,22 @@ impl OnlyQueenPromotion {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Quiet {
-    Castle { rook_start: usize, rook_end: usize },
-    PawnSkip { skipped_index: usize },
-    PawnPromotion { promotion_piece: Piece },
+    Castle {
+        rook_start: BoardIndex,
+        rook_end: BoardIndex,
+    },
+    PawnSkip {
+        skipped_index: BoardIndex,
+    },
+    PawnPromotion {
+        promotion_piece: Piece,
+    },
     Move,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Capture {
-    EnPassant { taken_index: usize },
+    EnPassant { taken_index: BoardIndex },
     Take { taken_piece: PlayerPiece },
 }
 
@@ -49,8 +56,8 @@ pub enum MoveType {
 pub struct Move {
     pub player: Player,
     pub piece: Piece,
-    pub start_index: usize,
-    pub end_index: usize,
+    pub start_index: BoardIndex,
+    pub end_index: BoardIndex,
     pub move_type: MoveType,
 }
 
@@ -59,8 +66,8 @@ impl Move {
         format!(
             "{} {} {} {:?}",
             player_and_piece_to_fen_char((self.player, self.piece)),
-            index_to_file_rank_str(self.start_index),
-            index_to_file_rank_str(self.end_index),
+            self.start_index,
+            self.end_index,
             self.move_type,
         )
     }
@@ -74,7 +81,7 @@ pub enum JumpingPiece {
 
 pub fn potential_bb_to_moves(
     (player, piece): PlayerPiece,
-    piece_index: usize,
+    piece_index: BoardIndex,
     potential: Bitboard,
     bitboards: Bitboards,
     only_captures: OnlyCaptures,
@@ -122,7 +129,7 @@ pub fn potential_bb_to_moves(
 }
 
 pub fn walk_potential_bb(
-    index: usize,
+    index: BoardIndex,
     bitboards: Bitboards,
     piece: Piece,
 ) -> ErrorResult<Bitboard> {
@@ -162,12 +169,12 @@ pub fn walk_moves(
     Box::new(moves)
 }
 
-pub fn jumping_bitboard(index: usize, jumping_piece: JumpingPiece) -> Bitboard {
+pub fn jumping_bitboard(index: BoardIndex, jumping_piece: JumpingPiece) -> Bitboard {
     let lookup: &[Bitboard; 64] = match jumping_piece {
         JumpingPiece::Knight => &KNIGHT_MOVE_BITBOARD,
         JumpingPiece::King => &KING_MOVE_BITBOARD,
     };
-    lookup[index]
+    lookup[index.i]
 }
 
 pub fn jump_moves(
@@ -214,13 +221,16 @@ pub fn pawn_moves(
             let capture_bb = attacking_bb & bitboards.occupied[other_player(player)];
 
             each_index_of_one(capture_bb).map(move |end_index| {
-                let start_index = (end_index as isize - pawn_dir.offset()) as usize;
+                let start_index =
+                    BoardIndex::from((end_index.i as isize - pawn_dir.offset()) as usize);
                 Move {
                     player,
                     piece: Piece::Pawn,
                     start_index,
                     end_index,
-                    move_type: MoveType::Quiet(Quiet::Move),
+                    move_type: MoveType::Capture(Capture::Take {
+                        taken_piece: (player.other(), Piece::Pawn),
+                    }),
                 }
             })
         })
@@ -240,7 +250,7 @@ pub fn pawn_moves(
         let promotion_pawns = moved_pawns & *PAWN_PROMOTION_BITBOARD;
 
         let pushed_pawns = each_index_of_one(pushed_pawns).map(move |end_index| {
-            let start_index = (end_index as isize - pawn_dir.offset()) as usize;
+            let start_index = BoardIndex::from((end_index.i as isize - pawn_dir.offset()) as usize);
             Move {
                 player,
                 piece: Piece::Pawn,
@@ -251,7 +261,7 @@ pub fn pawn_moves(
         });
 
         let promotion_pawns = each_index_of_one(promotion_pawns).flat_map(move |end_index| {
-            let start_index = (end_index as isize - pawn_dir.offset()) as usize;
+            let start_index = BoardIndex::from((end_index.i as isize - pawn_dir.offset()) as usize);
             only_queen_promotion.pieces().map(move |promo_piece| Move {
                 player,
                 piece: Piece::Pawn,
@@ -272,7 +282,8 @@ pub fn pawn_moves(
         let push2 = rotate_toward_index_63(push1, pawn_dir.offset()) & !bitboards.all_occupied();
 
         each_index_of_one(push2).map(move |end_index| {
-            let start_index = (end_index as isize - 2 * pawn_dir.offset()) as usize;
+            let start_index =
+                BoardIndex::from((end_index.i as isize - 2 * pawn_dir.offset()) as usize);
             Move {
                 player,
                 piece: Piece::Pawn,
@@ -289,7 +300,7 @@ pub fn pawn_moves(
 pub fn en_passant_move(
     player: Player,
     bitboards: Bitboards,
-    en_passant_index: Option<usize>,
+    en_passant_index: Option<BoardIndex>,
 ) -> Option<Move> {
     let pawns = bitboards.pieces[player][Piece::Pawn];
 
@@ -303,10 +314,12 @@ pub fn en_passant_move(
                 return Some(Move {
                     player,
                     piece: Piece::Pawn,
-                    start_index: (en_passant_index as isize - dir.offset()) as usize,
+                    start_index: BoardIndex::from(en_passant_index.i - dir.offset() as usize),
                     end_index: en_passant_index,
                     move_type: MoveType::Capture(Capture::EnPassant {
-                        taken_index: (en_passant_index as isize - target_dir.offset()) as usize,
+                        taken_index: BoardIndex::from(
+                            en_passant_index.i - target_dir.offset() as usize,
+                        ),
                     }),
                 });
             }
@@ -391,7 +404,7 @@ pub fn all_moves<'game>(
         .chain(castling_moves)
 }
 
-pub fn index_in_danger(player: Player, target: usize, state: &Game) -> ErrorResult<bool> {
+pub fn index_in_danger(player: Player, target: BoardIndex, state: &Game) -> ErrorResult<bool> {
     let enemy = other_player(player);
 
     let target_bb = single_bitboard(target);

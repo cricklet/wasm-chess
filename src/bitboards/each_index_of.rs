@@ -18,7 +18,7 @@ fn each_index_of_one_callback<F: FnMut(i32) -> Loop>(bb: Bitboard, mut callback:
     }
 }
 
-fn each_index_of_one_closure(bb: Bitboard) -> impl FnMut() -> Option<i32> {
+fn each_index_of_one_closure(bb: Bitboard) -> impl FnMut() -> Option<BoardIndex> {
     let mut temp = bb;
     move || {
         if temp != 0 {
@@ -27,7 +27,7 @@ fn each_index_of_one_closure(bb: Bitboard) -> impl FnMut() -> Option<i32> {
 
             temp = temp ^ ls1;
 
-            return Some(index as i32);
+            return Some(BoardIndex::from(index as usize));
         } else {
             return None;
         }
@@ -51,7 +51,7 @@ fn each_index_of_one_iteratorfn(bb: Bitboard) -> FnIterator<i32, impl FnMut() ->
     })
 }
 
-pub fn each_index_of_one(bb: Bitboard) -> impl Iterator<Item = usize> {
+pub fn each_index_of_one(bb: Bitboard) -> impl Iterator<Item = BoardIndex> {
     let mut temp = bb;
 
     FnIterator::new(move || {
@@ -61,7 +61,7 @@ pub fn each_index_of_one(bb: Bitboard) -> impl Iterator<Item = usize> {
 
             temp = temp ^ ls1;
 
-            return Some(index as usize);
+            return Some(BoardIndex::from(index as usize));
         } else {
             return None;
         }
@@ -90,7 +90,7 @@ fn test_each_index_of_one_closure() {
     loop {
         match generator() {
             Some(index) => {
-                assert_eq!(expected.pop().unwrap(), index);
+                assert_eq!(expected.pop().unwrap(), index.i);
             }
             None => break,
         }
@@ -115,6 +115,6 @@ fn test_each_index_of_one() {
     let mut expected = vec![36, 7, 1];
 
     for index in each_index_of_one(binary) {
-        assert_eq!(expected.pop().unwrap(), index);
+        assert_eq!(expected.pop().unwrap(), index.i);
     }
 }

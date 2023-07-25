@@ -4,7 +4,7 @@ use crate::helpers::{err, ErrorResult};
 
 pub type Bitboard = u64;
 
-pub fn bb_contains(bb: Bitboard, index: usize) -> bool {
+pub fn bb_contains(bb: Bitboard, index: BoardIndex) -> bool {
     bb & single_bitboard(index) != 0
 }
 
@@ -12,17 +12,20 @@ pub fn least_significant_one(bb: Bitboard) -> Bitboard {
     bb & bb.wrapping_neg()
 }
 
-pub fn first_index_of_one(bb: Bitboard) -> usize {
+pub fn first_index_of_one(bb: Bitboard) -> BoardIndex {
     let ls1 = least_significant_one(bb);
-    (ls1 - 1).count_ones() as usize
+    BoardIndex::from((ls1 - 1).count_ones() as usize)
 }
 
 #[test]
 fn test_least_significant_one() {
     let binary = 0b0000000010000000000000000000000000000000000000000000000000010000;
 
-    assert_eq!(first_index_of_one(binary), 4);
-    assert_eq!(least_significant_one(binary), single_bitboard(4));
+    assert_eq!(first_index_of_one(binary).i, 4);
+    assert_eq!(
+        least_significant_one(binary),
+        single_bitboard(BoardIndex::from(4))
+    );
 }
 
 #[test]
@@ -67,15 +70,15 @@ pub fn reverse_bits(v: u8) -> u8 {
     return REVERSE_BITS_CACHE[v as usize];
 }
 
-pub fn single_bitboard(index: usize) -> Bitboard {
-    rotate_toward_index_63(1, index as isize)
+pub fn single_bitboard(index: BoardIndex) -> Bitboard {
+    rotate_toward_index_63(1, index.i as isize)
 }
 
 #[test]
 fn test_single_bitboard() {
     use super::encoding::*;
 
-    let bb = single_bitboard(1);
+    let bb = single_bitboard(BoardIndex { i: 1 });
     let board_expected = "\
             ........\n\
             ........\n\
@@ -92,12 +95,60 @@ fn test_single_bitboard() {
     assert_eq!(binary_string(bb), binary_expected);
 }
 
-pub fn index_from_file_rank(file: usize, rank: usize) -> usize {
-    rank * 8 + file
+#[derive(Copy, Clone, Eq, PartialEq, Hash)]
+pub struct BoardIndex {
+    pub i: usize,
 }
 
-pub fn file_rank_from_index(index: usize) -> (usize, usize) {
-    (index % 8, index / 8)
+impl BoardIndex {
+    pub fn from(i: usize) -> BoardIndex {
+        BoardIndex { i }
+    }
+
+    pub fn file_rank(&self) -> FileRank {
+        FileRank {
+            file: self.i % 8,
+            rank: self.i / 8,
+        }
+    }
+}
+
+impl std::fmt::Debug for BoardIndex {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.file_rank())
+    }
+}
+
+impl std::fmt::Display for BoardIndex {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.file_rank())
+    }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Hash)]
+pub struct FileRank {
+    pub file: usize,
+    pub rank: usize,
+}
+
+impl std::fmt::Debug for FileRank {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let file_char = file_to_char(self.file);
+        let rank_char = rank_to_char(self.rank);
+        write!(f, "{}{}", file_char, rank_char)
+    }
+}
+
+impl std::fmt::Display for FileRank {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let file_char = file_to_char(self.file);
+        let rank_char = rank_to_char(self.rank);
+        write!(f, "{}{}", file_char, rank_char)
+    }
+}
+
+pub fn index_from_file_rank(file: usize, rank: usize) -> BoardIndex {
+    BoardIndex::from(rank * 8 + file)
 }
 
 pub fn file_from_char(file: char) -> Option<usize> {
@@ -142,7 +193,7 @@ pub fn is_file(c: char) -> bool {
     }
 }
 
-pub fn index_from_file_rank_str(file_rank_str: &str) -> ErrorResult<usize> {
+pub fn index_from_file_rank_str(file_rank_str: &str) -> ErrorResult<BoardIndex> {
     let mut chars = file_rank_str.chars();
 
     if file_rank_str.len() != 2 {
@@ -172,13 +223,13 @@ pub fn index_from_file_rank_str(file_rank_str: &str) -> ErrorResult<usize> {
     Ok(index_from_file_rank(file, rank))
 }
 
-pub fn unwrap_index_from_file_rank_str(file_rank_str: &str) -> usize {
+pub fn unwrap_index_from_file_rank_str(file_rank_str: &str) -> BoardIndex {
     index_from_file_rank_str(file_rank_str).unwrap()
 }
 
 pub fn map_index_from_file_rank_strs<'s>(
     file_rank_strs: impl IntoIterator<Item = &'s str>,
-) -> Vec<usize> {
+) -> Vec<BoardIndex> {
     file_rank_strs
         .into_iter()
         .map(unwrap_index_from_file_rank_str)
@@ -213,20 +264,12 @@ pub fn rank_to_char(rank: usize) -> char {
     }
 }
 
-pub fn file_rank_to_str(file: usize, rank: usize) -> String {
-    let file_char = file_to_char(file);
-
-    let rank_char = rank_to_char(rank);
-
-    format!("{}{}", file_char, rank_char)
+#[test]
+pub fn test_index_to_file_rank_str() {
+    assert_eq!(BoardIndex { i: 24 }.to_string(), "e4");
 }
 
-pub fn index_to_file_rank_str(i: usize) -> String {
-    let (file, rank) = file_rank_from_index(i);
-    file_rank_to_str(file, rank)
-}
-
-pub fn bitboard_with_indices_set(indices: &[usize]) -> Bitboard {
+pub fn bitboard_with_indices_set(indices: &[BoardIndex]) -> Bitboard {
     let mut bb: Bitboard = 0;
     for index in indices {
         bb |= single_bitboard(*index);
@@ -238,6 +281,6 @@ pub fn bitboard_with_file_rank_strs_set(locations: &[&str]) -> Bitboard {
     let indices = locations
         .iter()
         .map(|s| index_from_file_rank_str(s).unwrap())
-        .collect::<Vec<usize>>();
+        .collect::<Vec<BoardIndex>>();
     bitboard_with_indices_set(&indices)
 }

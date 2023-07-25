@@ -1,6 +1,6 @@
 use strum::IntoEnumIterator;
 
-use crate::bitboards::{self, castling_allowed_after_move, index_to_file_rank_str, Bitboards};
+use crate::bitboards::{self, castling_allowed_after_move, Bitboards, BoardIndex};
 use crate::bitboards::{index_from_file_rank_str, ForPlayer};
 use crate::helpers::{err, ErrorResult};
 use crate::moves::{Move, MoveType, Quiet};
@@ -84,7 +84,7 @@ pub struct Game {
     pub board: bitboards::Bitboards,
     pub player: types::Player,
     pub can_castle: ForPlayer<CanCastleOnSide>,
-    pub en_passant: Option<usize>,
+    pub en_passant: Option<BoardIndex>,
     pub half_moves_since_pawn_or_capture: usize,
     pub full_moves_total: usize,
 }
@@ -119,7 +119,7 @@ impl Game {
             self.player.to_fen(),
             self.can_castle.to_fen(),
             self.en_passant
-                .map(index_to_file_rank_str)
+                .map(|i| i.to_string())
                 .unwrap_or("-".to_string()),
             self.half_moves_since_pawn_or_capture,
             self.full_moves_total
@@ -213,8 +213,7 @@ impl Game {
                 if self.board.is_occupied(m.end_index) {
                     return self.err(&format!(
                         "invalid quiet move ({:?}): end index {} is occupied",
-                        m,
-                        index_to_file_rank_str(m.end_index)
+                        m, m.end_index
                     ));
                 }
                 if self.board.piece_at_index(m.start_index) != Some((player, m.piece)) {
@@ -222,7 +221,7 @@ impl Game {
                         "invalid quiet move ({:?}): piece {} isn't at start index {}",
                         m,
                         player_and_piece_to_fen_char((player, m.piece)),
-                        index_to_file_rank_str(m.start_index)
+                        m.start_index
                     ));
                 }
 
