@@ -43,34 +43,6 @@ fn test_fen_start_board() {
     assert_fen_matches(fen);
 }
 
-fn traverse_game(game: &Game, depth: u8, max_depth: u8) -> usize {
-    if depth >= max_depth {
-        return 1;
-    }
-
-    let mut result = 0;
-
-    let player = game.player;
-
-    let moves = all_moves(player, game, OnlyCaptures::NO, OnlyQueenPromotion::NO);
-    for m in moves {
-        let m = m.unwrap();
-        let mut next_game = *game;
-        next_game.make_move(m).unwrap();
-
-        let king_index = next_game.board.index_of_piece(player, Piece::King);
-        let illegal_move = index_in_danger(player, king_index, &next_game).unwrap();
-
-        if illegal_move {
-            continue;
-        }
-
-        result += traverse_game(&next_game, depth + 1, max_depth);
-    }
-
-    result
-}
-
 struct TraverseGameCallbackParams<'game> {
     moves_stack: &'game Vec<Move>,
     game: &'game Game,
@@ -82,14 +54,14 @@ fn print_game(fen: &str, moves: &Vec<Move>) -> String {
     let mut game = Game::from_fen(fen).unwrap();
 
     let mut s = "".to_string();
-    s.push_str(format!("{}\n", game.pretty()).as_str());
+    s.push_str(format!("{}\n", game).as_str());
 
     for m in moves {
         s.push_str(format!("{}\n", m).as_str());
         let result = game.make_move(*m);
         match result {
             Ok(_) => {
-                s.push_str(format!("{}\n", game.pretty()).as_str());
+                s.push_str(format!("{}\n", game).as_str());
             }
             Err(_) => {
                 s.push_str("failed\n");
@@ -142,6 +114,28 @@ fn traverse_game_callback(
     }
 
     Ok(())
+}
+
+pub fn run_perft(game: &Game, max_depth: usize) -> ErrorResult<(usize, HashMap<Move, usize>)> {
+    let mut perft_per_move: HashMap<Move, usize> = HashMap::new();
+    let mut perft_overall = 0;
+
+    let mut moves_stack = vec![];
+
+    traverse_game_callback(&mut moves_stack, &game, 0, max_depth, &mut |params| {
+        if params.depth == max_depth {
+            perft_overall += 1;
+
+            if params.depth == 0 {
+                return;
+            }
+
+            let count = perft_per_move.entry(params.moves_stack[0]).or_insert(0);
+            *count += 1;
+        }
+    })?;
+
+    Ok((perft_overall, perft_per_move))
 }
 
 fn assert_perft_matches_for_depth(

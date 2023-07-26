@@ -2,8 +2,10 @@ use strum::IntoEnumIterator;
 
 use crate::bitboards::{self, castling_allowed_after_move, Bitboards, BoardIndex};
 use crate::bitboards::{index_from_file_rank_str, ForPlayer};
-use crate::helpers::{err, ErrorResult};
-use crate::moves::{Move, MoveType, Quiet};
+use crate::helpers::{err, err_result, ErrorResult};
+use crate::moves::{
+    all_moves, index_in_danger, Move, MoveType, OnlyCaptures, OnlyQueenPromotion, Quiet,
+};
 use crate::types::{self, CastlingSide, Piece, PlayerPiece};
 
 #[derive(Debug, Default, Copy, Clone)]
@@ -49,7 +51,7 @@ impl ForPlayer<CanCastleOnSide> {
                         'Q' => can_castle_on_side_for_player.white.queenside = true,
                         'k' => can_castle_on_side_for_player.black.kingside = true,
                         'q' => can_castle_on_side_for_player.black.queenside = true,
-                        _ => return err(&format!("invalid castling side {}", c)),
+                        _ => return err_result(&format!("invalid castling side {}", c)),
                     }
                 }
                 can_castle_on_side_for_player
@@ -79,7 +81,7 @@ impl ForPlayer<CanCastleOnSide> {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Copy, Clone)]
 pub struct Game {
     pub board: bitboards::Bitboards,
     pub player: types::Player,
@@ -87,6 +89,18 @@ pub struct Game {
     pub en_passant: Option<BoardIndex>,
     pub half_moves_since_pawn_or_capture: usize,
     pub full_moves_total: usize,
+}
+
+impl std::fmt::Display for Game {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}\n{}", self.to_fen(), self.board)
+    }
+}
+
+impl std::fmt::Debug for Game {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self,)
+    }
 }
 
 impl Game {
@@ -105,11 +119,7 @@ impl Game {
     }
 
     pub fn err<T>(&self, msg: &str) -> ErrorResult<T> {
-        err::<T>(&format!("{}\n\n{}", msg, self.pretty()))
-    }
-
-    pub fn pretty(&self) -> String {
-        format!("{}\n{}", self.to_fen(), self.board.pretty())
+        err_result::<T>(&format!("{}\n\n{}", msg, self))
     }
 
     pub fn to_fen(&self) -> String {
@@ -126,6 +136,48 @@ impl Game {
         )
     }
 
+    pub fn from_position_uci(uci_line: &str) -> ErrorResult<Game> {
+        let position_prefix = "position";
+        let moves_separator = "moves";
+
+        if !uci_line.starts_with(position_prefix) {
+            return err_result(&format!("invalid uci line {}", uci_line));
+        }
+
+        let position_str = uci_line[position_prefix.len()..].trim().to_string();
+        let (position_str, moves_str) = if position_str.contains(moves_separator) {
+            let split: Vec<&str> = position_str.split(moves_separator).collect();
+            if split.len() != 2 {
+                return err_result(&format!("invalid uci line {}", uci_line));
+            }
+            (split[0].trim(), split[1].trim())
+        } else {
+            (position_str.trim(), "")
+        };
+
+        let game: ErrorResult<Game> = {
+            if position_str == "startpos" {
+                Game::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+            } else if position_str.starts_with("fen") {
+                let fen_part = &uci_line["fen".len()..].trim();
+                Game::from_fen(fen_part)
+            } else {
+                err_result(&format!("invalid uci line {}", uci_line))
+            }
+        };
+        let mut game = game?;
+
+        let moves: Vec<&str> = moves_str.split(" ").filter(|m| !m.is_empty()).collect();
+        for m in moves {
+            let m = game
+                .move_from_str(m)
+                .ok_or(err(&format!("invalid move '{}'", m)))?;
+            game.make_move(m)?;
+        }
+
+        Ok(game)
+    }
+
     pub fn from_fen(fen: &str) -> ErrorResult<Game> {
         let mut game = Game::new();
 
@@ -134,7 +186,7 @@ impl Game {
         // parse a string like "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 
         if split.len() <= 0 {
-            return err(&format!("empty fen {}", fen));
+            return err_result(&format!("empty fen {}", fen));
         }
 
         let board = Bitboards::from_fen(split[0]);
@@ -147,7 +199,7 @@ impl Game {
         game.player = match split[1] {
             "w" => types::Player::White,
             "b" => types::Player::Black,
-            _ => return err(&format!("invalid player {}", split[1])),
+            _ => return err_result(&format!("invalid player {}", split[1])),
         };
 
         if split.len() <= 2 {
@@ -174,7 +226,7 @@ impl Game {
         game.half_moves_since_pawn_or_capture = match split[4].parse::<usize>() {
             Ok(half_moves_since_pawn_or_capture) => half_moves_since_pawn_or_capture,
             Err(e) => {
-                return err(&format!(
+                return err_result(&format!(
                     "error parsing half moves since pawn or capture: {}",
                     e
                 ))
@@ -187,14 +239,36 @@ impl Game {
 
         game.full_moves_total = match split[5].parse::<usize>() {
             Ok(full_moves_total) => full_moves_total,
-            Err(e) => return err(&format!("error parsing full moves total: {}", e)),
+            Err(e) => return err_result(&format!("error parsing full moves total: {}", e)),
         };
 
         if split.len() > 6 {
-            return err(&format!("invalid fen {}", fen));
+            return err_result(&format!("invalid fen {}", fen));
         }
 
         Ok(game)
+    }
+
+    pub fn move_from_str(&self, move_str: &str) -> Option<Move> {
+        let moves = all_moves(self.player, self, OnlyCaptures::NO, OnlyQueenPromotion::NO);
+        for m in moves {
+            let m = m.unwrap();
+            let mut next_game = *self;
+            next_game.make_move(m).unwrap();
+
+            let king_index = next_game.board.index_of_piece(self.player, Piece::King);
+            let illegal_move = index_in_danger(self.player, king_index, &next_game).unwrap();
+
+            if illegal_move {
+                continue;
+            }
+
+            if m.to_uci() == move_str {
+                return Some(m);
+            }
+        }
+
+        None
     }
 
     pub fn make_move(&mut self, m: Move) -> ErrorResult<()> {

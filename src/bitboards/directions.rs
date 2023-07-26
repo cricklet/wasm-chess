@@ -3,7 +3,7 @@ use memoize::memoize;
 use strum::EnumIter;
 
 use crate::{
-    helpers::{err, ErrorResult},
+    helpers::{err_result, ErrorResult},
     types::Player,
 };
 
@@ -169,7 +169,7 @@ pub fn zeros_for(cs: &[char]) -> ErrorResult<Bitboard> {
         } else if is_rank(*c) {
             bb &= zeros_for_rank(*c);
         } else {
-            return err(&format!("Invalid char: {}", c));
+            return err_result(&format!("Invalid char: {}", c));
         }
     }
     Ok(bb)

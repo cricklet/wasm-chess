@@ -60,6 +60,23 @@ pub struct Move {
     pub move_type: MoveType,
 }
 
+impl Move {
+    pub fn to_uci(&self) -> String {
+        format!("{}{}", self.start_index, self.end_index)
+    }
+}
+
+#[test]
+pub fn test_move_to_uci() {
+    let m = Move {
+        piece: PlayerPiece::new(Player::White, Piece::Pawn),
+        start_index: BoardIndex::from(8),
+        end_index: BoardIndex::from(16),
+        move_type: MoveType::Quiet(Quiet::Move),
+    };
+    assert_eq!(m.to_uci(), "a2a4");
+}
+
 impl std::fmt::Display for Move {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -113,7 +130,7 @@ pub fn potential_bb_to_moves(
                 end_index,
                 move_type: MoveType::Capture(Capture::Take { taken_piece }),
             }),
-            None => err(&format!(
+            None => err_result(&format!(
                 "no piece at index {:} but marked as capture",
                 end_index
             )),
@@ -235,7 +252,9 @@ pub fn pawn_moves(
                         end_index,
                         move_type: MoveType::Capture(Capture::Take { taken_piece }),
                     }),
-                    None => err(&format!("no piece at {:} but marked as capture", end_index)),
+                    None => {
+                        err_result(&format!("no piece at {:} but marked as capture", end_index))
+                    }
                 }
             })
         })

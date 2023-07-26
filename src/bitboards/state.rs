@@ -89,11 +89,63 @@ impl<T> std::ops::IndexMut<Player> for ForPlayer<T> {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Copy, Clone)]
 pub struct Bitboards {
     pub pieces: ForPlayer<PieceBitboards>,
     pub occupied: ForPlayer<Bitboard>,
     pub piece_at_index: [Option<PlayerPiece>; 64],
+}
+
+impl std::fmt::Display for Bitboards {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut s = String::new();
+
+        for rank in (0..8).rev() {
+            s.push_str(format!("{} ", rank_to_char(rank)).as_str());
+            for file in 0..8 {
+                let index = index_from_file_rank(file, rank);
+
+                let piece: Option<PlayerPiece> = self.piece_at_index(index);
+                if let Some(PlayerPiece { player, piece }) = piece {
+                    match player {
+                        Player::White => match piece {
+                            Piece::Pawn => s.push_str("♙ "),
+                            Piece::Rook => s.push_str("♖ "),
+                            Piece::Knight => s.push_str("♘ "),
+                            Piece::Bishop => s.push_str("♗ "),
+                            Piece::Queen => s.push_str("♕ "),
+                            Piece::King => s.push_str("♔ "),
+                        },
+                        Player::Black => match piece {
+                            Piece::Pawn => s.push_str("♟ "),
+                            Piece::Rook => s.push_str("♜ "),
+                            Piece::Knight => s.push_str("♞ "),
+                            Piece::Bishop => s.push_str("♝ "),
+                            Piece::Queen => s.push_str("♛ "),
+                            Piece::King => s.push_str("♚ "),
+                        },
+                    }
+                } else {
+                    s.push_str("· ");
+                }
+            }
+            s.push_str("\n");
+        }
+
+        s.push_str("  ");
+        for file in 0..8 {
+            s.push_str(format!("{} ", file_to_char(file)).as_str());
+        }
+        s.push_str("\n");
+
+        write!(f, "{}", s)
+    }
+}
+
+impl std::fmt::Debug for Bitboards {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self,)
+    }
 }
 
 impl Bitboards {
@@ -140,7 +192,7 @@ impl Bitboards {
         for c in fen.chars() {
             if c == '/' {
                 if file != 8 {
-                    return err(&format!(
+                    return err_result(&format!(
                         "not enough squares in rank ({:}, fen {:}",
                         FileRank { file, rank },
                         fen
@@ -151,7 +203,7 @@ impl Bitboards {
             } else if let Some(d) = c.to_digit(10) {
                 file += d as usize;
                 if file > 8 {
-                    return err(&format!(
+                    return err_result(&format!(
                         "too many squares in rank ({:}, fen {:})",
                         FileRank { file, rank },
                         fen
@@ -162,7 +214,7 @@ impl Bitboards {
                 bb.set_square(index, piece);
                 file += 1;
             } else {
-                return err(&format!(
+                return err_result(&format!(
                     "unknown character {:} ({:}, fen {:})",
                     c,
                     FileRank { file, rank },
@@ -181,50 +233,6 @@ impl Bitboards {
     pub fn index_of_piece(&self, player: Player, piece: Piece) -> BoardIndex {
         let bb = self.pieces[player][piece];
         first_index_of_one(bb)
-    }
-
-    pub fn pretty(&self) -> String {
-        let mut s = String::new();
-
-        for rank in (0..8).rev() {
-            s.push_str(format!("{} ", rank_to_char(rank)).as_str());
-            for file in 0..8 {
-                let index = index_from_file_rank(file, rank);
-
-                let piece: Option<PlayerPiece> = self.piece_at_index(index);
-                if let Some(PlayerPiece { player, piece }) = piece {
-                    match player {
-                        Player::White => match piece {
-                            Piece::Pawn => s.push_str("♙ "),
-                            Piece::Rook => s.push_str("♖ "),
-                            Piece::Knight => s.push_str("♘ "),
-                            Piece::Bishop => s.push_str("♗ "),
-                            Piece::Queen => s.push_str("♕ "),
-                            Piece::King => s.push_str("♔ "),
-                        },
-                        Player::Black => match piece {
-                            Piece::Pawn => s.push_str("♟ "),
-                            Piece::Rook => s.push_str("♜ "),
-                            Piece::Knight => s.push_str("♞ "),
-                            Piece::Bishop => s.push_str("♝ "),
-                            Piece::Queen => s.push_str("♛ "),
-                            Piece::King => s.push_str("♚ "),
-                        },
-                    }
-                } else {
-                    s.push_str("· ");
-                }
-            }
-            s.push_str("\n");
-        }
-
-        s.push_str("  ");
-        for file in 0..8 {
-            s.push_str(format!("{} ", file_to_char(file)).as_str());
-        }
-        s.push_str("\n");
-
-        s
     }
 
     pub fn is_occupied_by_player(&self, index: BoardIndex, player: Player) -> bool {
@@ -256,7 +264,7 @@ impl Bitboards {
                 }
 
                 if found.len() > 1 {
-                    return err(&format!(
+                    return err_result(&format!(
                         "more than one piece at {:} -- {:?}",
                         FileRank { file, rank },
                         found,
@@ -265,7 +273,7 @@ impl Bitboards {
 
                 if found.len() == 0 {
                     if self.is_occupied(index) {
-                        return err(&format!(
+                        return err_result(&format!(
                             "no piece at {:} but occupied -- {:?}",
                             FileRank { file, rank },
                             found,
@@ -276,13 +284,13 @@ impl Bitboards {
 
                 let piece = found.iter().next().unwrap();
                 if self.is_occupied_by_player(index, other_player(piece.player)) {
-                    return err(&format!(
+                    return err_result(&format!(
                         "piece at {:} but occupied by other player -- {:?}",
                         FileRank { file, rank },
                         found,
                     ));
                 } else if !self.is_occupied_by_player(index, piece.player) {
-                    return err(&format!(
+                    return err_result(&format!(
                         "piece at {:} but not occupied by player -- {:?}",
                         FileRank { file, rank },
                         found,
@@ -290,7 +298,7 @@ impl Bitboards {
                 }
 
                 if self.piece_at_index(index) != Some(*piece) {
-                    return err(&format!(
+                    return err_result(&format!(
                         "piece at {:} but not found in piece_at_index -- {:?}",
                         FileRank { file, rank },
                         found,
@@ -324,7 +332,7 @@ pub fn test_starting_board() {
     let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
     let mut bb = Bitboards::from_fen(fen).unwrap();
     assert_eq!(
-        bb.pretty(),
+        format!("{}", bb).trim(),
         "♜♞♝♛♚♝♞♜\n\
 						 ♟♟♟♟♟♟♟♟\n\
 						 ········\n\
@@ -332,7 +340,7 @@ pub fn test_starting_board() {
 						 ········\n\
 						 ········\n\
 						 ♙♙♙♙♙♙♙♙\n\
-						 ♖♘♗♕♔♗♘♖\n"
+						 ♖♘♗♕♔♗♘♖"
     );
 
     bb.verify().unwrap();
@@ -341,7 +349,7 @@ pub fn test_starting_board() {
     bb.clear_square(i, PlayerPiece::new(Player::White, Piece::Pawn));
 
     assert_eq!(
-        bb.pretty(),
+        format!("{}", bb).trim(),
         "♜♞♝♛♚♝♞♜\n\
 						 ♟♟♟♟♟♟♟♟\n\
 						 ········\n\
@@ -349,7 +357,7 @@ pub fn test_starting_board() {
 						 ········\n\
 						 ········\n\
 						 ♙♙♙♙·♙♙♙\n\
-						 ♖♘♗♕♔♗♘♖\n"
+						 ♖♘♗♕♔♗♘♖"
     );
 
     bb.verify().unwrap();

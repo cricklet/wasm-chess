@@ -26,7 +26,7 @@ pub type ErrorResult<T> = Result<T, Error>;
 
 pub type VoidResult = Result<(), Error>;
 
-pub fn err<T>(msg: &str) -> ErrorResult<T> {
+pub fn err(msg: &str) -> Error {
     let backtrace = Backtrace::force_capture();
     let backtrace_str = backtrace.to_string();
     let mut backtrace_lines = backtrace_str.lines().collect::<Vec<_>>();
@@ -67,16 +67,24 @@ pub fn err<T>(msg: &str) -> ErrorResult<T> {
     let backtrace_str = pretty_backtrace(&backtrace_lines);
     let backtrace_str = backtrace_str.unwrap();
 
-    Err(Error {
+    Error {
         msg: msg.to_string() + "\n" + backtrace_str.as_str(),
-    })
+    }
+}
+
+pub fn err_result<T>(msg: &str) -> ErrorResult<T> {
+    Err(err(msg))
 }
 
 pub fn indent(input: &str, indent: usize) -> String {
     let indent_str = " ".repeat(indent);
+    prefix(input, &indent_str)
+}
+
+pub fn prefix(input: &str, p: &str) -> String {
     let mut output = String::new();
     for line in input.lines() {
-        output += &indent_str;
+        output += p;
         output += line;
         output += "\n";
     }
