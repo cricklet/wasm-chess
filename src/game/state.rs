@@ -137,6 +137,8 @@ impl Game {
     }
 
     pub fn from_position_uci(uci_line: &str) -> ErrorResult<Game> {
+        let uci_line = uci_line.trim();
+
         let position_prefix = "position";
         let moves_separator = "moves";
 
@@ -159,7 +161,7 @@ impl Game {
             if position_str == "startpos" {
                 Game::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
             } else if position_str.starts_with("fen") {
-                let fen_part = &uci_line["fen".len()..].trim();
+                let fen_part = &position_str["fen".len()..].trim();
                 Game::from_fen(fen_part)
             } else {
                 err_result(&format!("invalid uci line {}", uci_line))
@@ -181,7 +183,7 @@ impl Game {
     pub fn from_fen(fen: &str) -> ErrorResult<Game> {
         let mut game = Game::new();
 
-        let split: Vec<&str> = fen.split(' ').collect();
+        let split: Vec<&str> = fen.split(' ').filter(|v| !v.is_empty()).collect();
 
         // parse a string like "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 
@@ -278,6 +280,11 @@ impl Game {
         for castling_side in CastlingSide::iter() {
             self.can_castle[player][castling_side] &=
                 castling_allowed_after_move(player, castling_side, m.start_index);
+
+            if let MoveType::Capture(Capture::Take { .. }) = m.move_type {
+                self.can_castle[enemy][castling_side] &=
+                    castling_allowed_after_move(enemy, castling_side, m.end_index);
+            }
         }
 
         self.en_passant = None;
@@ -333,17 +340,6 @@ impl Game {
 
                         self.en_passant = Some(skipped_index);
                     }
-                    Quiet::PawnPromotion { promotion_piece } => {
-                        let promotion_piece = PlayerPiece::new(player, promotion_piece);
-                        if !types::PROMOTION_PIECES.contains(&promotion_piece.piece) {
-                            return self.err(format!(
-                                "invalid pawn promotion: promotion piece {} isn't a promotion piece",
-                                promotion_piece,
-                            ).as_str());
-                        }
-                        self.board.clear_square(m.start_index, m.piece);
-                        self.board.set_square(m.end_index, promotion_piece);
-                    }
                 }
             }
             MoveType::Capture(c) => match c {
@@ -375,6 +371,21 @@ impl Game {
             },
         }
 
+        if let Some(promo_piece) = m.promotion {
+            let promo_piece = PlayerPiece::new(player, promo_piece);
+            if !types::PROMOTION_PIECES.contains(&promo_piece.piece) {
+                return self.err(
+                    format!(
+                        "invalid pawn promotion: promotion piece {} isn't a promotion piece",
+                        promo_piece,
+                    )
+                    .as_str(),
+                );
+            }
+            self.board.clear_square(m.end_index, m.piece);
+            self.board.set_square(m.end_index, promo_piece);
+        }
+
         self.player = enemy;
         self.half_moves_since_pawn_or_capture += 1;
         if self.player == types::Player::White {
@@ -401,6 +412,7 @@ pub fn test_en_passant_1() {
             move_type: MoveType::Quiet(Quiet::PawnSkip {
                 skipped_index: index_from_file_rank_str("b3").unwrap()
             }),
+            promotion: None,
         }
     );
 }
@@ -436,6 +448,27 @@ pub fn test_en_passant_3() {
             move_type: MoveType::Capture(Capture::EnPassant {
                 taken_index: index_from_file_rank_str("b5").unwrap()
             }),
+            promotion: None,
         }
     );
+}
+
+#[test]
+pub fn test_castling_disallowed() {
+    let game = Game::from_position_uci(
+        "position fen rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8 moves a2a3 f2h1",
+    )
+    .unwrap();
+
+    assert_eq!(false, game.can_castle[game.player][CastlingSide::Kingside]);
+    assert_eq!(true, game.can_castle[game.player][CastlingSide::Queenside]);
+
+    let castling = all_moves(game.player, &game, OnlyCaptures::NO, OnlyQueenPromotion::NO)
+        .map(|m| m.unwrap())
+        .filter(|m| match m.move_type {
+            MoveType::Quiet(Quiet::Castle { .. }) => true,
+            _ => false,
+        });
+
+    assert_eq!(castling.count(), 0);
 }

@@ -103,4 +103,17 @@ pub enum Piece {
     King,
 }
 
+impl Piece {
+    pub fn to_uci(&self) -> &'static str {
+        match self {
+            Piece::Pawn => "p",
+            Piece::Rook => "r",
+            Piece::Knight => "n",
+            Piece::Bishop => "b",
+            Piece::Queen => "q",
+            Piece::King => "k",
+        }
+    }
+}
+
 pub const PROMOTION_PIECES: [Piece; 4] = [Piece::Rook, Piece::Knight, Piece::Bishop, Piece::Queen];

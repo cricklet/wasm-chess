@@ -4,6 +4,8 @@ from typing import Iterable
 
 from pprint import pprint
 
+debug = False
+
 class SafeList:
     def __init__(self):
         self.lock = threading.RLock()
@@ -47,6 +49,7 @@ class UciRunner:
 
     def send(self, command):
         if self.subprocess.stdin:
+            print("sending command: '{}'".format(command))
             self.subprocess.stdin.write(command.encode() + b'\n')
             self.subprocess.stdin.flush()
 
@@ -55,6 +58,8 @@ class UciRunner:
         if until is None:
             output = self.stdout_buffer.flush()
             for line in output:
+                if debug:
+                    print("read: {}".format(line))
                 result.append(line)
         else:
             while True:
@@ -64,10 +69,13 @@ class UciRunner:
                     continue
 
                 for line in output:
+                    if debug:
+                        print("read: {}".format(line))
                     result.append(line)
 
                     if until in line:
                         return result
+
         return result
 
     def kill(self):
@@ -147,15 +155,21 @@ if __name__ == '__main__':
     crab = UciRunner('cargo run main')
 
     position = "position startpos"
-    moves = "e2e4"
+    moves = ""
     depth = 3
 
-    if len(sys.argv) > 1:
-        position = sys.argv[1]
-    if len(sys.argv) > 2:
-        moves = sys.argv[2]
-    if len(sys.argv) > 3:
-        depth = int(sys.argv[3])
+    args = sys.argv[1:]
+
+    if len(args) > 0 and args[0] == '-d':
+        debug = True
+        args.pop(0)
+
+    if len(args) > 0:
+        position = args.pop(0)
+    if len(args) > 0:
+        moves = args.pop(0)
+    if len(args) > 0:
+        depth = int(args.pop(0))
 
     print("computing for position: '{}' moves: '{}' depth: '{}'".format(position, moves, depth))
 

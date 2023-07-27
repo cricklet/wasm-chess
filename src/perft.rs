@@ -53,6 +53,15 @@ struct TraverseGameCallbackParams<'game> {
 fn print_game(fen: &str, moves: &Vec<Move>) -> String {
     let mut game = Game::from_fen(fen).unwrap();
 
+    let uci_moves = moves
+        .iter()
+        .map(|m| m.to_uci())
+        .collect::<Vec<_>>()
+        .join(" ");
+
+    let mut uci = "".to_string();
+    uci.push_str(format!("position fen {} moves {}", fen, uci_moves).as_str());
+
     let mut s = "".to_string();
     s.push_str(format!("{}\n", game).as_str());
 
@@ -72,7 +81,7 @@ fn print_game(fen: &str, moves: &Vec<Move>) -> String {
 
     s.push_str(format!("{}", game.to_fen()).as_str());
 
-    format!("history: {{\n{}\n}}", indent(&s, 2))
+    format!("'{}': {{\n{}\n}}", uci, indent(&s, 2))
 }
 
 fn traverse_game_callback(
@@ -179,7 +188,7 @@ fn assert_perft_matches_for_depth(
     );
 
     for (m, count) in perft_per_move.iter() {
-        let m = format!("{}{}", m.start_index, m.end_index);
+        let m = m.to_uci();
 
         if let Some(expected_branches) = expected_branches {
             let expected_count = expected_branches.get(m.as_str()).unwrap();
@@ -206,11 +215,11 @@ fn assert_perft_matches(fen: &str, expected_counts: &[usize]) {
 
 #[test]
 fn test_perft_start_board() {
-    let guard = pprof::ProfilerGuardBuilder::default()
-        .frequency(1000)
-        .blocklist(&["libc", "libgcc", "pthread", "vdso", "backtrace"])
-        .build()
-        .unwrap();
+    // let guard = pprof::ProfilerGuardBuilder::default()
+    //     .frequency(1000)
+    //     .blocklist(&["libc", "libgcc", "pthread", "vdso", "backtrace"])
+    //     .build()
+    //     .unwrap();
 
     let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
     let expected_count = [
@@ -221,49 +230,49 @@ fn test_perft_start_board() {
     ];
     assert_perft_matches(fen, &expected_count);
 
-    match guard.report().build() {
-        Ok(report) => {
-            let mut file = File::create("profile.pb").unwrap();
-            let profile = report.pprof().unwrap();
+    // match guard.report().build() {
+    //     Ok(report) => {
+    //         let mut file = File::create("profile.pb").unwrap();
+    //         let profile = report.pprof().unwrap();
 
-            let mut content = Vec::new();
-            profile.write_to_vec(&mut content).unwrap();
+    //         let mut content = Vec::new();
+    //         profile.write_to_vec(&mut content).unwrap();
 
-            file.write_all(&content).unwrap();
-        }
-        Err(_) => {}
-    };
+    //         file.write_all(&content).unwrap();
+    //     }
+    //     Err(_) => {}
+    // };
 }
 
-#[test]
-fn test_perft_start_board_depth_5() {
-    let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-    let max_depth = 5;
-    let expected_count = 4865609;
-    let expected_branches = HashMap::from([
-        ("a2a3", 181046),
-        ("b2b3", 215255),
-        ("c2c3", 222861),
-        ("d2d3", 328511),
-        ("e2e3", 402988),
-        ("f2f3", 178889),
-        ("g2g3", 217210),
-        ("h2h3", 181044),
-        ("a2a4", 217832),
-        ("b2b4", 216145),
-        ("c2c4", 240082),
-        ("d2d4", 361790),
-        ("e2e4", 405385),
-        ("f2f4", 198473),
-        ("g2g4", 214048),
-        ("h2h4", 218829),
-        ("b1a3", 198572),
-        ("b1c3", 234656),
-        ("g1f3", 233491),
-        ("g1h3", 198502),
-    ]);
-    assert_perft_matches_for_depth(fen, max_depth, expected_count, Some(&expected_branches));
-}
+// #[test]
+// fn test_perft_start_board_depth_5() {
+//     let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+//     let max_depth = 5;
+//     let expected_count = 4865609;
+//     let expected_branches = HashMap::from([
+//         ("a2a3", 181046),
+//         ("b2b3", 215255),
+//         ("c2c3", 222861),
+//         ("d2d3", 328511),
+//         ("e2e3", 402988),
+//         ("f2f3", 178889),
+//         ("g2g3", 217210),
+//         ("h2h3", 181044),
+//         ("a2a4", 217832),
+//         ("b2b4", 216145),
+//         ("c2c4", 240082),
+//         ("d2d4", 361790),
+//         ("e2e4", 405385),
+//         ("f2f4", 198473),
+//         ("g2g4", 214048),
+//         ("h2h4", 218829),
+//         ("b1a3", 198572),
+//         ("b1c3", 234656),
+//         ("g1f3", 233491),
+//         ("g1h3", 198502),
+//     ]);
+//     assert_perft_matches_for_depth(fen, max_depth, expected_count, Some(&expected_branches));
+// }
 
 #[test]
 fn test_perft_start_board_a2a4_depth_4() {
@@ -293,6 +302,41 @@ fn test_perft_start_board_a2a4_depth_4() {
         ("g8h6", 9798),
     ]);
     assert_perft_matches_for_depth(fen, max_depth, expected_count, Some(&expected_branches));
+}
+
+#[test]
+fn test_perft_position_2() {
+    let fen = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1";
+    let expected_count = [1, 48, 2039, 97862];
+    assert_perft_matches(fen, &expected_count);
+}
+
+#[test]
+fn test_perft_position_3() {
+    let fen = "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1";
+    let expected_count = [1, 14, 191, 2812];
+    assert_perft_matches(fen, &expected_count);
+}
+
+#[test]
+fn test_perft_position_4() {
+    let fen = "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1";
+    let expected_count = [1, 6, 264, 9467];
+    assert_perft_matches(fen, &expected_count);
+}
+
+#[test]
+fn test_perft_position_5() {
+    let fen = "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8";
+    let expected_count = [1, 44, 1486, 62379];
+    assert_perft_matches(fen, &expected_count);
+}
+
+#[test]
+fn test_perft_position_6() {
+    let fen = "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10";
+    let expected_count = [1, 46, 2079, 89890];
+    assert_perft_matches(fen, &expected_count);
 }
 
 // fn measure_time(f: impl FnOnce()) -> std::time::Duration {

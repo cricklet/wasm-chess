@@ -258,3 +258,19 @@ fn test_understand_iter_from_params() {
     let x = add_iter(5);
     for _ in x {}
 }
+
+pub fn debug_and_return<T>(t: T) -> T
+where
+    T: std::fmt::Debug,
+{
+    println!("{:#?}", t);
+    t
+}
+
+pub fn display_and_return<T>(t: T) -> T
+where
+    T: std::fmt::Display,
+{
+    println!("{}", t);
+    t
+}

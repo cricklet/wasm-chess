@@ -1,4 +1,4 @@
-use std::iter;
+use std::{collections::HashMap, iter};
 
 use strum::IntoEnumIterator;
 
@@ -17,10 +17,10 @@ pub enum OnlyQueenPromotion {
 }
 
 impl OnlyQueenPromotion {
-    pub fn pieces(&self) -> Box<dyn Iterator<Item = Piece>> {
+    pub fn pieces(&self) -> &'static [Piece] {
         match self {
-            OnlyQueenPromotion::NO => Box::new(PROMOTION_PIECES.into_iter()),
-            OnlyQueenPromotion::YES => Box::new(iter::once(Piece::Queen)),
+            OnlyQueenPromotion::NO => &PROMOTION_PIECES,
+            OnlyQueenPromotion::YES => &[Piece::Queen],
         }
     }
 }
@@ -33,9 +33,6 @@ pub enum Quiet {
     },
     PawnSkip {
         skipped_index: BoardIndex,
-    },
-    PawnPromotion {
-        promotion_piece: Piece,
     },
     Move,
 }
@@ -58,11 +55,26 @@ pub struct Move {
     pub start_index: BoardIndex,
     pub end_index: BoardIndex,
     pub move_type: MoveType,
+    pub promotion: Option<Piece>,
 }
 
 impl Move {
     pub fn to_uci(&self) -> String {
-        format!("{}{}", self.start_index, self.end_index)
+        let promo = self.promotion.map(|p| p.to_uci());
+        let promo = promo.unwrap_or(&"");
+        format!("{}{}{}", self.start_index, self.end_index, promo)
+    }
+}
+
+impl std::fmt::Display for Move {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {} {:?}", self.piece, self.to_uci(), self.move_type,)
+    }
+}
+
+impl std::fmt::Debug for Move {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {} {:?}", self.piece, self.to_uci(), self.move_type,)
     }
 }
 
@@ -73,28 +85,9 @@ pub fn test_move_to_uci() {
         start_index: BoardIndex::from(8),
         end_index: BoardIndex::from(16),
         move_type: MoveType::Quiet(Quiet::Move),
+        promotion: None,
     };
     assert_eq!(m.to_uci(), "a2a3");
-}
-
-impl std::fmt::Display for Move {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{} {}{} {:?}",
-            self.piece, self.start_index, self.end_index, self.move_type,
-        )
-    }
-}
-
-impl std::fmt::Debug for Move {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{} {}{} {:?}",
-            self.piece, self.start_index, self.end_index, self.move_type,
-        )
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -129,6 +122,7 @@ pub fn potential_bb_to_moves(
                 start_index,
                 end_index,
                 move_type: MoveType::Capture(Capture::Take { taken_piece }),
+                promotion: None,
             }),
             None => err_result(&format!(
                 "no piece at index {:} but marked as capture",
@@ -142,6 +136,7 @@ pub fn potential_bb_to_moves(
         start_index,
         end_index,
         move_type: MoveType::Quiet(Quiet::Move),
+        promotion: None,
     });
 
     match only_captures {
@@ -227,6 +222,41 @@ pub fn pawn_attacking_bb(start_bb: Bitboard, capture_dir: Direction) -> Bitboard
     attacking_bb
 }
 
+pub fn pawn_capture_move(
+    bitboards: Bitboards,
+    player: Player,
+    end_index: BoardIndex,
+    capture_dir: Direction,
+) -> ErrorResult<Move> {
+    let start_index = BoardIndex::from((end_index.i as isize - capture_dir.offset()) as usize);
+    let taken_piece = bitboards.piece_at_index(end_index);
+    match taken_piece {
+        Some(taken_piece) => Ok(Move {
+            piece: PlayerPiece::new(player, Piece::Pawn),
+            start_index,
+            end_index,
+            move_type: MoveType::Capture(Capture::Take { taken_piece }),
+            promotion: None,
+        }),
+        None => err_result(&format!("no piece at {:} but marked as capture", end_index)),
+    }
+}
+
+pub fn pawn_quiet_move(
+    player: Player,
+    end_index: BoardIndex,
+    push_dir: Direction,
+) -> ErrorResult<Move> {
+    let start_index = BoardIndex::from((end_index.i as isize - push_dir.offset()) as usize);
+    Ok(Move {
+        piece: PlayerPiece::new(player, Piece::Pawn),
+        start_index,
+        end_index,
+        move_type: MoveType::Quiet(Quiet::Move),
+        promotion: None,
+    })
+}
+
 pub fn pawn_moves(
     player: Player,
     bitboards: Bitboards,
@@ -241,22 +271,24 @@ pub fn pawn_moves(
             let attacking_bb = pawn_attacking_bb(pawns, *capture_dir);
             let capture_bb = attacking_bb & bitboards.occupied[other_player(player)];
 
-            each_index_of_one(capture_bb).map(move |end_index| {
-                let start_index =
-                    BoardIndex::from((end_index.i as isize - capture_dir.offset()) as usize);
-                let taken_piece = bitboards.piece_at_index(end_index);
-                match taken_piece {
-                    Some(taken_piece) => Ok(Move {
-                        piece: PlayerPiece::new(player, Piece::Pawn),
-                        start_index,
-                        end_index,
-                        move_type: MoveType::Capture(Capture::Take { taken_piece }),
-                    }),
-                    None => {
-                        err_result(&format!("no piece at {:} but marked as capture", end_index))
-                    }
-                }
-            })
+            let capture_pawns = capture_bb & !*PAWN_PROMOTION_BITBOARD;
+            let promotion_pawns = capture_bb & *PAWN_PROMOTION_BITBOARD;
+
+            let capture_pawns = each_index_of_one(capture_pawns).map(move |end_index| {
+                pawn_capture_move(bitboards, player, end_index, *capture_dir)
+            });
+            let promotion_pawns = each_index_of_one(promotion_pawns).flat_map(move |end_index| {
+                only_queen_promotion
+                    .pieces()
+                    .iter()
+                    .map(move |&promo_piece| -> ErrorResult<Move> {
+                        let mut m = pawn_capture_move(bitboards, player, end_index, *capture_dir)?;
+                        m.promotion = Some(promo_piece);
+                        Ok(m)
+                    })
+            });
+
+            capture_pawns.chain(promotion_pawns)
         })
     };
 
@@ -275,30 +307,17 @@ pub fn pawn_moves(
         let pushed_pawns = moved_pawns & !*PAWN_PROMOTION_BITBOARD;
         let promotion_pawns = moved_pawns & *PAWN_PROMOTION_BITBOARD;
 
-        let pushed_pawns = each_index_of_one(pushed_pawns).map(move |end_index| {
-            let start_index =
-                BoardIndex::from((end_index.i as isize - quiet_push_dir.offset()) as usize);
-            Ok(Move {
-                piece: PlayerPiece::new(player, Piece::Pawn),
-                start_index,
-                end_index,
-                move_type: MoveType::Quiet(Quiet::Move),
-            })
-        });
-
+        let pushed_pawns = each_index_of_one(pushed_pawns)
+            .map(move |end_index| pawn_quiet_move(player, end_index, quiet_push_dir));
         let promotion_pawns = each_index_of_one(promotion_pawns).flat_map(move |end_index| {
-            let start_index =
-                BoardIndex::from((end_index.i as isize - quiet_push_dir.offset()) as usize);
-            only_queen_promotion.pieces().map(move |promo_piece| {
-                Ok(Move {
-                    piece: PlayerPiece::new(player, Piece::Pawn),
-                    start_index,
-                    end_index,
-                    move_type: MoveType::Quiet(Quiet::PawnPromotion {
-                        promotion_piece: promo_piece,
-                    }),
+            only_queen_promotion
+                .pieces()
+                .iter()
+                .map(move |&promo_piece| -> ErrorResult<Move> {
+                    let mut m = pawn_quiet_move(player, end_index, quiet_push_dir)?;
+                    m.promotion = Some(promo_piece);
+                    Ok(m)
                 })
-            })
         });
 
         pushed_pawns.chain(promotion_pawns)
@@ -320,6 +339,7 @@ pub fn pawn_moves(
                 start_index,
                 end_index,
                 move_type: MoveType::Quiet(Quiet::PawnSkip { skipped_index }),
+                promotion: None,
             })
         })
     };
@@ -352,6 +372,7 @@ pub fn en_passant_move(
                     start_index,
                     end_index: en_passant_index,
                     move_type: MoveType::Capture(Capture::EnPassant { taken_index }),
+                    promotion: None,
                 });
             }
         }
@@ -380,23 +401,20 @@ pub fn castling_moves<'game>(
         return true;
     });
 
-    let safe_castling_sides = empty_castling_sides.flat_map(move |req| {
-        let require_safe = req.require_safe.iter();
-        let potential_castles = require_safe.filter_map(move |&safe_index| {
-            match index_in_danger(player, safe_index, state) {
-                Err(err) => {
-                    return Some(Err(err));
+    let safe_castling_sides = empty_castling_sides
+        .map(move |req| -> ErrorResult<Option<&CastlingRequirements>> {
+            for &safe_index in &req.require_safe {
+                if index_in_danger(player, safe_index, state)? {
+                    return Ok(None);
                 }
-                Ok(true) => return None,
-                Ok(false) => return Some(Ok(req)),
             }
-        });
 
-        potential_castles
-    });
+            Ok(Some(req))
+        })
+        .filter_map(|req| req.transpose());
 
-    let moves = safe_castling_sides.map(move |req_result| {
-        req_result.map(|req| Move {
+    let moves = safe_castling_sides.map(move |req| {
+        req.map(|req| Move {
             piece: PlayerPiece::new(player, Piece::King),
             start_index: req.king_start,
             end_index: req.king_end,
@@ -404,6 +422,7 @@ pub fn castling_moves<'game>(
                 rook_start: req.rook_start,
                 rook_end: req.rook_end,
             }),
+            promotion: None,
         })
     });
 
@@ -490,4 +509,40 @@ pub fn index_in_danger(player: Player, target: BoardIndex, state: &Game) -> Erro
     } else {
         Ok(false)
     }
+}
+
+#[test]
+fn test_castling_repeat_moves() {
+    let position = "position fen r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1 moves e1c1";
+    let game = Game::from_position_uci(position).unwrap();
+
+    let mut count_moves = HashMap::<String, usize>::new();
+    for m in all_moves(game.player, &game, OnlyCaptures::NO, OnlyQueenPromotion::NO) {
+        let m = m.unwrap();
+        let count = count_moves.entry(m.to_uci().to_string()).or_insert(0);
+        *count += 1;
+    }
+
+    for (m, count) in count_moves.iter() {
+        assert_eq!(*count, 1, "incorrect count for: {}", m);
+    }
+}
+
+#[test]
+fn test_promotion_moves() {
+    let position =
+        "position fen r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1 moves b4c5";
+    let game = Game::from_position_uci(position).unwrap();
+
+    let mut count_moves = HashMap::<String, usize>::new();
+    for m in all_moves(game.player, &game, OnlyCaptures::NO, OnlyQueenPromotion::NO) {
+        let m = m.unwrap();
+        let count = count_moves.entry(m.to_uci().to_string()).or_insert(0);
+        *count += 1;
+    }
+
+    assert_eq!(*count_moves.get("b2b1b").unwrap(), 1);
+    assert_eq!(*count_moves.get("b2b1r").unwrap(), 1);
+    assert_eq!(*count_moves.get("b2b1q").unwrap(), 1);
+    assert_eq!(*count_moves.get("b2b1n").unwrap(), 1);
 }
