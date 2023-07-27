@@ -4,9 +4,9 @@ use crate::bitboards::{self, castling_allowed_after_move, Bitboards, BoardIndex}
 use crate::bitboards::{index_from_file_rank_str, ForPlayer};
 use crate::helpers::{err, err_result, ErrorResult};
 use crate::moves::{
-    all_moves, index_in_danger, Move, MoveType, OnlyCaptures, OnlyQueenPromotion, Quiet,
+    all_moves, index_in_danger, Capture, Move, MoveType, OnlyCaptures, OnlyQueenPromotion, Quiet,
 };
-use crate::types::{self, CastlingSide, Piece, PlayerPiece};
+use crate::types::{self, CastlingSide, Piece, Player, PlayerPiece};
 
 #[derive(Debug, Default, Copy, Clone)]
 pub struct CanCastleOnSide {
@@ -99,7 +99,7 @@ impl std::fmt::Display for Game {
 
 impl std::fmt::Debug for Game {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self,)
+        write!(f, "{}\n{}", self.to_fen(), self.board)
     }
 }
 
@@ -350,7 +350,10 @@ impl Game {
                 crate::moves::Capture::EnPassant { taken_index } => {
                     let taken_piece = PlayerPiece::new(enemy, Piece::Pawn);
                     if self.board.piece_at_index(taken_index) != Some(taken_piece) {
-                        return self.err("invalid en-passant: taken piece isn't enemy pawn");
+                        return self.err(&format!(
+                            "invalid en-passant {:?}: taken piece isn't enemy pawn",
+                            m
+                        ));
                     }
                     self.board.clear_square(taken_index, taken_piece);
 
@@ -359,7 +362,10 @@ impl Game {
                 }
                 crate::moves::Capture::Take { taken_piece } => {
                     if taken_piece.player != enemy {
-                        return self.err("invalid capture: taken piece isn't enemy piece");
+                        return self.err(&format!(
+                            "invalid en-passant {:?}: taken piece isn't enemy piece",
+                            m
+                        ));
                     }
                     self.board.clear_square(m.end_index, taken_piece);
 
@@ -377,4 +383,59 @@ impl Game {
 
         Ok(())
     }
+}
+
+#[test]
+pub fn test_en_passant_1() {
+    let game = Game::from_position_uci("position startpos moves e2e4 a7a5 e4e5 a5a4").unwrap();
+    let m = game.move_from_str("b2b4");
+    assert_eq!(
+        m.unwrap(),
+        Move {
+            piece: PlayerPiece {
+                player: Player::White,
+                piece: Piece::Pawn
+            },
+            start_index: index_from_file_rank_str("b2").unwrap(),
+            end_index: index_from_file_rank_str("b4").unwrap(),
+            move_type: MoveType::Quiet(Quiet::PawnSkip {
+                skipped_index: index_from_file_rank_str("b3").unwrap()
+            }),
+        }
+    );
+}
+
+#[test]
+pub fn test_en_passsant_2() {
+    let game = Game::from_position_uci("position startpos moves e2e4 a7a5 e4e5 a5a4 b2b4").unwrap();
+    assert_eq!(
+        game.en_passant,
+        Some(index_from_file_rank_str("b3").unwrap())
+    );
+
+    for m in all_moves(game.player, &game, OnlyCaptures::NO, OnlyQueenPromotion::NO) {
+        let mut next_game = game;
+        next_game.make_move(m.unwrap()).unwrap();
+    }
+}
+
+#[test]
+pub fn test_en_passant_3() {
+    let game =
+        Game::from_fen("rnbqkbnr/p2ppppp/2p5/Pp6/8/8/1PPPPPPP/RNBQKBNR w KQkq b6 4 3").unwrap();
+    let m = game.move_from_str("a5b6");
+    assert_eq!(
+        m.unwrap(),
+        Move {
+            piece: PlayerPiece {
+                player: Player::White,
+                piece: Piece::Pawn
+            },
+            start_index: index_from_file_rank_str("a5").unwrap(),
+            end_index: index_from_file_rank_str("b6").unwrap(),
+            move_type: MoveType::Capture(Capture::EnPassant {
+                taken_index: index_from_file_rank_str("b5").unwrap()
+            }),
+        }
+    );
 }

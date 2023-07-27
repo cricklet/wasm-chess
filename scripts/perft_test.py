@@ -1,6 +1,38 @@
 
-import subprocess, itertools
+import subprocess, itertools, sys, datetime, select, threading, time
 from typing import Iterable
+
+from pprint import pprint
+
+class SafeList:
+    def __init__(self):
+        self.lock = threading.RLock()
+        self.buffer = []
+
+    def add(self, line):
+        with self.lock:
+            self.buffer.append(line)
+
+    def pop(self) -> str | None:
+        with self.lock:
+            if len(self.buffer) == 0:
+                return None
+            return self.buffer.pop(0)
+
+    def flush(self) -> list[str]:
+        with self.lock:
+            result = self.buffer
+            self.buffer = []
+            return result
+
+    def __len__(self):
+        with self.lock:
+            return len(self.buffer)
+
+def watch_stdout(subprocess, thread_list: SafeList):
+    while subprocess.stdout and subprocess.poll() is None:
+        line = subprocess.stdout.readline().strip().decode()
+        thread_list.add(line)
 
 class UciRunner:
     def __init__(self, command):
@@ -9,20 +41,34 @@ class UciRunner:
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
         )
+        self.stdout_buffer = SafeList()
+        self.stdout_watcher = threading.Thread(target=watch_stdout, args=(self.subprocess, self.stdout_buffer))
+        self.stdout_watcher.start()
 
     def send(self, command):
         if self.subprocess.stdin:
             self.subprocess.stdin.write(command.encode() + b'\n')
             self.subprocess.stdin.flush()
 
-    def read(self, until) -> Iterable[str]:
-        while self.subprocess.stdout:
-            line = self.subprocess.stdout.readline().strip().decode()
-            yield line
+    def read(self, until: str | None = None) -> list[str]:
+        result = []
+        if until is None:
+            output = self.stdout_buffer.flush()
+            for line in output:
+                result.append(line)
+        else:
+            while True:
+                output = self.stdout_buffer.flush()
+                if len(output) == 0:
+                    time.sleep(0.05)
+                    continue
 
-            for s in until:
-                if s in line:
-                    return
+                for line in output:
+                    result.append(line)
+
+                    if until in line:
+                        return result
+        return result
 
     def kill(self):
         try:
@@ -47,7 +93,7 @@ def main(stockfish, crab, position, moves, depth):
 
     stockfish.send('position {} moves {}'.format(position, moves))
     stockfish.send('go perft {}'.format(depth))
-    for line in stockfish.read(["Nodes searched:", "error"]):
+    for line in stockfish.read("Nodes searched:"):
         if "Nodes searched:" in line:
             stockfish_perft_overall = line
         elif ":" in line:
@@ -57,9 +103,19 @@ def main(stockfish, crab, position, moves, depth):
     crab_perft_overall = 0
     crab_perft_per_move = []
 
+    crab.send("isready")
+    crab.read("readyok")
+
     crab.send('position {} moves {}'.format(position, moves))
+    crab.read()
+
+    crab.send('d')
+    crab.send("isready")
+    for line in crab.read("readyok")[:-1]:
+        print(line)
+
     crab.send('go perft {}'.format(depth))
-    for line in crab.read(["Nodes searched:", "error"]):
+    for line in crab.read("Nodes searched:"):
         if "Nodes searched:" in line:
             crab_perft_overall = line
         elif ":" in line:
@@ -68,31 +124,48 @@ def main(stockfish, crab, position, moves, depth):
     stockfish_perft_per_move = sorted(stockfish_perft_per_move)
     crab_perft_per_move = sorted(crab_perft_per_move)
 
+    eq_str = lambda x: "!=" if x[0] != x[1] else "=="
+
     print_columns(
-        sorted(stockfish_perft_per_move),
-        list(map(
-            lambda x: "!=" if x[0] != x[1] else "==",
+        ['stock'] + sorted(stockfish_perft_per_move),
+        [''] + list(map(
+            eq_str,
             zip(
                 sorted(stockfish_perft_per_move),
                 sorted(crab_perft_per_move))
         )),
-        sorted(crab_perft_per_move),
+        ['crab'] + sorted(crab_perft_per_move),
     )
 
     print_columns(
-        [stockfish_perft_overall],[crab_perft_overall])
+        [stockfish_perft_overall], [
+            eq_str((stockfish_perft_overall, crab_perft_overall))
+        ], [crab_perft_overall])
 
 if __name__ == '__main__':
     stockfish = UciRunner('stockfish')
     crab = UciRunner('cargo run main')
 
+    position = "position startpos"
+    moves = "e2e4"
+    depth = 3
+
+    if len(sys.argv) > 1:
+        position = sys.argv[1]
+    if len(sys.argv) > 2:
+        moves = sys.argv[2]
+    if len(sys.argv) > 3:
+        depth = int(sys.argv[3])
+
+    print("computing for position: '{}' moves: '{}' depth: '{}'".format(position, moves, depth))
+
     try:
         main(
             stockfish,
             crab,
-            "startpos",
-            "e2e4",
-            3
+            position,
+            moves,
+            depth
         )
     finally:
         stockfish.kill()

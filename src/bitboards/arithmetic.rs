@@ -266,7 +266,7 @@ pub fn rank_to_char(rank: usize) -> char {
 
 #[test]
 pub fn test_index_to_file_rank_str() {
-    assert_eq!(BoardIndex { i: 24 }.to_string(), "e4");
+    assert_eq!(BoardIndex { i: 27 }.to_string(), "d4");
 }
 
 pub fn bitboard_with_indices_set(indices: &[BoardIndex]) -> Bitboard {

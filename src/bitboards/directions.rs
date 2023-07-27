@@ -9,7 +9,7 @@ use crate::{
 
 use super::*;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, EnumIter)]
+#[derive(Debug, strum::Display, Copy, Clone, PartialEq, Eq, Hash, EnumIter)]
 pub enum Direction {
     N,
     S,
@@ -115,7 +115,7 @@ pub fn pawn_capture_directions_for_player(player: Player) -> &'static [Direction
 pub fn en_passant_move_and_target_offsets(player: Player) -> &'static [(Direction, Direction); 2] {
     match player {
         Player::White => &[(Direction::NE, Direction::E), (Direction::NW, Direction::W)],
-        Player::Black => &[(Direction::SE, Direction::S), (Direction::SW, Direction::W)],
+        Player::Black => &[(Direction::SE, Direction::E), (Direction::SW, Direction::W)],
     }
 }
 

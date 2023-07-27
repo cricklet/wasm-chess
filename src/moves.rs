@@ -74,7 +74,7 @@ pub fn test_move_to_uci() {
         end_index: BoardIndex::from(16),
         move_type: MoveType::Quiet(Quiet::Move),
     };
-    assert_eq!(m.to_uci(), "a2a4");
+    assert_eq!(m.to_uci(), "a2a3");
 }
 
 impl std::fmt::Display for Move {
@@ -313,11 +313,13 @@ pub fn pawn_moves(
         each_index_of_one(push2).map(move |end_index| {
             let start_index =
                 BoardIndex::from((end_index.i as isize - 2 * quiet_push_dir.offset()) as usize);
+            let skipped_index =
+                BoardIndex::from((end_index.i as isize - quiet_push_dir.offset()) as usize);
             Ok(Move {
                 piece: PlayerPiece::new(player, Piece::Pawn),
                 start_index,
                 end_index,
-                move_type: MoveType::Quiet(Quiet::Move),
+                move_type: MoveType::Quiet(Quiet::PawnSkip { skipped_index }),
             })
         })
     };
@@ -336,18 +338,20 @@ pub fn en_passant_move(
         let en_passant_bb = single_bitboard(en_passant_index);
 
         for (dir, target_dir) in en_passant_move_and_target_offsets(player) {
+            let pawns = pawns & pre_move_mask(*dir);
             let moved_pawns = rotate_toward_index_63(pawns, dir.offset());
 
             if moved_pawns & en_passant_bb != 0 {
+                let start_index =
+                    BoardIndex::from((en_passant_index.i as isize - dir.offset()) as usize);
+                let taken_index =
+                    BoardIndex::from((start_index.i as isize + target_dir.offset()) as usize);
+
                 return Some(Move {
                     piece: PlayerPiece::new(player, Piece::Pawn),
-                    start_index: BoardIndex::from(en_passant_index.i - dir.offset() as usize),
+                    start_index,
                     end_index: en_passant_index,
-                    move_type: MoveType::Capture(Capture::EnPassant {
-                        taken_index: BoardIndex::from(
-                            en_passant_index.i - target_dir.offset() as usize,
-                        ),
-                    }),
+                    move_type: MoveType::Capture(Capture::EnPassant { taken_index }),
                 });
             }
         }

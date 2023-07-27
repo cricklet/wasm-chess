@@ -214,7 +214,8 @@ fn test_perft_start_board() {
 
     let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
     let expected_count = [
-        1, 20, 400, 8902, 197281, 4865609,
+        1, 20, 400, 8902, 197281,
+        // 4865609,
         // 119060324,
         // 3195901860,
     ];
@@ -234,41 +235,41 @@ fn test_perft_start_board() {
     };
 }
 
-// #[test]
-// fn test_perft_start_board_depth_5() {
-//     let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-//     let max_depth = 5;
-//     let expected_count = 4865609;
-//     let expected_branches = HashMap::from([
-//         ("a2a3", 181046),
-//         ("b2b3", 215255),
-//         ("c2c3", 222861),
-//         ("d2d3", 328511),
-//         ("e2e3", 402988),
-//         ("f2f3", 178889),
-//         ("g2g3", 217210),
-//         ("h2h3", 181044),
-//         ("a2a4", 217832),
-//         ("b2b4", 216145),
-//         ("c2c4", 240082),
-//         ("d2d4", 361790),
-//         ("e2e4", 405385),
-//         ("f2f4", 198473),
-//         ("g2g4", 214048),
-//         ("h2h4", 218829),
-//         ("b1a3", 198572),
-//         ("b1c3", 234656),
-//         ("g1f3", 233491),
-//         ("g1h3", 198502),
-//     ]);
-//     assert_perft_matches_for_depth(fen, max_depth, expected_count, Some(&expected_branches));
-// }
+#[test]
+fn test_perft_start_board_depth_5() {
+    let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    let max_depth = 5;
+    let expected_count = 4865609;
+    let expected_branches = HashMap::from([
+        ("a2a3", 181046),
+        ("b2b3", 215255),
+        ("c2c3", 222861),
+        ("d2d3", 328511),
+        ("e2e3", 402988),
+        ("f2f3", 178889),
+        ("g2g3", 217210),
+        ("h2h3", 181044),
+        ("a2a4", 217832),
+        ("b2b4", 216145),
+        ("c2c4", 240082),
+        ("d2d4", 361790),
+        ("e2e4", 405385),
+        ("f2f4", 198473),
+        ("g2g4", 214048),
+        ("h2h4", 218829),
+        ("b1a3", 198572),
+        ("b1c3", 234656),
+        ("g1f3", 233491),
+        ("g1h3", 198502),
+    ]);
+    assert_perft_matches_for_depth(fen, max_depth, expected_count, Some(&expected_branches));
+}
 
 #[test]
 fn test_perft_start_board_a2a4_depth_4() {
     let fen = "rnbqkbnr/pppppppp/8/8/P7/8/1PPPPPPP/RNBQKBNR b KQkq - 0 1";
     let max_depth = 4;
-    let expected_count = 4865609;
+    let expected_count = 217832;
     let expected_branches = HashMap::from([
         ("a7a6", 9312),
         ("b7b6", 10348),
@@ -294,12 +295,12 @@ fn test_perft_start_board_a2a4_depth_4() {
     assert_perft_matches_for_depth(fen, max_depth, expected_count, Some(&expected_branches));
 }
 
-fn measure_time(f: impl FnOnce()) -> std::time::Duration {
-    let start_time = std::time::Instant::now();
-    f();
-    let end_time = std::time::Instant::now();
-    end_time - start_time
-}
+// fn measure_time(f: impl FnOnce()) -> std::time::Duration {
+//     let start_time = std::time::Instant::now();
+//     f();
+//     let end_time = std::time::Instant::now();
+//     end_time - start_time
+// }
 
 // #[test]
 // fn test_copy_vs_ref() {
