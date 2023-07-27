@@ -147,7 +147,7 @@ pub fn potential_bb_to_moves(
 
 pub fn walk_potential_bb(
     index: BoardIndex,
-    bitboards: &Bitboards,
+    all_occupied: Bitboard,
     piece: Piece,
 ) -> ErrorResult<Bitboard> {
     let walk_types = walk_type_for_piece(piece);
@@ -157,7 +157,7 @@ pub fn walk_potential_bb(
     let mut danger_bb = 0;
 
     for walk_type in walk_types.iter() {
-        danger_bb |= moves_bb_for_piece_and_blockers(index, *walk_type, bitboards.all_occupied());
+        danger_bb |= moves_bb_for_piece_and_blockers(index, *walk_type, all_occupied);
     }
 
     Ok(danger_bb)
@@ -169,7 +169,7 @@ pub fn walk_moves(
     only_captures: OnlyCaptures,
 ) -> Box<dyn Iterator<Item = ErrorResult<Move>> + '_> {
     let moves = each_index_of_one(bitboards.pieces[player][piece]).flat_map(move |piece_index| {
-        let potential_bb = walk_potential_bb(piece_index, bitboards, piece);
+        let potential_bb = walk_potential_bb(piece_index, bitboards.all_occupied(), piece);
 
         match potential_bb {
             Err(err) => Box::new(iter::once(Err(err))),
@@ -483,8 +483,8 @@ pub fn index_in_danger(player: Player, target: BoardIndex, state: &Game) -> Erro
     let knight_dangers = jumping_bitboard(target, JumpingPiece::Knight);
     let king_dangers = jumping_bitboard(target, JumpingPiece::King);
 
-    let bishop_dangers = walk_potential_bb(target, &state.board, Piece::Bishop);
-    let rook_dangers = walk_potential_bb(target, &state.board, Piece::Rook);
+    let bishop_dangers = walk_potential_bb(target, state.board.all_occupied(), Piece::Bishop);
+    let rook_dangers = walk_potential_bb(target, state.board.all_occupied(), Piece::Rook);
 
     let bishop_dangers = bishop_dangers?;
     let rook_dangers = rook_dangers?;

@@ -105,6 +105,10 @@ impl BoardIndex {
         BoardIndex { i }
     }
 
+    pub fn from_str(s: &str) -> ErrorResult<BoardIndex> {
+        index_from_file_rank_str(s)
+    }
+
     pub fn file_rank(&self) -> FileRank {
         FileRank {
             file: self.i % 8,
