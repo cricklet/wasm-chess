@@ -175,27 +175,29 @@ pub fn zeros_for(cs: &[char]) -> ErrorResult<Bitboard> {
     Ok(bb)
 }
 
+lazy_static! {
+    pub static ref PRE_MOVE_MASKS: Vec<Bitboard> = vec![
+        zeros_for(&['8']).unwrap(),
+        zeros_for(&['1']).unwrap(),
+        zeros_for(&['h']).unwrap(),
+        zeros_for(&['a']).unwrap(),
+        zeros_for(&['8', 'h']).unwrap(),
+        zeros_for(&['8', 'a']).unwrap(),
+        zeros_for(&['1', 'h']).unwrap(),
+        zeros_for(&['1', 'a']).unwrap(),
+        zeros_for(&['8', '7', 'h']).unwrap(),
+        zeros_for(&['8', '7', 'a']).unwrap(),
+        zeros_for(&['1', '2', 'h']).unwrap(),
+        zeros_for(&['1', '2', 'a']).unwrap(),
+        zeros_for(&['h', 'g', '8']).unwrap(),
+        zeros_for(&['h', 'g', '1']).unwrap(),
+        zeros_for(&['a', 'b', '8']).unwrap(),
+        zeros_for(&['a', 'b', '1']).unwrap(),
+    ];
+}
+
 pub fn pre_move_mask(direction: Direction) -> Bitboard {
-    match direction {
-        Direction::N => zeros_for(&['8']).unwrap(),
-        Direction::S => zeros_for(&['1']).unwrap(),
-        Direction::E => zeros_for(&['h']).unwrap(),
-        Direction::W => zeros_for(&['a']).unwrap(),
-
-        Direction::NE => zeros_for(&['8', 'h']).unwrap(),
-        Direction::NW => zeros_for(&['8', 'a']).unwrap(),
-        Direction::SE => zeros_for(&['1', 'h']).unwrap(),
-        Direction::SW => zeros_for(&['1', 'a']).unwrap(),
-
-        Direction::NNE => zeros_for(&['8', '7', 'h']).unwrap(),
-        Direction::NNW => zeros_for(&['8', '7', 'a']).unwrap(),
-        Direction::SSE => zeros_for(&['1', '2', 'h']).unwrap(),
-        Direction::SSW => zeros_for(&['1', '2', 'a']).unwrap(),
-        Direction::EEN => zeros_for(&['h', 'g', '8']).unwrap(),
-        Direction::EES => zeros_for(&['h', 'g', '1']).unwrap(),
-        Direction::WWN => zeros_for(&['a', 'b', '8']).unwrap(),
-        Direction::WWS => zeros_for(&['a', 'b', '1']).unwrap(),
-    }
+    PRE_MOVE_MASKS[direction as usize]
 }
 
 #[test]

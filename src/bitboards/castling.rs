@@ -71,7 +71,6 @@ pub fn castling_requirements(
     }
 }
 
-#[memoize]
 pub fn castling_allowed_after_move(
     player: Player,
     castling_side: CastlingSide,

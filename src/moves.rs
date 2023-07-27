@@ -100,9 +100,9 @@ pub fn potential_bb_to_moves(
     PlayerPiece { player, piece }: PlayerPiece,
     piece_index: BoardIndex,
     potential: Bitboard,
-    bitboards: Bitboards,
+    bitboards: &Bitboards,
     only_captures: OnlyCaptures,
-) -> Box<dyn Iterator<Item = ErrorResult<Move>>> {
+) -> Box<dyn Iterator<Item = ErrorResult<Move>> + '_> {
     let self_occupied = bitboards.occupied[player];
     let enemy_occupied = bitboards.occupied[other_player(player)];
 
@@ -147,7 +147,7 @@ pub fn potential_bb_to_moves(
 
 pub fn walk_potential_bb(
     index: BoardIndex,
-    bitboards: Bitboards,
+    bitboards: &Bitboards,
     piece: Piece,
 ) -> ErrorResult<Bitboard> {
     let walk_types = walk_type_for_piece(piece);
@@ -165,9 +165,9 @@ pub fn walk_potential_bb(
 
 pub fn walk_moves(
     PlayerPiece { player, piece }: PlayerPiece,
-    bitboards: Bitboards,
+    bitboards: &Bitboards,
     only_captures: OnlyCaptures,
-) -> Box<dyn Iterator<Item = ErrorResult<Move>>> {
+) -> Box<dyn Iterator<Item = ErrorResult<Move>> + '_> {
     let moves = each_index_of_one(bitboards.pieces[player][piece]).flat_map(move |piece_index| {
         let potential_bb = walk_potential_bb(piece_index, bitboards, piece);
 
@@ -196,10 +196,10 @@ pub fn jumping_bitboard(index: BoardIndex, jumping_piece: JumpingPiece) -> Bitbo
 
 pub fn jump_moves(
     player: Player,
-    bitboards: Bitboards,
+    bitboards: &Bitboards,
     jumping_piece: JumpingPiece,
     only_captures: OnlyCaptures,
-) -> impl Iterator<Item = ErrorResult<Move>> {
+) -> impl Iterator<Item = ErrorResult<Move>> + '_ {
     let piece = match jumping_piece {
         JumpingPiece::Knight => Piece::Knight,
         JumpingPiece::King => Piece::King,
@@ -223,7 +223,7 @@ pub fn pawn_attacking_bb(start_bb: Bitboard, capture_dir: Direction) -> Bitboard
 }
 
 pub fn pawn_capture_move(
-    bitboards: Bitboards,
+    bitboards: &Bitboards,
     player: Player,
     end_index: BoardIndex,
     capture_dir: Direction,
@@ -259,10 +259,10 @@ pub fn pawn_quiet_move(
 
 pub fn pawn_moves(
     player: Player,
-    bitboards: Bitboards,
+    bitboards: &Bitboards,
     only_captures: OnlyCaptures,
     only_queen_promotion: OnlyQueenPromotion,
-) -> Box<dyn Iterator<Item = ErrorResult<Move>>> {
+) -> Box<dyn Iterator<Item = ErrorResult<Move>> + '_> {
     let pawns = bitboards.pieces[player][Piece::Pawn];
 
     let capture_moves = {
@@ -349,7 +349,7 @@ pub fn pawn_moves(
 
 pub fn en_passant_move(
     player: Player,
-    bitboards: Bitboards,
+    bitboards: &Bitboards,
     en_passant_index: Option<BoardIndex>,
 ) -> Option<Move> {
     let pawns = bitboards.pieces[player][Piece::Pawn];
@@ -435,27 +435,27 @@ pub fn all_moves<'game>(
     only_captures: OnlyCaptures,
     only_queen_promotion: OnlyQueenPromotion,
 ) -> impl Iterator<Item = ErrorResult<Move>> + 'game {
-    let pawn_moves = pawn_moves(player, state.board, only_captures, only_queen_promotion);
-    let knight_moves = jump_moves(player, state.board, JumpingPiece::Knight, only_captures);
-    let king_moves = jump_moves(player, state.board, JumpingPiece::King, only_captures);
+    let pawn_moves = pawn_moves(player, &state.board, only_captures, only_queen_promotion);
+    let knight_moves = jump_moves(player, &state.board, JumpingPiece::Knight, only_captures);
+    let king_moves = jump_moves(player, &state.board, JumpingPiece::King, only_captures);
     let bishop_moves = walk_moves(
         PlayerPiece::new(player, Piece::Bishop),
-        state.board,
+        &state.board,
         only_captures,
     );
     let rook_moves = walk_moves(
         PlayerPiece::new(player, Piece::Rook),
-        state.board,
+        &state.board,
         only_captures,
     );
     let queen_moves = walk_moves(
         PlayerPiece::new(player, Piece::Queen),
-        state.board,
+        &state.board,
         only_captures,
     );
     let castling_moves = castling_moves(player, state);
 
-    let en_passant = en_passant_move(player, state.board, state.en_passant);
+    let en_passant = en_passant_move(player, &state.board, state.en_passant);
     let en_passant = en_passant.map(Ok);
 
     pawn_moves
@@ -483,8 +483,8 @@ pub fn index_in_danger(player: Player, target: BoardIndex, state: &Game) -> Erro
     let knight_dangers = jumping_bitboard(target, JumpingPiece::Knight);
     let king_dangers = jumping_bitboard(target, JumpingPiece::King);
 
-    let bishop_dangers = walk_potential_bb(target, state.board, Piece::Bishop);
-    let rook_dangers = walk_potential_bb(target, state.board, Piece::Rook);
+    let bishop_dangers = walk_potential_bb(target, &state.board, Piece::Bishop);
+    let rook_dangers = walk_potential_bb(target, &state.board, Piece::Rook);
 
     let bishop_dangers = bishop_dangers?;
     let rook_dangers = rook_dangers?;

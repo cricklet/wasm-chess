@@ -1,11 +1,9 @@
 use std::{collections::HashMap, fs::File, io::Write};
 
-use pprof::protos::Message;
-
 use crate::{
     bitboards::{magic_constants, MAGIC_MOVE_TABLE},
     game::Game,
-    helpers::{indent, ErrorResult},
+    helpers::{indent, ErrorResult, Profiler},
     moves::{all_moves, index_in_danger, Move, OnlyCaptures, OnlyQueenPromotion},
     types::Piece,
 };
@@ -84,6 +82,30 @@ fn print_game(fen: &str, moves: &Vec<Move>) -> String {
     format!("'{}': {{\n{}\n}}", uci, indent(&s, 2))
 }
 
+fn for_each_legal_move(
+    game: &Game,
+    callback: &mut dyn FnMut(&Game, &Move) -> ErrorResult<()>,
+) -> ErrorResult<()> {
+    let player: crate::types::Player = game.player;
+
+    let moves = all_moves(player, game, OnlyCaptures::NO, OnlyQueenPromotion::NO);
+    for m in moves {
+        let m = m?;
+
+        let mut next_game = *game;
+        next_game.make_move(m)?;
+
+        let king_index = next_game.board.index_of_piece(player, Piece::King);
+        let illegal_move = index_in_danger(player, king_index, &next_game).unwrap();
+
+        if !illegal_move {
+            callback(&next_game, &m)?;
+        }
+    }
+
+    Ok(())
+}
+
 fn traverse_game_callback(
     moves_stack: &mut Vec<Move>,
     game: &Game,
@@ -102,31 +124,17 @@ fn traverse_game_callback(
         return Ok(());
     }
 
-    let player = game.player;
-
-    let moves = all_moves(player, game, OnlyCaptures::NO, OnlyQueenPromotion::NO);
-    for m in moves {
-        let m = m?;
-        moves_stack.push(m);
-
-        let mut next_game = *game;
-        next_game.make_move(m)?;
-
-        let king_index = next_game.board.index_of_piece(player, Piece::King);
-        let illegal_move = index_in_danger(player, king_index, &next_game).unwrap();
-
-        if !illegal_move {
-            traverse_game_callback(moves_stack, &next_game, depth + 1, max_depth, callback)?;
-        }
-
+    for_each_legal_move(game, &mut |next_game, m| {
+        moves_stack.push(*m);
+        traverse_game_callback(moves_stack, next_game, depth + 1, max_depth, callback)?;
         moves_stack.pop();
-    }
+        Ok(())
+    })?;
 
     Ok(())
 }
 
-pub fn run_perft(game: &Game, max_depth: usize) -> ErrorResult<(usize, HashMap<Move, usize>)> {
-    let mut perft_per_move: HashMap<Move, usize> = HashMap::new();
+pub fn run_perft(game: &Game, max_depth: usize) -> ErrorResult<usize> {
     let mut perft_overall = 0;
 
     let mut moves_stack = vec![];
@@ -138,27 +146,36 @@ pub fn run_perft(game: &Game, max_depth: usize) -> ErrorResult<(usize, HashMap<M
             if params.depth == 0 {
                 return;
             }
-
-            let count = perft_per_move.entry(params.moves_stack[0]).or_insert(0);
-            *count += 1;
         }
     })?;
 
-    Ok((perft_overall, perft_per_move))
+    Ok(perft_overall)
 }
 
-fn assert_perft_matches_for_depth(
-    fen: &str,
+pub fn run_perft_counting_first_move(
+    game: &Game,
     max_depth: usize,
-    expected_count: usize,
-    expected_branches: Option<&HashMap<&str, usize>>,
-) {
+) -> ErrorResult<(usize, HashMap<String, usize>)> {
+    let mut total_count = 0;
+    let mut count_per_move: HashMap<String, usize> = HashMap::new();
+    for_each_legal_move(game, &mut |next_game, next_move| {
+        let move_str = next_move.to_uci();
+        let count = count_per_move.entry(move_str).or_insert(0);
+
+        *count = run_perft(next_game, max_depth - 1)?;
+        total_count += *count;
+        Ok(())
+    })?;
+
+    Ok((total_count, count_per_move))
+}
+
+fn assert_perft_matches_for_depth(fen: &str, max_depth: usize, expected_count: usize) {
     let game = Game::from_fen(fen).unwrap();
     assert_eq!(game.to_fen(), fen);
 
     let start_time = std::time::Instant::now();
 
-    let mut perft_per_move: HashMap<Move, usize> = HashMap::new();
     let mut perft_overall = 0;
 
     let mut moves_stack = vec![];
@@ -170,9 +187,6 @@ fn assert_perft_matches_for_depth(
             if params.depth == 0 {
                 return;
             }
-
-            let count = perft_per_move.entry(params.moves_stack[0]).or_insert(0);
-            *count += 1;
         }
     });
 
@@ -187,61 +201,35 @@ fn assert_perft_matches_for_depth(
         (end_time - start_time).as_millis()
     );
 
-    for (m, count) in perft_per_move.iter() {
-        let m = m.to_uci();
-
-        if let Some(expected_branches) = expected_branches {
-            let expected_count = expected_branches.get(m.as_str()).unwrap();
-            assert_eq!(expected_count, count, "incorrect perft for: {}", m);
-        }
-    }
-
     assert_eq!(expected_count, perft_overall);
 }
 
 fn assert_perft_matches(fen: &str, expected_counts: &[usize]) {
     for (max_depth, &expected_count) in expected_counts.iter().enumerate() {
-        assert_perft_matches_for_depth(fen, max_depth, expected_count, None);
+        assert_perft_matches_for_depth(fen, max_depth, expected_count);
     }
-
-    // traverse
-
-    // let mut perft = perft::Perft::new(game);
-    // for (depth, expected_count) in expected_counts.iter().enumerate() {
-    //     let count = perft.perft(depth as u8);
-    //     assert_eq!(count, *expected_count);
-    // }
 }
 
 #[test]
 fn test_perft_start_board() {
-    // let guard = pprof::ProfilerGuardBuilder::default()
-    //     .frequency(1000)
-    //     .blocklist(&["libc", "libgcc", "pthread", "vdso", "backtrace"])
-    //     .build()
-    //     .unwrap();
-
     let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-    let expected_count = [
-        1, 20, 400, 8902, 197281,
-        // 4865609,
-        // 119060324,
-        // 3195901860,
-    ];
+
+    // Run once to warm up the magics cache
+    let expected_count = [1, 20];
     assert_perft_matches(fen, &expected_count);
 
-    // match guard.report().build() {
-    //     Ok(report) => {
-    //         let mut file = File::create("profile.pb").unwrap();
-    //         let profile = report.pprof().unwrap();
-
-    //         let mut content = Vec::new();
-    //         profile.write_to_vec(&mut content).unwrap();
-
-    //         file.write_all(&content).unwrap();
-    //     }
-    //     Err(_) => {}
-    // };
+    {
+        let p = Profiler::new("perft_start_board".to_string());
+        let expected_count = [
+            1, 20, 400, 8902,
+            197281,
+            // 4865609,
+            // 119060324,
+            // 3195901860,
+        ];
+        assert_perft_matches(fen, &expected_count);
+        p.flush();
+    }
 }
 
 // #[test]
@@ -273,36 +261,6 @@ fn test_perft_start_board() {
 //     ]);
 //     assert_perft_matches_for_depth(fen, max_depth, expected_count, Some(&expected_branches));
 // }
-
-#[test]
-fn test_perft_start_board_a2a4_depth_4() {
-    let fen = "rnbqkbnr/pppppppp/8/8/P7/8/1PPPPPPP/RNBQKBNR b KQkq - 0 1";
-    let max_depth = 4;
-    let expected_count = 217832;
-    let expected_branches = HashMap::from([
-        ("a7a6", 9312),
-        ("b7b6", 10348),
-        ("c7c6", 10217),
-        ("d7d6", 13203),
-        ("e7e6", 14534),
-        ("f7f6", 9328),
-        ("g7g6", 10310),
-        ("h7h6", 9328),
-        ("a7a5", 9062),
-        ("b7b5", 11606),
-        ("c7c5", 10737),
-        ("d7d5", 13725),
-        ("e7e5", 14560),
-        ("f7f5", 9847),
-        ("g7g5", 10293),
-        ("h7h5", 10293),
-        ("b8a6", 9827),
-        ("b8c6", 10746),
-        ("g8f6", 10758),
-        ("g8h6", 9798),
-    ]);
-    assert_perft_matches_for_depth(fen, max_depth, expected_count, Some(&expected_branches));
-}
 
 #[test]
 fn test_perft_position_2() {

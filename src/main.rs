@@ -9,6 +9,7 @@ use perft::run_perft;
 use crate::{
     game::Game,
     helpers::{indent, prefix},
+    perft::run_perft_counting_first_move,
 };
 
 pub mod bitboards;
@@ -44,9 +45,10 @@ fn run() -> ErrorResult<()> {
                     return err_result(&format!("invalid depth for '{}'", input));
                 }
             };
-            let (perft_overall, perft_per_move) = run_perft(&current_game.unwrap(), depth)?;
+            let (perft_overall, perft_per_move) =
+                run_perft_counting_first_move(&current_game.unwrap(), depth)?;
             perft_per_move.iter().for_each(|(mv, count)| {
-                println!("{}: {}", mv.to_uci(), count);
+                println!("{}: {}", mv, count);
             });
             println!("Nodes searched: {}", perft_overall);
         } else if input == "d" {
