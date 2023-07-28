@@ -6,7 +6,7 @@ use crate::helpers::{err, err_result, ErrorResult};
 use crate::moves::{
     all_moves, index_in_danger, Capture, Move, MoveType, OnlyCaptures, OnlyQueenPromotion, Quiet,
 };
-use crate::types::{self, CastlingSide, Piece, Player, PlayerPiece};
+use crate::types::{self, CastlingSide, Piece, Player, PlayerPiece, CASTLING_SIDES};
 
 #[derive(Debug, Default, Copy, Clone)]
 pub struct CanCastleOnSide {
@@ -259,7 +259,7 @@ impl Game {
             next_game.make_move(m).unwrap();
 
             let king_index = next_game.board.index_of_piece(self.player, Piece::King);
-            let illegal_move = index_in_danger(self.player, king_index, &next_game).unwrap();
+            let illegal_move = index_in_danger(self.player, king_index, &next_game.board).unwrap();
 
             if illegal_move {
                 continue;
@@ -277,13 +277,24 @@ impl Game {
         let player = m.piece.player;
         let enemy = player.other();
 
-        for castling_side in CastlingSide::iter() {
-            self.can_castle[player][castling_side] &=
-                castling_allowed_after_move(player, castling_side, m.start_index);
+        for &castling_side in CASTLING_SIDES.iter() {
+            if m.piece.piece != Piece::King && m.piece.piece != Piece::Rook {
+                continue;
+            }
+            let ref mut player_can_castle = self.can_castle[player][castling_side];
+            if !*player_can_castle {
+                continue;
+            }
+            *player_can_castle = castling_allowed_after_move(player, castling_side, m.start_index);
+        }
 
+        for &castling_side in CASTLING_SIDES.iter() {
             if let MoveType::Capture(Capture::Take { .. }) = m.move_type {
-                self.can_castle[enemy][castling_side] &=
-                    castling_allowed_after_move(enemy, castling_side, m.end_index);
+                let ref mut enemy_can_castle = self.can_castle[enemy][castling_side];
+                if !*enemy_can_castle {
+                    continue;
+                }
+                *enemy_can_castle &= castling_allowed_after_move(enemy, castling_side, m.end_index);
             }
         }
 

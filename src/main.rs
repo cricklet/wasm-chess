@@ -13,6 +13,7 @@ use crate::{
 };
 
 pub mod bitboards;
+pub mod danger;
 pub mod game;
 pub mod helpers;
 pub mod moves;

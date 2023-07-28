@@ -94,9 +94,6 @@ pub struct Bitboards {
     pub pieces: ForPlayer<PieceBitboards>,
     pub occupied: ForPlayer<Bitboard>,
     pub piece_at_index: [Option<PlayerPiece>; 64],
-
-    pub in_check: ForPlayer<Option<bool>>,
-    pub pinned: ForPlayer<Option<Bitboard>>,
 }
 
 impl std::fmt::Display for Bitboards {
@@ -147,17 +144,7 @@ impl std::fmt::Display for Bitboards {
 
 impl std::fmt::Debug for Bitboards {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}\nwhite pinned:\n{}\nblack pinned:\n{}",
-            self,
-            self.pinned
-                .white
-                .map_or_else(|| "?".to_string(), bitboard_string),
-            self.pinned
-                .black
-                .map_or_else(|| "?".to_string(), bitboard_string),
-        )
+        write!(f, "{}", self)
     }
 }
 
@@ -167,8 +154,6 @@ impl Bitboards {
             pieces: ForPlayer::new(PieceBitboards::new(), PieceBitboards::new()),
             occupied: ForPlayer::new(0, 0),
             piece_at_index: [None; 64],
-            pinned: ForPlayer::new(None, None),
-            in_check: ForPlayer::new(None, None),
         }
     }
 
@@ -325,89 +310,7 @@ impl Bitboards {
         Ok(())
     }
 
-    fn in_danger_and_pinned_pieces(
-        target: BoardIndex,
-        occupied: Bitboard,
-        player_occupied: Bitboard,
-        enemy_occupied: Bitboard,
-        walk_type: WalkType,
-    ) -> (bool, Bitboard) {
-        let dangers = moves_bb_for_piece_and_blockers(target, walk_type, occupied);
-        let in_danger = dangers & enemy_occupied != 0;
-
-        // Ignore direct threats
-        let enemy_occupied = enemy_occupied & !dangers;
-
-        let mut pinned = Bitboard::default();
-
-        let player_potential_blockers = dangers & player_occupied;
-        for potential_blocker_index in each_index_of_one(player_potential_blockers) {
-            // If we remove this blocker, is the king in danger?
-            let occupied = occupied & !single_bitboard(potential_blocker_index);
-            let dangers = moves_bb_for_piece_and_blockers(target, walk_type, occupied);
-            let in_danger = dangers & enemy_occupied != 0;
-
-            if in_danger {
-                pinned |= single_bitboard(potential_blocker_index);
-            }
-        }
-
-        (in_danger, pinned)
-    }
-
-    pub fn update_pin_and_danger_maps(&mut self, player: Player) -> ErrorResult<()> {
-        let enemy = other_player(player);
-
-        let target = self.index_of_piece(player, Piece::King);
-
-        let (in_danger_from_bishop, pinned_by_bishop) = Bitboards::in_danger_and_pinned_pieces(
-            target,
-            self.all_occupied(),
-            self.occupied[player],
-            self.pieces[enemy].bishops | self.pieces[enemy].queens,
-            WalkType::Bishop,
-        );
-
-        let (in_danger_from_rook, pinned_by_rook) = Bitboards::in_danger_and_pinned_pieces(
-            target,
-            self.all_occupied(),
-            self.occupied[player],
-            self.pieces[enemy].rooks | self.pieces[enemy].queens,
-            WalkType::Rook,
-        );
-
-        self.pinned[player] = Some(pinned_by_bishop | pinned_by_rook);
-        self.in_check[player] = Some(in_danger_from_bishop || in_danger_from_rook);
-
-        Ok(())
-    }
-
-    pub fn piece_is_pinned(&mut self, index: BoardIndex) -> ErrorResult<bool> {
-        let PlayerPiece { player, piece: _ } =
-            self.piece_at_index(index).ok_or(err("no piece at index"))?;
-        if self.pinned[player] == None {
-            self.update_pin_and_danger_maps(player)?;
-        }
-
-        let ref pinned = self.pinned[player].ok_or(err("failed to update pins"))?;
-        Ok(pinned & single_bitboard(index) != 0)
-    }
-
-    pub fn in_check(&mut self, player: Player) -> ErrorResult<bool> {
-        if self.in_check[player] == None {
-            self.update_pin_and_danger_maps(player)?;
-        }
-
-        let ref in_check = self.in_check[player].ok_or(err("failed to update pins"))?;
-        Ok(*in_check)
-    }
-
     pub fn clear_square(&mut self, index: BoardIndex, piece: PlayerPiece) {
-        self.pinned.white = None;
-        self.pinned.black = None;
-        self.in_check.white = None;
-        self.in_check.black = None;
-
         let bb = single_bitboard(index);
 
         self.pieces[piece.player][piece.piece] &= !bb;
@@ -416,11 +319,6 @@ impl Bitboards {
     }
 
     pub fn set_square(&mut self, index: BoardIndex, piece: PlayerPiece) {
-        self.pinned.white = None;
-        self.pinned.black = None;
-        self.in_check.white = None;
-        self.in_check.black = None;
-
         let bb = single_bitboard(index);
 
         self.pieces[piece.player][piece.piece] |= bb;
@@ -467,91 +365,4 @@ pub fn test_starting_board() {
     );
 
     bb.verify().unwrap();
-}
-
-#[test]
-pub fn test_pins() {
-    let fen = "2k5/3r4/6b1/1N1N4/4N3/3K4/8/8";
-    let mut bb = Bitboards::from_fen(fen).unwrap();
-
-    assert_eq!(false, bb.in_check(Player::White).unwrap());
-
-    assert_eq!(
-        true,
-        bb.piece_is_pinned(BoardIndex::from_str("d5").unwrap())
-            .unwrap()
-    );
-    assert_eq!(
-        true,
-        bb.piece_is_pinned(BoardIndex::from_str("e4").unwrap())
-            .unwrap()
-    );
-    assert_eq!(
-        false,
-        bb.piece_is_pinned(BoardIndex::from_str("b5").unwrap())
-            .unwrap()
-    );
-}
-
-#[test]
-pub fn test_double_pin() {
-    let fen = "2k5/3r4/q5b1/1N1N1B2/2N1N3/3K1rPr/2Pnn3/3q1b2";
-    let mut bb = Bitboards::from_fen(fen).unwrap();
-
-    assert_eq!(true, bb.in_check(Player::White).unwrap());
-
-    assert_eq!(
-        true,
-        bb.piece_is_pinned(BoardIndex::from_str("d5").unwrap())
-            .unwrap()
-    );
-    assert_eq!(
-        false,
-        bb.piece_is_pinned(BoardIndex::from_str("b5").unwrap())
-            .unwrap()
-    );
-    assert_eq!(
-        false,
-        bb.piece_is_pinned(BoardIndex::from_str("c4").unwrap())
-            .unwrap()
-    );
-    assert_eq!(
-        false,
-        bb.piece_is_pinned(BoardIndex::from_str("c2").unwrap())
-            .unwrap()
-    );
-    assert_eq!(
-        false,
-        bb.piece_is_pinned(BoardIndex::from_str("e4").unwrap())
-            .unwrap()
-    );
-    assert_eq!(
-        false,
-        bb.piece_is_pinned(BoardIndex::from_str("f5").unwrap())
-            .unwrap()
-    );
-}
-
-#[test]
-pub fn test_check() {
-    let fen = "2k5/3r4/6b1/1N1N4/4N3/q2K4/8/8";
-    let mut bb = Bitboards::from_fen(fen).unwrap();
-
-    assert_eq!(true, bb.in_check(Player::White).unwrap());
-
-    assert_eq!(
-        true,
-        bb.piece_is_pinned(BoardIndex::from_str("d5").unwrap())
-            .unwrap()
-    );
-    assert_eq!(
-        true,
-        bb.piece_is_pinned(BoardIndex::from_str("e4").unwrap())
-            .unwrap()
-    );
-    assert_eq!(
-        false,
-        bb.piece_is_pinned(BoardIndex::from_str("b5").unwrap())
-            .unwrap()
-    );
 }

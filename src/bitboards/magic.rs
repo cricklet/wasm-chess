@@ -450,9 +450,9 @@ pub fn moves_bb_for_piece_and_blockers(
     piece: WalkType,
     occupancy_bb: Bitboard,
 ) -> Bitboard {
-    let magic_value = &MAGIC_MOVE_TABLE.magics[piece][piece_index.i];
-    let magic_moves = &MAGIC_MOVE_TABLE.moves_table[piece][piece_index.i];
-    let mask_blockers_bb = &MAGIC_MOVE_TABLE.mask_blocker_bbs[piece][piece_index.i];
+    let ref magic_value = MAGIC_MOVE_TABLE.magics[piece][piece_index.i];
+    let ref magic_moves = MAGIC_MOVE_TABLE.moves_table[piece][piece_index.i];
+    let ref mask_blockers_bb = MAGIC_MOVE_TABLE.mask_blocker_bbs[piece][piece_index.i];
 
     let specific_blocker_bb = mask_blockers_bb & occupancy_bb;
     let magic_index = magic_index_for_specific_blocker_bb(magic_value, specific_blocker_bb);

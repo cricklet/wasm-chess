@@ -385,12 +385,12 @@ pub fn castling_moves<'game>(
     player: Player,
     state: &'game Game,
 ) -> impl Iterator<Item = ErrorResult<Move>> + 'game {
-    let castling_sides: CastlingSideIter = CastlingSide::iter();
-    let allowed_castling_sides =
-        castling_sides.filter(move |castling_side| state.can_castle[player][*castling_side]);
+    let allowed_castling_sides = CASTLING_SIDES
+        .iter()
+        .filter(move |&&castling_side| state.can_castle[player][castling_side]);
 
     let castling_requirements = allowed_castling_sides
-        .map(move |castling_side| castling_requirements(player, castling_side));
+        .map(move |&castling_side| castling_requirements(player, castling_side));
 
     let empty_castling_sides = castling_requirements.filter(move |&req| {
         for &empty_index in &req.require_empty {
@@ -404,7 +404,7 @@ pub fn castling_moves<'game>(
     let safe_castling_sides = empty_castling_sides
         .map(move |req| -> ErrorResult<Option<&CastlingRequirements>> {
             for &safe_index in &req.require_safe {
-                if index_in_danger(player, safe_index, state)? {
+                if index_in_danger(player, safe_index, &state.board)? {
                     return Ok(None);
                 }
             }
@@ -468,7 +468,11 @@ pub fn all_moves<'game>(
         .chain(castling_moves)
 }
 
-pub fn index_in_danger(player: Player, target: BoardIndex, state: &Game) -> ErrorResult<bool> {
+pub fn index_in_danger(
+    player: Player,
+    target: BoardIndex,
+    bitboards: &Bitboards,
+) -> ErrorResult<bool> {
     let enemy = other_player(player);
 
     let target_bb = single_bitboard(target);
@@ -483,20 +487,20 @@ pub fn index_in_danger(player: Player, target: BoardIndex, state: &Game) -> Erro
     let knight_dangers = jumping_bitboard(target, JumpingPiece::Knight);
     let king_dangers = jumping_bitboard(target, JumpingPiece::King);
 
-    let bishop_dangers = walk_potential_bb(target, state.board.all_occupied(), Piece::Bishop);
-    let rook_dangers = walk_potential_bb(target, state.board.all_occupied(), Piece::Rook);
+    let bishop_dangers = walk_potential_bb(target, bitboards.all_occupied(), Piece::Bishop);
+    let rook_dangers = walk_potential_bb(target, bitboards.all_occupied(), Piece::Rook);
 
     let bishop_dangers = bishop_dangers?;
     let rook_dangers = rook_dangers?;
 
     let queen_dangers = bishop_dangers | rook_dangers;
 
-    let enemy_pawns = state.board.pieces[enemy][Piece::Pawn];
-    let enemy_knights = state.board.pieces[enemy][Piece::Knight];
-    let enemy_kings = state.board.pieces[enemy][Piece::King];
-    let enemy_bishops = state.board.pieces[enemy][Piece::Bishop];
-    let enemy_rooks = state.board.pieces[enemy][Piece::Rook];
-    let enemy_queens = state.board.pieces[enemy][Piece::Queen];
+    let enemy_pawns = bitboards.pieces[enemy][Piece::Pawn];
+    let enemy_knights = bitboards.pieces[enemy][Piece::Knight];
+    let enemy_kings = bitboards.pieces[enemy][Piece::King];
+    let enemy_bishops = bitboards.pieces[enemy][Piece::Bishop];
+    let enemy_rooks = bitboards.pieces[enemy][Piece::Rook];
+    let enemy_queens = bitboards.pieces[enemy][Piece::Queen];
 
     if enemy_pawns & pawn_dangers != 0
         || enemy_knights & knight_dangers != 0

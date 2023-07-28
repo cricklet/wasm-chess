@@ -2,10 +2,14 @@ use std::{collections::HashMap, fs::File, io::Write};
 
 use crate::{
     bitboards::{magic_constants, MAGIC_MOVE_TABLE},
+    danger::Danger,
     game::Game,
     helpers::{indent, ErrorResult, Profiler},
-    moves::{all_moves, index_in_danger, Move, OnlyCaptures, OnlyQueenPromotion},
-    types::Piece,
+    moves::{
+        all_moves, index_in_danger, Capture, Move, MoveType, OnlyCaptures, OnlyQueenPromotion,
+        Quiet,
+    },
+    types::{Piece, Player},
 };
 
 fn assert_fen_matches(expected_fen: &str) {
@@ -86,7 +90,8 @@ fn for_each_legal_move(
     game: &Game,
     callback: &mut dyn FnMut(&Game, &Move) -> ErrorResult<()>,
 ) -> ErrorResult<()> {
-    let player: crate::types::Player = game.player;
+    let player: Player = game.player;
+    let danger = Danger::from(player, &game.board)?;
 
     let moves = all_moves(player, game, OnlyCaptures::NO, OnlyQueenPromotion::NO);
     for m in moves {
@@ -95,12 +100,20 @@ fn for_each_legal_move(
         let mut next_game = *game;
         next_game.make_move(m)?;
 
-        let king_index = next_game.board.index_of_piece(player, Piece::King);
-        let illegal_move = index_in_danger(player, king_index, &next_game).unwrap();
+        let be_extra_careful = danger.check
+            || m.piece.piece == Piece::King
+            || matches!(m.move_type, MoveType::Capture(Capture::EnPassant { .. }))
+            || danger.piece_is_pinned(m.start_index);
 
-        if !illegal_move {
-            callback(&next_game, &m)?;
+        if be_extra_careful {
+            let king_index = next_game.board.index_of_piece(player, Piece::King);
+            let illegal_move = index_in_danger(player, king_index, &next_game.board).unwrap();
+            if illegal_move {
+                continue;
+            }
         }
+
+        callback(&next_game, &m)?;
     }
 
     Ok(())
@@ -221,9 +234,7 @@ fn test_perft_start_board() {
     {
         let p = Profiler::new("perft_start_board".to_string());
         let expected_count = [
-            1, 20, 400, 8902,
-            197281,
-            // 4865609,
+            1, 20, 400, 8902, 197281, 4865609,
             // 119060324,
             // 3195901860,
         ];

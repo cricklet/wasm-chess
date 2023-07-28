@@ -87,11 +87,13 @@ pub fn other_player(player: Player) -> Player {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, EnumIter, Enum)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Enum)]
 pub enum CastlingSide {
     Kingside,
     Queenside,
 }
+
+pub static CASTLING_SIDES: [CastlingSide; 2] = [CastlingSide::Kingside, CastlingSide::Queenside];
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, EnumIter, Enum)]
 pub enum Piece {
