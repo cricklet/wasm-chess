@@ -141,7 +141,7 @@ pub fn zeros_for_file(file: char) -> Bitboard {
     let f = file_from_char(file).unwrap();
 
     for r in 0..8 {
-        let index = index_from_file_rank(f, r);
+        let index = FileRank::from(f, r).to_index();
         bb &= !single_bitboard(index);
     }
 
@@ -154,7 +154,7 @@ pub fn zeros_for_rank(rank: char) -> Bitboard {
     let r = rank_from_char(rank).unwrap();
 
     for f in 0..8 {
-        let index = index_from_file_rank(f, r);
+        let index = FileRank::from(f, r).to_index();
         bb &= !single_bitboard(index);
     }
 

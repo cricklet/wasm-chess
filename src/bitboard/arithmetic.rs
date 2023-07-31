@@ -105,6 +105,10 @@ impl BoardIndex {
         BoardIndex { i }
     }
 
+    pub fn from_file_rank(file: usize, rank: usize) -> BoardIndex {
+        FileRank::from(file, rank).to_index()
+    }
+
     pub fn from_str(s: &str) -> ErrorResult<BoardIndex> {
         index_from_file_rank_str(s)
     }
@@ -135,6 +139,23 @@ pub struct FileRank {
     pub rank: usize,
 }
 
+impl FileRank {
+    pub fn from(file: usize, rank: usize) -> FileRank {
+        FileRank { file, rank }
+    }
+
+    pub fn from_index(index: usize) -> FileRank {
+        FileRank {
+            file: index % 8,
+            rank: index / 8,
+        }
+    }
+
+    pub fn to_index(&self) -> BoardIndex {
+        BoardIndex::from(self.rank * 8 + self.file)
+    }
+}
+
 impl std::fmt::Debug for FileRank {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let file_char = file_to_char(self.file);
@@ -149,10 +170,6 @@ impl std::fmt::Display for FileRank {
         let rank_char = rank_to_char(self.rank);
         write!(f, "{}{}", file_char, rank_char)
     }
-}
-
-pub fn index_from_file_rank(file: usize, rank: usize) -> BoardIndex {
-    BoardIndex::from(rank * 8 + file)
 }
 
 pub fn file_from_char(file: char) -> Option<usize> {
@@ -224,7 +241,7 @@ pub fn index_from_file_rank_str(file_rank_str: &str) -> ErrorResult<BoardIndex> 
         None => return err_result(&format!("Invalid rank: {}", file_rank_str)),
     };
 
-    Ok(index_from_file_rank(file, rank))
+    Ok(FileRank { file, rank }.to_index())
 }
 
 pub fn unwrap_index_from_file_rank_str(file_rank_str: &str) -> BoardIndex {

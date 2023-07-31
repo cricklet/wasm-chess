@@ -103,7 +103,7 @@ impl std::fmt::Display for Bitboards {
         for rank in (0..8).rev() {
             s.push_str(format!("{} ", rank_to_char(rank)).as_str());
             for file in 0..8 {
-                let index = index_from_file_rank(file, rank);
+                let index = FileRank { file, rank }.to_index();
 
                 let piece: Option<PlayerPiece> = self.piece_at_index(index);
                 if let Some(PlayerPiece { player, piece }) = piece {
@@ -162,7 +162,7 @@ impl Bitboards {
         for rank in (0..8).rev() {
             let mut empty_count = 0;
             for file in 0..8 {
-                let index = index_from_file_rank(file, rank);
+                let index = FileRank { file, rank }.to_index();
                 if let Some(piece) = self.piece_at_index(index) {
                     if empty_count > 0 {
                         fen.push_str(&empty_count.to_string());
@@ -210,7 +210,7 @@ impl Bitboards {
                     ));
                 }
             } else if let Some(piece) = PlayerPiece::from(c) {
-                let index = index_from_file_rank(file, rank);
+                let index = FileRank { file, rank }.to_index();
                 bb.set_square(index, piece);
                 file += 1;
             } else {
@@ -251,7 +251,7 @@ impl Bitboards {
     pub fn verify(&mut self) -> ErrorResult<()> {
         for file in 0..8 {
             for rank in 0..8 {
-                let index = index_from_file_rank(file, rank);
+                let index = FileRank { file, rank }.to_index();
                 let single = single_bitboard(index);
 
                 let mut found: HashSet<PlayerPiece> = HashSet::new();

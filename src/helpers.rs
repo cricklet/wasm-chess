@@ -2,6 +2,7 @@ use std::{backtrace::Backtrace, fs::File, io::Write, iter};
 
 use pprof::protos::Message;
 
+#[derive(Clone, PartialEq, Eq)]
 pub struct Error {
     pub msg: String,
 }
@@ -217,6 +218,16 @@ pub fn map_successes<'iter, T: 'iter, U>(
     results.map(move |result| result.map(&callback))
 }
 
+fn filter_results<'iter, T>(
+    results: impl Iterator<Item = ErrorResult<T>> + 'iter,
+    callback: impl Fn(&T) -> bool + 'iter,
+) -> impl Iterator<Item = ErrorResult<T>> + 'iter {
+    results.filter(move |result| match result {
+        Ok(t) => callback(t),
+        Err(_) => true,
+    })
+}
+
 struct RecursiveStrings {
     current: String,
     next: Box<dyn Iterator<Item = RecursiveStrings>>,
@@ -313,5 +324,46 @@ impl<'a> Profiler<'a> {
 impl<'a> Drop for Profiler<'a> {
     fn drop(&mut self) {
         drop(&mut self.guard)
+    }
+}
+
+trait ResultIteration<'iter, T> {
+    fn filter_results(
+        self,
+        callback: impl Fn(&T) -> bool + 'iter,
+    ) -> Box<dyn Iterator<Item = ErrorResult<T>> + 'iter>;
+}
+
+impl<'iter, T, I> ResultIteration<'iter, T> for I
+where
+    I: Iterator<Item = ErrorResult<T>> + 'iter,
+{
+    fn filter_results(
+        self,
+        callback: impl Fn(&T) -> bool + 'iter,
+    ) -> Box<dyn Iterator<Item = ErrorResult<T>> + 'iter> {
+        let filtered = filter_results(self, callback);
+        Box::new(filtered)
+    }
+}
+
+#[test]
+pub fn test_filter_results() {
+    let e = err("err");
+
+    {
+        let results = vec![Ok(1), Ok(2), Ok(3), Ok(4), Err(e.clone())];
+        let results = filter_results(results.into_iter(), |&i| i % 2 == 0);
+
+        let results: Vec<_> = results.collect();
+        assert_eq!(results, vec![Ok(2), Ok(4), Err(e.clone())]);
+    }
+
+    {
+        let results = vec![Ok(1), Ok(2), Ok(3), Ok(4), Err(e.clone())];
+        let results = results.into_iter().filter_results(|&i| i % 2 == 0);
+
+        let results: Vec<_> = results.collect();
+        assert_eq!(results, vec![Ok(2), Ok(4), Err(e.clone())]);
     }
 }

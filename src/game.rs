@@ -2,7 +2,8 @@ use strum::IntoEnumIterator;
 
 use crate::bitboard::{self, castling_allowed_after_move, Bitboards, BoardIndex};
 use crate::bitboard::{index_from_file_rank_str, ForPlayer};
-use crate::helpers::{err, err_result, ErrorResult};
+use crate::danger::Danger;
+use crate::helpers::*;
 use crate::moves::{
     all_moves, index_in_danger, Capture, Move, MoveType, OnlyCaptures, OnlyQueenPromotion, Quiet,
 };
@@ -271,6 +272,84 @@ impl Game {
         }
 
         None
+    }
+
+    // pub fn for_each_legal_move_iter(&self) -> impl Iterator<Item = (&Game, &Move)> {
+    //     let player: Player = self.player;
+    //     let danger = Danger::from(player, &self.board)?;
+    //     let moves = all_moves(player, self, OnlyCaptures::NO, OnlyQueenPromotion::NO);
+
+    //     let games = moves.map(|m| -> ErrorResult<(Game, Move)> {
+    //         let m = m?;
+
+    //         let mut next_game = *self;
+    //         next_game.make_move(m)?;
+
+    //         Ok((next_game, m))
+    //     });
+
+    //     let legal_games = games.filter_results(|(next_game, m)| -> bool {
+    //         let king_index = next_game.board.index_of_piece(player, Piece::King);
+    //         let illegal_move = index_in_danger(player, king_index, &next_game.board).unwrap();
+
+    //         !illegal_move
+    //     });
+    //     for m in moves {
+    //         let m = m?;
+
+    //         let mut next_game = *self;
+    //         next_game.make_move(m)?;
+
+    //         let be_extra_careful = danger.check
+    //             || m.piece.piece == Piece::King
+    //             || matches!(m.move_type, MoveType::Capture(Capture::EnPassant { .. }))
+    //             || danger.piece_is_pinned(m.start_index);
+
+    //         if be_extra_careful {
+    //             let king_index = next_game.board.index_of_piece(player, Piece::King);
+    //             let illegal_move = index_in_danger(player, king_index, &next_game.board).unwrap();
+    //             if illegal_move {
+    //                 continue;
+    //             }
+    //         }
+
+    //         callback(&next_game, &m)?;
+    //     }
+
+    //     Ok(())
+    // }
+
+    pub fn for_each_legal_move(
+        &self,
+        callback: &mut dyn FnMut(&Game, &Move) -> ErrorResult<()>,
+    ) -> ErrorResult<()> {
+        let player: Player = self.player;
+        let danger = Danger::from(player, &self.board)?;
+
+        let moves = all_moves(player, self, OnlyCaptures::NO, OnlyQueenPromotion::NO);
+        for m in moves {
+            let m = m?;
+
+            let mut next_game = *self;
+            next_game.make_move(m)?;
+
+            let be_extra_careful = danger.check
+                || m.piece.piece == Piece::King
+                || matches!(m.move_type, MoveType::Capture(Capture::EnPassant { .. }))
+                || danger.piece_is_pinned(m.start_index);
+
+            if be_extra_careful {
+                let king_index = next_game.board.index_of_piece(player, Piece::King);
+                let illegal_move = index_in_danger(player, king_index, &next_game.board).unwrap();
+                if illegal_move {
+                    continue;
+                }
+            }
+
+            callback(&next_game, &m)?;
+        }
+
+        Ok(())
     }
 
     pub fn make_move(&mut self, m: Move) -> ErrorResult<()> {

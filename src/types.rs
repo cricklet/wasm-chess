@@ -116,6 +116,17 @@ impl Piece {
             Piece::King => "k",
         }
     }
+
+    pub fn centipawns(&self) -> isize {
+        match self {
+            Piece::Pawn => 100,
+            Piece::Rook => 500,
+            Piece::Knight => 300,
+            Piece::Bishop => 300,
+            Piece::Queen => 900,
+            Piece::King => 0,
+        }
+    }
 }
 
 pub const PROMOTION_PIECES: [Piece; 4] = [Piece::Rook, Piece::Knight, Piece::Bishop, Piece::Queen];

@@ -12,8 +12,10 @@ use crate::{
     perft::run_perft_counting_first_move,
 };
 
+pub mod alphabeta;
 pub mod bitboard;
 pub mod danger;
+pub mod evaluation;
 pub mod game;
 pub mod helpers;
 pub mod moves;

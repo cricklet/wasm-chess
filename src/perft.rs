@@ -86,39 +86,6 @@ fn print_game(fen: &str, moves: &Vec<Move>) -> String {
     format!("'{}': {{\n{}\n}}", uci, indent(&s, 2))
 }
 
-fn for_each_legal_move(
-    game: &Game,
-    callback: &mut dyn FnMut(&Game, &Move) -> ErrorResult<()>,
-) -> ErrorResult<()> {
-    let player: Player = game.player;
-    let danger = Danger::from(player, &game.board)?;
-
-    let moves = all_moves(player, game, OnlyCaptures::NO, OnlyQueenPromotion::NO);
-    for m in moves {
-        let m = m?;
-
-        let mut next_game = *game;
-        next_game.make_move(m)?;
-
-        let be_extra_careful = danger.check
-            || m.piece.piece == Piece::King
-            || matches!(m.move_type, MoveType::Capture(Capture::EnPassant { .. }))
-            || danger.piece_is_pinned(m.start_index);
-
-        if be_extra_careful {
-            let king_index = next_game.board.index_of_piece(player, Piece::King);
-            let illegal_move = index_in_danger(player, king_index, &next_game.board).unwrap();
-            if illegal_move {
-                continue;
-            }
-        }
-
-        callback(&next_game, &m)?;
-    }
-
-    Ok(())
-}
-
 fn traverse_game_callback(
     moves_stack: &mut Vec<Move>,
     game: &Game,
@@ -137,7 +104,7 @@ fn traverse_game_callback(
         return Ok(());
     }
 
-    for_each_legal_move(game, &mut |next_game, m| {
+    game.for_each_legal_move(&mut |next_game, m| {
         moves_stack.push(*m);
         traverse_game_callback(moves_stack, next_game, depth + 1, max_depth, callback)?;
         moves_stack.pop();
@@ -171,7 +138,7 @@ pub fn run_perft_counting_first_move(
 ) -> ErrorResult<(usize, HashMap<String, usize>)> {
     let mut total_count = 0;
     let mut count_per_move: HashMap<String, usize> = HashMap::new();
-    for_each_legal_move(game, &mut |next_game, next_move| {
+    game.for_each_legal_move(&mut |next_game, next_move| {
         let move_str = next_move.to_uci();
         let count = count_per_move.entry(move_str).or_insert(0);
 
