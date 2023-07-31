@@ -2,7 +2,7 @@ use std::{collections::HashMap, iter};
 
 use strum::IntoEnumIterator;
 
-use crate::{bitboards::*, game::Game, helpers::*, types::*};
+use crate::{bitboard::*, game::Game, helpers::*, types::*};
 
 #[derive(Debug, Copy, Clone)]
 pub enum OnlyCaptures {

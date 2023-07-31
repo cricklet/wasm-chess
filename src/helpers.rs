@@ -297,7 +297,7 @@ impl<'a> Profiler<'a> {
     pub fn flush(&self) {
         match self.guard.report().build() {
             Ok(report) => {
-                let mut file = File::create(&format!("{}.pb", self.name)).unwrap();
+                let mut file = File::create(&format!("profiles/{}.pb", self.name)).unwrap();
                 let profile = report.pprof().unwrap();
 
                 let mut content = Vec::new();

@@ -12,7 +12,7 @@ use crate::{
     perft::run_perft_counting_first_move,
 };
 
-pub mod bitboards;
+pub mod bitboard;
 pub mod danger;
 pub mod game;
 pub mod helpers;

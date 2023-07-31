@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fs::File, io::Write};
 
 use crate::{
-    bitboards::{magic_constants, MAGIC_MOVE_TABLE},
+    bitboard::{magic_constants, MAGIC_MOVE_TABLE},
     danger::Danger,
     game::Game,
     helpers::{indent, ErrorResult, Profiler},

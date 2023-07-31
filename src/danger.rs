@@ -1,5 +1,5 @@
 use crate::{
-    bitboards::{
+    bitboard::{
         each_index_of_one, moves_bb_for_piece_and_blockers, single_bitboard, Bitboard, Bitboards,
         BoardIndex, ForPlayer, WalkType,
     },
