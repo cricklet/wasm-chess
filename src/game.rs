@@ -1,3 +1,5 @@
+use std::iter;
+
 use strum::IntoEnumIterator;
 
 use crate::bitboard::{self, castling_allowed_after_move, Bitboards, BoardIndex};
@@ -274,82 +276,54 @@ impl Game {
         None
     }
 
-    // pub fn for_each_legal_move_iter(&self) -> impl Iterator<Item = (&Game, &Move)> {
-    //     let player: Player = self.player;
-    //     let danger = Danger::from(player, &self.board)?;
-    //     let moves = all_moves(player, self, OnlyCaptures::NO, OnlyQueenPromotion::NO);
-
-    //     let games = moves.map(|m| -> ErrorResult<(Game, Move)> {
-    //         let m = m?;
-
-    //         let mut next_game = *self;
-    //         next_game.make_move(m)?;
-
-    //         Ok((next_game, m))
-    //     });
-
-    //     let legal_games = games.filter_results(|(next_game, m)| -> bool {
-    //         let king_index = next_game.board.index_of_piece(player, Piece::King);
-    //         let illegal_move = index_in_danger(player, king_index, &next_game.board).unwrap();
-
-    //         !illegal_move
-    //     });
-    //     for m in moves {
-    //         let m = m?;
-
-    //         let mut next_game = *self;
-    //         next_game.make_move(m)?;
-
-    //         let be_extra_careful = danger.check
-    //             || m.piece.piece == Piece::King
-    //             || matches!(m.move_type, MoveType::Capture(Capture::EnPassant { .. }))
-    //             || danger.piece_is_pinned(m.start_index);
-
-    //         if be_extra_careful {
-    //             let king_index = next_game.board.index_of_piece(player, Piece::King);
-    //             let illegal_move = index_in_danger(player, king_index, &next_game.board).unwrap();
-    //             if illegal_move {
-    //                 continue;
-    //             }
-    //         }
-
-    //         callback(&next_game, &m)?;
-    //     }
-
-    //     Ok(())
-    // }
-
-    pub fn for_each_legal_move(
-        &self,
-        callback: &mut dyn FnMut(&Game, &Move) -> ErrorResult<()>,
-    ) -> ErrorResult<()> {
+    pub fn for_each_pseudo_move(&self) -> Box<dyn Iterator<Item = ErrorResult<(Game, Move)>> + '_> {
         let player: Player = self.player;
-        let danger = Danger::from(player, &self.board)?;
-
         let moves = all_moves(player, self, OnlyCaptures::NO, OnlyQueenPromotion::NO);
-        for m in moves {
+
+        let games = moves.map(|m| -> ErrorResult<(Game, Move)> {
             let m = m?;
 
             let mut next_game = *self;
             next_game.make_move(m)?;
 
-            let be_extra_careful = danger.check
-                || m.piece.piece == Piece::King
-                || matches!(m.move_type, MoveType::Capture(Capture::EnPassant { .. }))
-                || danger.piece_is_pinned(m.start_index);
+            Ok((next_game, m))
+        });
 
-            if be_extra_careful {
-                let king_index = next_game.board.index_of_piece(player, Piece::King);
-                let illegal_move = index_in_danger(player, king_index, &next_game.board).unwrap();
-                if illegal_move {
-                    continue;
-                }
+        Box::new(games)
+    }
+
+    pub fn move_is_illegal(&self, m: &Move, previous_danger: &Danger) -> bool {
+        let previous_player = self.player.other();
+
+        let be_extra_careful = previous_danger.check
+            || m.piece.piece == Piece::King
+            || matches!(m.move_type, MoveType::Capture(Capture::EnPassant { .. }))
+            || previous_danger.piece_is_pinned(m.start_index);
+
+        if be_extra_careful {
+            let king_index = self.board.index_of_piece(previous_player, Piece::King);
+            let illegal_move = index_in_danger(previous_player, king_index, &self.board).unwrap();
+            if illegal_move {
+                return false;
             }
-
-            callback(&next_game, &m)?;
         }
+        true
+    }
 
-        Ok(())
+    pub fn for_each_legal_move(&self) -> Box<dyn Iterator<Item = ErrorResult<(Game, Move)>> + '_> {
+        let games = self.for_each_pseudo_move();
+
+        let player = self.player;
+        let danger = match Danger::from(player, &self.board) {
+            Ok(danger) => danger,
+            Err(e) => return Box::new(iter::once(Err(e))),
+        };
+
+        let legal_games = games.filter_results(move |(next_game, m)| -> bool {
+            next_game.move_is_illegal(m, &danger)
+        });
+
+        Box::new(legal_games)
     }
 
     pub fn make_move(&mut self, m: Move) -> ErrorResult<()> {
@@ -561,4 +535,21 @@ pub fn test_castling_disallowed() {
         });
 
     assert_eq!(castling.count(), 0);
+}
+
+#[test]
+pub fn test_map_results() {
+    let e = err("err");
+
+    {
+        let results = vec![Ok(1), Ok(2), Ok(3), Ok(4), Err(e.clone())];
+        let results = results.into_iter();
+        let results = results.map(|r| r);
+        let results = results.map_results(|i| i + 1);
+        let results: Vec<_> = results.collect();
+        assert_eq!(
+            results,
+            vec![Ok(1 + 1), Ok(2 + 1), Ok(3 + 1), Ok(4 + 1), Err(e.clone())]
+        )
+    }
 }

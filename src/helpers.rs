@@ -211,7 +211,7 @@ where
     Box::new(result_iter)
 }
 
-pub fn map_successes<'iter, T: 'iter, U>(
+fn map_results<'iter, T: 'iter, U>(
     results: impl Iterator<Item = ErrorResult<T>> + 'iter,
     callback: impl Fn(T) -> U + 'iter,
 ) -> impl Iterator<Item = ErrorResult<U>> + 'iter {
@@ -327,14 +327,19 @@ impl<'a> Drop for Profiler<'a> {
     }
 }
 
-trait ResultIteration<'iter, T> {
+pub trait ResultIteration<'iter, T> {
     fn filter_results(
         self,
         callback: impl Fn(&T) -> bool + 'iter,
     ) -> Box<dyn Iterator<Item = ErrorResult<T>> + 'iter>;
+
+    fn map_results<U>(
+        self,
+        callback: impl Fn(T) -> U + 'iter,
+    ) -> Box<dyn Iterator<Item = ErrorResult<U>> + 'iter>;
 }
 
-impl<'iter, T, I> ResultIteration<'iter, T> for I
+impl<'iter, T: 'iter, I> ResultIteration<'iter, T> for I
 where
     I: Iterator<Item = ErrorResult<T>> + 'iter,
 {
@@ -345,6 +350,14 @@ where
         let filtered = filter_results(self, callback);
         Box::new(filtered)
     }
+
+    fn map_results<U>(
+        self,
+        callback: impl Fn(T) -> U + 'iter,
+    ) -> Box<dyn Iterator<Item = ErrorResult<U>> + 'iter> {
+        let results = map_results(self, callback);
+        Box::new(results)
+    }
 }
 
 #[test]
@@ -353,7 +366,9 @@ pub fn test_filter_results() {
 
     {
         let results = vec![Ok(1), Ok(2), Ok(3), Ok(4), Err(e.clone())];
-        let results = filter_results(results.into_iter(), |&i| i % 2 == 0);
+        let results = results.into_iter();
+        let results = results.map(|r| r);
+        let results = filter_results(results, |&i| i % 2 == 0);
 
         let results: Vec<_> = results.collect();
         assert_eq!(results, vec![Ok(2), Ok(4), Err(e.clone())]);
@@ -361,9 +376,40 @@ pub fn test_filter_results() {
 
     {
         let results = vec![Ok(1), Ok(2), Ok(3), Ok(4), Err(e.clone())];
-        let results = results.into_iter().filter_results(|&i| i % 2 == 0);
+        let results = results.into_iter();
+        let results = results.map(|r| r);
+        let results = results.filter_results(|&i| i % 2 == 0);
 
         let results: Vec<_> = results.collect();
         assert_eq!(results, vec![Ok(2), Ok(4), Err(e.clone())]);
+    }
+}
+
+#[test]
+pub fn test_map_results() {
+    let e = err("err");
+
+    {
+        let results = vec![Ok(1), Ok(2), Ok(3), Ok(4), Err(e.clone())];
+        let results = results.into_iter();
+        let results = results.map(|r| r);
+        let results = map_results(results, |i| i + 1);
+        let results: Vec<_> = results.collect();
+        assert_eq!(
+            results,
+            vec![Ok(1 + 1), Ok(2 + 1), Ok(3 + 1), Ok(4 + 1), Err(e.clone())]
+        )
+    }
+
+    {
+        let results = vec![Ok(1), Ok(2), Ok(3), Ok(4), Err(e.clone())];
+        let results = results.into_iter();
+        let results = results.map(|r| r);
+        let results = results.map_results(|i| i + 1);
+        let results: Vec<_> = results.collect();
+        assert_eq!(
+            results,
+            vec![Ok(1 + 1), Ok(2 + 1), Ok(3 + 1), Ok(4 + 1), Err(e.clone())]
+        )
     }
 }

@@ -104,12 +104,12 @@ fn traverse_game_callback(
         return Ok(());
     }
 
-    game.for_each_legal_move(&mut |next_game, m| {
-        moves_stack.push(*m);
-        traverse_game_callback(moves_stack, next_game, depth + 1, max_depth, callback)?;
+    for result in game.for_each_legal_move() {
+        let (next_game, m) = result?;
+        moves_stack.push(m);
+        traverse_game_callback(moves_stack, &next_game, depth + 1, max_depth, callback)?;
         moves_stack.pop();
-        Ok(())
-    })?;
+    }
 
     Ok(())
 }
@@ -138,14 +138,15 @@ pub fn run_perft_counting_first_move(
 ) -> ErrorResult<(usize, HashMap<String, usize>)> {
     let mut total_count = 0;
     let mut count_per_move: HashMap<String, usize> = HashMap::new();
-    game.for_each_legal_move(&mut |next_game, next_move| {
+
+    for result in game.for_each_legal_move() {
+        let (next_game, next_move) = result?;
         let move_str = next_move.to_uci();
         let count = count_per_move.entry(move_str).or_insert(0);
 
-        *count = run_perft(next_game, max_depth - 1)?;
+        *count = run_perft(&next_game, max_depth - 1)?;
         total_count += *count;
-        Ok(())
-    })?;
+    }
 
     Ok((total_count, count_per_move))
 }

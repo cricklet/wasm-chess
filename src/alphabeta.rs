@@ -31,7 +31,7 @@ impl AlphaBeta {
 
         for m in self.move_generator.moves(game, ply) {
             let (next_game, _) = m?;
-            let score = -self.alpha_beta(next_game, -beta, -alpha, ply + 1)?;
+            let score = -self.alpha_beta(&next_game, -beta, -alpha, ply + 1)?;
             if score >= beta {
                 // enemy is can force a better score. cutoff early.
                 // beta is the lower bound for the score we can get at this board state.
@@ -66,30 +66,21 @@ impl Evaluator for PointEvaluator {
 // ************************************************************************************************* //
 
 trait MoveGenerator {
-    fn moves(
+    fn moves<'t>(
         &self,
-        game: &Game,
+        game: &'t Game,
         ply: usize,
-    ) -> Box<dyn Iterator<Item = ErrorResult<(&Game, &Move)>>>;
+    ) -> Box<dyn Iterator<Item = ErrorResult<(Game, Move)>> + 't>;
 }
 
 struct AllMovesGenerator {}
 
 impl MoveGenerator for AllMovesGenerator {
-    fn moves(
+    fn moves<'t>(
         &self,
-        game: &Game,
-        ply: usize,
-    ) -> Box<dyn Iterator<Item = ErrorResult<(&Game, &Move)>>> {
-        // while self.moves_buffer_per_ply.len() <= ply {
-        //     self.moves_buffer_per_ply.push(vec![]);
-        // }
-
-        // let moves_buffer = &self.moves_buffer_per_ply[ply];
-        // for m in all_moves(player, self, OnlyCaptures::NO, OnlyQueenPromotion::NO) {
-        //     moves_buffer.push(*m);
-        // }
-
-        todo!()
+        game: &'t Game,
+        _: usize,
+    ) -> Box<dyn Iterator<Item = ErrorResult<(Game, Move)>> + 't> {
+        game.for_each_legal_move()
     }
 }
