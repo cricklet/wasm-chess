@@ -286,7 +286,7 @@ pub fn rank_to_char(rank: usize) -> char {
 }
 
 #[test]
-pub fn test_index_to_file_rank_str() {
+fn test_index_to_file_rank_str() {
     assert_eq!(BoardIndex { i: 27 }.to_string(), "d4");
 }
 

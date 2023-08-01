@@ -328,7 +328,7 @@ impl Bitboards {
 }
 
 #[test]
-pub fn test_starting_board() {
+fn test_starting_board() {
     let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
     let mut bb = Bitboards::from_fen(fen).unwrap();
     assert_eq!(

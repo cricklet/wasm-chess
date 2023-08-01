@@ -198,7 +198,7 @@ const DEFAULT_BITS_REQUIRED: [[usize; 64]; 2] = [
 ];
 
 #[test]
-pub fn test_precomputed_magic_values() {
+fn test_precomputed_magic_values() {
     for piece in WalkType::iter() {
         for piece_index in 0..64 {
             let magic_value =

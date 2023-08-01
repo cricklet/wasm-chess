@@ -361,7 +361,7 @@ where
 }
 
 #[test]
-pub fn test_filter_results() {
+fn test_filter_results() {
     let e = err("err");
 
     {
@@ -386,7 +386,7 @@ pub fn test_filter_results() {
 }
 
 #[test]
-pub fn test_map_results() {
+fn test_map_results() {
     let e = err("err");
 
     {

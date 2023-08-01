@@ -7,7 +7,8 @@ use crate::bitboard::{index_from_file_rank_str, ForPlayer};
 use crate::danger::Danger;
 use crate::helpers::*;
 use crate::moves::{
-    all_moves, index_in_danger, Capture, Move, MoveType, OnlyCaptures, OnlyQueenPromotion, Quiet,
+    all_moves, index_in_danger, Capture, Move, MoveOptions, MoveType, OnlyCaptures,
+    OnlyQueenPromotion, Quiet,
 };
 use crate::types::{self, CastlingSide, Piece, Player, PlayerPiece, CASTLING_SIDES};
 
@@ -255,7 +256,7 @@ impl Game {
     }
 
     pub fn move_from_str(&self, move_str: &str) -> Option<Move> {
-        let moves = all_moves(self.player, self, OnlyCaptures::NO, OnlyQueenPromotion::NO);
+        let moves = all_moves(self.player, self, MoveOptions::default());
         for m in moves {
             let m = m.unwrap();
             let mut next_game = *self;
@@ -276,9 +277,12 @@ impl Game {
         None
     }
 
-    pub fn for_each_pseudo_move(&self) -> Box<dyn Iterator<Item = ErrorResult<(Game, Move)>> + '_> {
+    pub fn for_each_pseudo_move(
+        &self,
+        options: MoveOptions,
+    ) -> Box<dyn Iterator<Item = ErrorResult<(Game, Move)>> + '_> {
         let player: Player = self.player;
-        let moves = all_moves(player, self, OnlyCaptures::NO, OnlyQueenPromotion::NO);
+        let moves = all_moves(player, self, options);
 
         let games = moves.map(|m| -> ErrorResult<(Game, Move)> {
             let m = m?;
@@ -310,14 +314,25 @@ impl Game {
         true
     }
 
-    pub fn for_each_legal_move(&self) -> Box<dyn Iterator<Item = ErrorResult<(Game, Move)>> + '_> {
-        let games = self.for_each_pseudo_move();
-
+    pub fn for_each_legal_move(
+        &self,
+        options: MoveOptions,
+    ) -> Box<dyn Iterator<Item = ErrorResult<(Game, Move)>> + '_> {
         let player = self.player;
         let danger = match Danger::from(player, &self.board) {
             Ok(danger) => danger,
             Err(e) => return Box::new(iter::once(Err(e))),
         };
+
+        self.for_each_legal_move_with_danger(danger, options)
+    }
+
+    pub fn for_each_legal_move_with_danger<'t>(
+        &'t self,
+        danger: Danger,
+        options: MoveOptions,
+    ) -> Box<dyn Iterator<Item = ErrorResult<(Game, Move)>> + 't> {
+        let games = self.for_each_pseudo_move(options);
 
         let legal_games = games.filter_results(move |(next_game, m)| -> bool {
             next_game.move_is_illegal(m, &danger)
@@ -461,7 +476,7 @@ impl Game {
 }
 
 #[test]
-pub fn test_en_passant_1() {
+fn test_en_passant_1() {
     let game = Game::from_position_uci("position startpos moves e2e4 a7a5 e4e5 a5a4").unwrap();
     let m = game.move_from_str("b2b4");
     assert_eq!(
@@ -482,21 +497,21 @@ pub fn test_en_passant_1() {
 }
 
 #[test]
-pub fn test_en_passsant_2() {
+fn test_en_passsant_2() {
     let game = Game::from_position_uci("position startpos moves e2e4 a7a5 e4e5 a5a4 b2b4").unwrap();
     assert_eq!(
         game.en_passant,
         Some(index_from_file_rank_str("b3").unwrap())
     );
 
-    for m in all_moves(game.player, &game, OnlyCaptures::NO, OnlyQueenPromotion::NO) {
+    for m in all_moves(game.player, &game, MoveOptions::default()) {
         let mut next_game = game;
         next_game.make_move(m.unwrap()).unwrap();
     }
 }
 
 #[test]
-pub fn test_en_passant_3() {
+fn test_en_passant_3() {
     let game =
         Game::from_fen("rnbqkbnr/p2ppppp/2p5/Pp6/8/8/1PPPPPPP/RNBQKBNR w KQkq b6 4 3").unwrap();
     let m = game.move_from_str("a5b6");
@@ -518,7 +533,7 @@ pub fn test_en_passant_3() {
 }
 
 #[test]
-pub fn test_castling_disallowed() {
+fn test_castling_disallowed() {
     let game = Game::from_position_uci(
         "position fen rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8 moves a2a3 f2h1",
     )
@@ -527,7 +542,7 @@ pub fn test_castling_disallowed() {
     assert_eq!(false, game.can_castle[game.player][CastlingSide::Kingside]);
     assert_eq!(true, game.can_castle[game.player][CastlingSide::Queenside]);
 
-    let castling = all_moves(game.player, &game, OnlyCaptures::NO, OnlyQueenPromotion::NO)
+    let castling = all_moves(game.player, &game, MoveOptions::default())
         .map(|m| m.unwrap())
         .filter(|m| match m.move_type {
             MoveType::Quiet(Quiet::Castle { .. }) => true,
@@ -538,7 +553,7 @@ pub fn test_castling_disallowed() {
 }
 
 #[test]
-pub fn test_map_results() {
+fn test_map_results() {
     let e = err("err");
 
     {

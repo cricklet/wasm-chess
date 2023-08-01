@@ -5,22 +5,49 @@ use strum::IntoEnumIterator;
 use crate::{bitboard::*, game::Game, helpers::*, types::*};
 
 #[derive(Debug, Copy, Clone)]
+pub struct MoveOptions {
+    pub only_captures: OnlyCaptures,
+    pub only_queen_promotion: OnlyQueenPromotion,
+}
+
+impl Default for MoveOptions {
+    fn default() -> Self {
+        Self {
+            only_captures: Default::default(),
+            only_queen_promotion: Default::default(),
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
 pub enum OnlyCaptures {
-    NO,
-    YES,
+    No,
+    Yes,
+}
+
+impl Default for OnlyCaptures {
+    fn default() -> Self {
+        Self::No
+    }
 }
 
 #[derive(Debug, Copy, Clone)]
 pub enum OnlyQueenPromotion {
-    NO,
-    YES,
+    No,
+    Yes,
+}
+
+impl Default for OnlyQueenPromotion {
+    fn default() -> Self {
+        Self::No
+    }
 }
 
 impl OnlyQueenPromotion {
     pub fn pieces(&self) -> &'static [Piece] {
         match self {
-            OnlyQueenPromotion::NO => &PROMOTION_PIECES,
-            OnlyQueenPromotion::YES => &[Piece::Queen],
+            OnlyQueenPromotion::No => &PROMOTION_PIECES,
+            OnlyQueenPromotion::Yes => &[Piece::Queen],
         }
     }
 }
@@ -64,6 +91,13 @@ impl Move {
         let promo = promo.unwrap_or(&"");
         format!("{}{}{}", self.start_index, self.end_index, promo)
     }
+
+    pub fn is_quiet(&self) -> bool {
+        match self.move_type {
+            MoveType::Quiet(_) => true,
+            _ => false,
+        }
+    }
 }
 
 impl std::fmt::Display for Move {
@@ -79,7 +113,7 @@ impl std::fmt::Debug for Move {
 }
 
 #[test]
-pub fn test_move_to_uci() {
+fn test_move_to_uci() {
     let m = Move {
         piece: PlayerPiece::new(Player::White, Piece::Pawn),
         start_index: BoardIndex::from(8),
@@ -140,8 +174,8 @@ pub fn potential_bb_to_moves(
     });
 
     match only_captures {
-        OnlyCaptures::NO => Box::new(capture_moves.chain(quiet_moves.map(Ok))),
-        OnlyCaptures::YES => Box::new(capture_moves),
+        OnlyCaptures::No => Box::new(capture_moves.chain(quiet_moves.map(Ok))),
+        OnlyCaptures::Yes => Box::new(capture_moves),
     }
 }
 
@@ -292,7 +326,7 @@ pub fn pawn_moves(
         })
     };
 
-    if let OnlyCaptures::YES = only_captures {
+    if let OnlyCaptures::Yes = only_captures {
         return Box::new(capture_moves);
     }
 
@@ -432,26 +466,40 @@ pub fn castling_moves<'game>(
 pub fn all_moves<'game>(
     player: Player,
     state: &'game Game,
-    only_captures: OnlyCaptures,
-    only_queen_promotion: OnlyQueenPromotion,
+    options: MoveOptions,
 ) -> impl Iterator<Item = ErrorResult<Move>> + 'game {
-    let pawn_moves = pawn_moves(player, &state.board, only_captures, only_queen_promotion);
-    let knight_moves = jump_moves(player, &state.board, JumpingPiece::Knight, only_captures);
-    let king_moves = jump_moves(player, &state.board, JumpingPiece::King, only_captures);
+    let pawn_moves = pawn_moves(
+        player,
+        &state.board,
+        options.only_captures,
+        options.only_queen_promotion,
+    );
+    let knight_moves = jump_moves(
+        player,
+        &state.board,
+        JumpingPiece::Knight,
+        options.only_captures,
+    );
+    let king_moves = jump_moves(
+        player,
+        &state.board,
+        JumpingPiece::King,
+        options.only_captures,
+    );
     let bishop_moves = walk_moves(
         PlayerPiece::new(player, Piece::Bishop),
         &state.board,
-        only_captures,
+        options.only_captures,
     );
     let rook_moves = walk_moves(
         PlayerPiece::new(player, Piece::Rook),
         &state.board,
-        only_captures,
+        options.only_captures,
     );
     let queen_moves = walk_moves(
         PlayerPiece::new(player, Piece::Queen),
         &state.board,
-        only_captures,
+        options.only_captures,
     );
     let castling_moves = castling_moves(player, state);
 
@@ -521,7 +569,7 @@ fn test_castling_repeat_moves() {
     let game = Game::from_position_uci(position).unwrap();
 
     let mut count_moves = HashMap::<String, usize>::new();
-    for m in all_moves(game.player, &game, OnlyCaptures::NO, OnlyQueenPromotion::NO) {
+    for m in all_moves(game.player, &game, MoveOptions::default()) {
         let m = m.unwrap();
         let count = count_moves.entry(m.to_uci().to_string()).or_insert(0);
         *count += 1;
@@ -539,7 +587,7 @@ fn test_promotion_moves() {
     let game = Game::from_position_uci(position).unwrap();
 
     let mut count_moves = HashMap::<String, usize>::new();
-    for m in all_moves(game.player, &game, OnlyCaptures::NO, OnlyQueenPromotion::NO) {
+    for m in all_moves(game.player, &game, MoveOptions::default()) {
         let m = m.unwrap();
         let count = count_moves.entry(m.to_uci().to_string()).or_insert(0);
         *count += 1;

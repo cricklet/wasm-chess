@@ -363,7 +363,7 @@ lazy_static! {
 }
 
 #[test]
-pub fn test_knight_move_bitboard() {
+fn test_knight_move_bitboard() {
     assert_eq!(
         bitboard_string(single_bitboard(BoardIndex::from(9))),
         "\
@@ -393,7 +393,7 @@ pub fn test_knight_move_bitboard() {
 }
 
 #[test]
-pub fn test_king_move_bitboard() {
+fn test_king_move_bitboard() {
     assert_eq!(
         bitboard_string(single_bitboard(BoardIndex::from(9))),
         "\

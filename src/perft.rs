@@ -6,8 +6,8 @@ use crate::{
     game::Game,
     helpers::{indent, ErrorResult, Profiler},
     moves::{
-        all_moves, index_in_danger, Capture, Move, MoveType, OnlyCaptures, OnlyQueenPromotion,
-        Quiet,
+        all_moves, index_in_danger, Capture, Move, MoveOptions, MoveType, OnlyCaptures,
+        OnlyQueenPromotion, Quiet,
     },
     types::{Piece, Player},
 };
@@ -104,7 +104,7 @@ fn traverse_game_callback(
         return Ok(());
     }
 
-    for result in game.for_each_legal_move() {
+    for result in game.for_each_legal_move(MoveOptions::default()) {
         let (next_game, m) = result?;
         moves_stack.push(m);
         traverse_game_callback(moves_stack, &next_game, depth + 1, max_depth, callback)?;
@@ -139,7 +139,7 @@ pub fn run_perft_counting_first_move(
     let mut total_count = 0;
     let mut count_per_move: HashMap<String, usize> = HashMap::new();
 
-    for result in game.for_each_legal_move() {
+    for result in game.for_each_legal_move(MoveOptions::default()) {
         let (next_game, next_move) = result?;
         let move_str = next_move.to_uci();
         let count = count_per_move.entry(move_str).or_insert(0);

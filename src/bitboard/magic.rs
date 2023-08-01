@@ -26,7 +26,7 @@ pub fn walk_type_for_piece(piece: Piece) -> ErrorResult<&'static [WalkType]> {
 }
 
 #[test]
-pub fn test_piece_enum_iter() {
+fn test_piece_enum_iter() {
     {
         let mut iter = WalkType::iter();
         assert_eq!(iter.next(), Some(WalkType::Rook));
@@ -148,7 +148,7 @@ pub fn generate_walk_bb(piece_index: BoardIndex, blocker_bb: Bitboard, dir: Dire
 }
 
 #[test]
-pub fn test_generate_walk_bb() {
+fn test_generate_walk_bb() {
     let start_index = 10;
     let start_bb = single_bitboard(BoardIndex::from(start_index));
 
@@ -229,7 +229,7 @@ pub fn generate_mask_blockers_bb(start_index: BoardIndex, piece: WalkType) -> Bi
 }
 
 #[test]
-pub fn test_generate_overall_blocker_bb() {
+fn test_generate_overall_blocker_bb() {
     let start_index = 10 as usize;
     let start_bb = single_bitboard(BoardIndex::from(start_index));
 
@@ -286,7 +286,7 @@ pub fn generate_specific_blocker_bb(mask_blockers_bb: Bitboard, seed: usize) -> 
 }
 
 #[test]
-pub fn test_generate_specific_blocker_bb() {
+fn test_generate_specific_blocker_bb() {
     let start_index = 15;
     let start_bb = single_bitboard(BoardIndex::from(start_index));
 
@@ -463,7 +463,7 @@ pub fn moves_bb_for_piece_and_blockers(
 }
 
 #[test]
-pub fn test_find_best_magic() {
+fn test_find_best_magic() {
     let mut magics_for_piece: [[u64; 64]; 2] = [[0; 64]; 2];
     let mut bits_required_for_piece: [[usize; 64]; 2] = [[0; 64]; 2];
     for piece in WalkType::iter() {
@@ -494,7 +494,7 @@ pub fn test_find_best_magic() {
 }
 
 #[test]
-pub fn test_moves_for_piece_and_blockers() {
+fn test_moves_for_piece_and_blockers() {
     let occupancy_bb = bitboard_from_string(
         "\
     .......1\n\

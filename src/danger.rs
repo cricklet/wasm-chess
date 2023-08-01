@@ -8,6 +8,7 @@ use crate::{
     types::{other_player, Piece, Player},
 };
 
+#[derive(Debug, Clone, Copy)]
 pub struct Danger {
     pub check: bool,
     pub pinned: Bitboard,
@@ -78,7 +79,7 @@ impl Danger {
 }
 
 #[test]
-pub fn test_pins() {
+fn test_pins() {
     let fen = "2k5/3r4/6b1/1N1N4/4N3/3K4/8/8";
     let bb = Bitboards::from_fen(fen).unwrap();
     let d = Danger::from(Player::White, &bb).unwrap();
@@ -94,7 +95,7 @@ pub fn test_pins() {
 }
 
 #[test]
-pub fn test_double_pin() {
+fn test_double_pin() {
     let fen = "2k5/3r4/q5b1/1N1N1B2/2N1N3/3K1rPr/2Pnn3/3q1b2";
     let bb = Bitboards::from_fen(fen).unwrap();
     let d = Danger::from(Player::White, &bb).unwrap();
@@ -125,7 +126,7 @@ pub fn test_double_pin() {
 }
 
 #[test]
-pub fn test_check() {
+fn test_check() {
     let fen = "2k5/3r4/6b1/1N1N4/4N3/q2K4/8/8";
     let bb = Bitboards::from_fen(fen).unwrap();
     let d = Danger::from(Player::White, &bb).unwrap();
