@@ -1,0 +1,63 @@
+
+ 
+:root {
+  --dark-square: #a0aabb;
+  --light-square: #b0bbcc;
+  --background: var(--light-square);
+  --dark-piece: #456;
+  --light-piece: #fff;
+} 
+
+body {
+  background-color: var(--background);
+}
+
+.App {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.row {
+  font-size: 4rem;
+  height: 1em;
+  display: flex;
+}
+
+span {
+  display: inline-block;
+  text-align: center;
+  grid-area: 1/1;
+}
+
+.square {
+  cursor: default;
+  display: grid;
+  width: 1em;
+  height: 1em;
+  line-height: 1em;
+}
+
+.dark {
+  background-color: var(--dark-square);
+}
+
+.light {
+  background-color: var(--light-square);
+}
+
+.clickable {
+  cursor: pointer;
+}
+
+.piece {
+  width: 1em;
+  height: 1em;
+  background-origin: content-box;
+  background-repeat: no-repeat;
+  background-position: center;
+  padding: 4px;
+  box-sizing: border-box;
+}
