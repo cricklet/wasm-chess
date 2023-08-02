@@ -22,7 +22,8 @@ use crate::{game::Game, uci::Uci};
 
 #[wasm_bindgen]
 extern "C" {
-    fn console_log(s: &str);
+    #[wasm_bindgen(js_namespace = console)]
+    fn log(s: &str);
 }
 
 lazy_static! {
@@ -32,15 +33,23 @@ lazy_static! {
 }
 
 #[wasm_bindgen]
+pub fn greet() {
+    log("wasm loaded")
+}
+
+#[wasm_bindgen]
 pub fn process(input: &str) {
     for line in input.split("\n") {
+        if line.is_empty() {
+            continue;
+        }
         for output in UCI.lock().unwrap().handle_line(line) {
             match output {
                 Ok(line) => {
-                    console_log(&line);
+                    log(&line);
                 }
                 Err(e) => {
-                    console_log(&format!("Error: {}", e));
+                    log(&format!("Error: {}", e));
                 }
             }
         }
