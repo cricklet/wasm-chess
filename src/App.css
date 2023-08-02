@@ -1,11 +1,12 @@
-
  
 :root {
-  --dark-square: #a0aabb;
-  --light-square: #b0bbcc;
+  /* --dark-square: #a0aabb;
+  --light-square: #b0bbcc; */
+  --dark-square: #707a7b;
+  --light-square: #808b8c;
   --background: var(--light-square);
-  --dark-piece: #456;
-  --light-piece: #fff;
+  --dark-piece: #345;
+  --light-piece: #a8a8a8;
 } 
 
 body {

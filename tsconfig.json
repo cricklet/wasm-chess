@@ -21,6 +21,6 @@
     "jsx": "react-jsx"
   },
   "include": [
-    "src", "crab_chess", "static"
+    "src",
   ]
 }

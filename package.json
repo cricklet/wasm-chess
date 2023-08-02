@@ -6,20 +6,17 @@
     "@types/node": "^20.4.5",
     "@types/react": "^18.2.18",
     "@types/react-dom": "^18.2.7",
-    "crab_chess": "file:../crab_chess/pkg",
-    "hello-wasm-pack": "^0.1.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "typescript": "^5.1.6"
   },
-  "eslintConfig": {
-    "extends": [
-      "react-app",
-      "react-app/jest"
-    ]
+  "scripts": {
+    "build": "node ./esbuild.mjs"
   },
   "devDependencies": {
+    "@svgr/plugin-jsx": "^8.0.1",
     "esbuild": "0.18.17",
-    "esbuild-plugin-svgr": "^2.0.0"
+    "esbuild-plugin-svgr": "^2.0.0",
+    "esbuild-plugin-wasm": "^1.1.0"
   }
 }

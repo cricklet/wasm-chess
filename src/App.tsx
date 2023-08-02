@@ -2,19 +2,16 @@
 
 import './App.css';
 
-import { ReactComponent as RookSvg } from './assets/chess-rook-solid.svg';
-import { ReactComponent as KnightSvg } from './assets/chess-knight-solid.svg';
-import { ReactComponent as BishopSvg } from './assets/chess-bishop-solid.svg';
-import { ReactComponent as KingSvg } from './assets/chess-king-solid.svg';
-import { ReactComponent as QueenSvg } from './assets/chess-queen-solid.svg';
-import { ReactComponent as PawnSvg } from './assets/chess-pawn-solid.svg';
+import RookSvg from './assets/rook.svg';
+import KnightSvg from './assets/knight.svg';
+import BishopSvg from './assets/bishop.svg';
+import KingSvg from './assets/king.svg';
+import QueenSvg from './assets/queen.svg';
+import PawnSvg from './assets/pawn.svg';
 
-// import wasmModule from '%PUBLIC_URL%/stockfish.wasm?module';
-// import wasmModule from './stockfish.wasm';
-
-// import * as wasm from 'crab_chess'
-import * as wasm from 'hello-wasm-pack'
-wasm.greet();
+import * as wasm from 'crab-chess'
+wasm.greet()
+wasm.process('d\n');
 
 type Piece = 'R' | 'N' | 'B' | 'K' | 'Q' | 'P' | 'r' | 'n' | 'b' | 'k' | 'q' | 'p' | ' ';
 type Row = [Piece, Piece, Piece, Piece, Piece, Piece, Piece, Piece];
