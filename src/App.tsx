@@ -12,6 +12,7 @@ import PawnSvg from './assets/pawn.svg';
 import * as wasm from 'crab-chess'
 wasm.greet()
 wasm.process('d\n');
+wasm.process('go perft 1\n');
 
 type Piece = 'R' | 'N' | 'B' | 'K' | 'Q' | 'P' | 'r' | 'n' | 'b' | 'k' | 'q' | 'p' | ' ';
 type Row = [Piece, Piece, Piece, Piece, Piece, Piece, Piece, Piece];

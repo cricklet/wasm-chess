@@ -6,7 +6,8 @@
   --light-square: #808b8c;
   --background: var(--light-square);
   --dark-piece: #345;
-  --light-piece: #a8a8a8;
+  /* --light-piece: #c8c8c8; */
+  --light-piece: #cfcfc5;
 } 
 
 body {

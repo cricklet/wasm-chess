@@ -11,12 +11,13 @@
     "typescript": "^5.1.6"
   },
   "scripts": {
-    "build": "node ./esbuild.mjs"
+    "build": "ts-node-esm ./scripts/esbuild.ts --link crab-chess"
   },
   "devDependencies": {
     "@svgr/plugin-jsx": "^8.0.1",
     "esbuild": "0.18.17",
     "esbuild-plugin-svgr": "^2.0.0",
-    "esbuild-plugin-wasm": "^1.1.0"
+    "esbuild-plugin-wasm": "^1.1.0",
+    "ts-node": "^10.9.1"
   }
 }
