@@ -4,7 +4,7 @@ use crate::{
     bitboard::{magic_constants, MAGIC_MOVE_TABLE},
     danger::Danger,
     game::Game,
-    helpers::{indent, ErrorResult, Profiler},
+    helpers::{indent, ErrorResult},
     moves::{
         all_moves, index_in_danger, Capture, Move, MoveOptions, MoveType, OnlyCaptures,
         OnlyQueenPromotion, Quiet,
@@ -200,14 +200,14 @@ fn test_perft_start_board() {
     assert_perft_matches(fen, &expected_count);
 
     {
-        let p = Profiler::new("perft_start_board".to_string());
+        // let p = Profiler::new("perft_start_board".to_string());
         let expected_count = [
             1, 20, 400, 8902, 197281, 4865609,
             // 119060324,
             // 3195901860,
         ];
         assert_perft_matches(fen, &expected_count);
-        p.flush();
+        // p.flush();
     }
 }
 
