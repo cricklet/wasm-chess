@@ -81,11 +81,17 @@ async function main() {
     }
 
     let ctx = await esbuild.context({
-      entryPoints: ['src/entry.tsx'],
+      entryPoints: ['src/entry.tsx', 'src/entry.test.ts'],
       bundle: true,
       sourcemap: true,
+      platform: 'browser',
       format: 'esm',
-      outfile: 'public/build/out.js',
+      outdir: 'public/build/',
+      // define: {
+      //   'process.stdout': '{}',
+      //   'process.env.NODE_ENV': '"development"',
+      //   'process.env.NODE_DEBUG': '"development"',
+      // },
       plugins: [
         svgr({
           plugins: ['@svgr/plugin-jsx'],

@@ -8,23 +8,7 @@ import BishopSvg from './assets/bishop.svg';
 import KingSvg from './assets/king.svg';
 import QueenSvg from './assets/queen.svg';
 import PawnSvg from './assets/pawn.svg';
-
-import * as wasm from 'crab-chess'
-wasm.greet()
-wasm.process('d\n');
-wasm.process('go perft 1\n');
-
-type Piece = 'R' | 'N' | 'B' | 'K' | 'Q' | 'P' | 'r' | 'n' | 'b' | 'k' | 'q' | 'p' | ' ';
-type Row = [Piece, Piece, Piece, Piece, Piece, Piece, Piece, Piece];
-type Board = [Row, Row, Row, Row, Row, Row, Row, Row];
-
-type File = number;
-type Rank = number;
-type FileRank = [File, Rank];
-
-function invert(rank: Rank): Rank {
-  return 7 - rank;
-}
+import { Board, FileRank, Piece, Rank, Row, invert } from './helpers';
 
 function PieceComponent(props: { piece: Piece }) {
   let { piece } = props;

@@ -1,16 +1,24 @@
  
 :root {
-  /* --dark-square: #a0aabb;
-  --light-square: #b0bbcc; */
   --dark-square: #707a7b;
   --light-square: #808b8c;
   --background: var(--light-square);
   --dark-piece: #345;
-  /* --light-piece: #c8c8c8; */
-  --light-piece: #cfcfc5;
-} 
+  --light-piece: #d8d8cc;
+
+  --square-size: min(4rem, 10vw);
+}
+
+* {
+  box-sizing: border-box;
+}
 
 body {
+  padding: 0;
+  margin: 0;
+}
+
+#root {
   background-color: var(--background);
 }
 
@@ -19,11 +27,17 @@ body {
   width: 100%;
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: top;
+  padding-top: var(--square-size);
+}
+
+.Log {
+  margin-top: var(--square-size);
+  font-size: 1rem;
 }
 
 .row {
-  font-size: 4rem;
+  font-size: var(--square-size);
   height: 1em;
   display: flex;
 }
