@@ -1,6 +1,4 @@
 
-export { }
-
 interface IBindingsJs {
     log(message: string): void;
 }
@@ -15,3 +13,10 @@ globalThis.BindingsJs = {
     }
 }
 
+import * as wasm from 'crab-chess'
+
+export function loadWasm() {
+    wasm.greet()
+    wasm.process('d\n');
+    wasm.process('go perft 1\n');
+}

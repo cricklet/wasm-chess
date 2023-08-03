@@ -2,7 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import * as helpers from './helpers'
-import './wasm-bindings'
+import * as wasm from './wasm-bindings'
 
 import { create } from 'zustand'
 
@@ -28,4 +28,4 @@ root.render(
   </React.StrictMode>
 );
 
-helpers.loadWasm()
+wasm.loadWasm()

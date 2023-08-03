@@ -1,11 +1,13 @@
-import { describe, it } from "mocha";
-import { boardFromFen, boardString } from "./helpers";
-import { assert } from "chai";
 
-describe("helpers boardFromFen", () => {
-    it("should return the starting position", () => {
+console.log('loading helper tests')
+
+import { boardFromFen, boardString } from "./helpers";
+
+
+describe('helpers.test.ts', function () {
+    it('boardFromFen: should return the starting position', function () {
         let board = boardFromFen('startpos')
-        assert.strictEqual(boardString(board),
+        expect(boardString(board)).toEqual(
             'rnbqkbnr\n' +
             'pppppppp\n' +
             '        \n' +
@@ -15,5 +17,5 @@ describe("helpers boardFromFen", () => {
             'PPPPPPPP\n' +
             'RNBQKBNR'
         );
-    });
-});
+    })
+})

@@ -1,6 +1,4 @@
 
-import * as wasm from 'crab-chess'
-
 export type Piece = 'R' | 'N' | 'B' | 'K' | 'Q' | 'P' | 'r' | 'n' | 'b' | 'k' | 'q' | 'p' | ' ';
 export type Row = [Piece, Piece, Piece, Piece, Piece, Piece, Piece, Piece];
 export type Board = [Row, Row, Row, Row, Row, Row, Row, Row];
@@ -34,7 +32,7 @@ export function boardFromFen(fen: string): Board {
         row.split('').map(piece => {
             let pieceAsInt = parseInt(piece);
             if (isNaN(pieceAsInt)) {
-                board[file][invert(rank)] = piece as Piece;
+                board[invert(rank)][file] = piece as Piece;
                 file++
             } else {
                 file += pieceAsInt;
@@ -46,11 +44,5 @@ export function boardFromFen(fen: string): Board {
 }
 
 export function boardString(board: Board): string {
-    return board.map(row => row.join('')).join('\n');
-}
-
-export function loadWasm() {
-    wasm.greet()
-    wasm.process('d\n');
-    wasm.process('go perft 1\n');
+    return [...board].reverse().map(row => row.join('')).join('\n');
 }

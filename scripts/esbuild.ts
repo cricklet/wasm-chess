@@ -87,11 +87,6 @@ async function main() {
       platform: 'browser',
       format: 'esm',
       outdir: 'public/build/',
-      // define: {
-      //   'process.stdout': '{}',
-      //   'process.env.NODE_ENV': '"development"',
-      //   'process.env.NODE_DEBUG': '"development"',
-      // },
       plugins: [
         svgr({
           plugins: ['@svgr/plugin-jsx'],
