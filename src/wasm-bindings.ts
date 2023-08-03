@@ -1,28 +1,34 @@
 
 interface IBindingsJs {
-    log(message: string): void;
+    log(message: string): void
 }
 
 declare global {
-    var BindingsJs: IBindingsJs;
+    var BindingsJs: IBindingsJs
 }
 
-export type WasmListener = (line: string) => void;
+export type WasmListener = (line: string) => void
 
-let listeners: WasmListener[] = [];
+let listeners: WasmListener[] = []
 
-export function listen(listener: WasmListener, callback: () => void): void {
-    listeners.push(listener);
-    callback();
-    listeners.pop();
+export function listenScope(listener: WasmListener, callback: () => void): void {
+    listeners.push(listener)
+    callback()
+    listeners = listeners.filter((l) => l !== listener)
+}
+
+export function listen(listener: WasmListener): () => void {
+    listeners.push(listener)
+    return () => {
+        listeners = listeners.filter((l) => l !== listener)
+    }
 }
 
 globalThis.BindingsJs = {
     log: (message: string): void => {
-        console.log(message);
         message.split('\n').forEach((line) => {
-            listeners.forEach((listener) => listener(line));
-        });
+            listeners.forEach((listener) => listener(line))
+        })
     }
 }
 
@@ -33,7 +39,7 @@ export let process = wasm.process
 
 export function currentFen(): string {
     let fenLine: string = ''
-    listen((line: string) => {
+    listenScope((line: string) => {
         if (line.indexOf('Fen: ') >= 0) {
             fenLine = line
         }
@@ -43,6 +49,36 @@ export function currentFen(): string {
     return fenLine.split('Fen: ')[1].trim()
 }
 
+export function possibleMoves(): string[] {
+    let moves: string[] = []
+    listenScope((line: string) => {
+        if (line.indexOf(':') === -1) {
+            return
+        }
+        let split = line.split(':').filter(v => v !== '').map(v => v.trim())
+        if (split.length !== 2) {
+            return
+        }
+        let [move, perft] = split
+        if (perft !== '1') {
+            return
+        }
+
+        if (move.length !== 4 && move.length !== 5) {
+            return
+        }
+        moves.push(move)
+    }, () => {
+        wasm.process('go perft 1')
+    })
+
+    return moves
+}
+
 export function setPosition(position: string, moves: string[]) {
-    wasm.process(`position ${position} moves ${moves.join(' ')}`)
+    if (position === 'startpos') {
+        wasm.process(`position ${position} moves ${moves.join(' ')}`)
+    } else {
+        wasm.process(`position fen ${position} moves ${moves.join(' ')}`)
+    }
 }

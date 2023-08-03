@@ -1,8 +1,5 @@
 
-console.log('loading helper tests')
-
 import { boardFromFen, boardString } from "./helpers";
-
 
 describe('helpers.test.ts', function () {
     it('boardFromFen: should return the starting position', function () {

@@ -1,19 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './app'
-import * as helpers from './helpers'
-import * as wasm from './wasm-bindings'
 
-import { create } from 'zustand'
-
-interface UciState {
-  fen: string
-}
-
-const useChessStore = create<UciState>((set) => ({
-  fen: 'startpos',
-  setFen: (fen: string) => set((state) => ({ fen })),
-}))
 
 new EventSource('/esbuild').addEventListener('change', () => location.reload())
 
@@ -27,5 +15,3 @@ root.render(
     <App />
   </React.StrictMode>
 );
-
-wasm.greet()

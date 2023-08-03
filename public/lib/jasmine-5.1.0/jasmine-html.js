@@ -204,7 +204,7 @@ jasmineRequire.HtmlReporter = function(j$) {
         createDom(
           'span',
           { className: 'jasmine-duration' },
-          'finished in ' + doneResult.totalTime / 1000 + 's'
+          'in ' + doneResult.totalTime / 1000 + 's'
         )
       );
 
@@ -263,29 +263,29 @@ jasmineRequire.HtmlReporter = function(j$) {
         statusBarClassName += ' jasmine-failed ';
       }
 
-      let seedBar;
-      if (order && order.random) {
-        seedBar = createDom(
-          'span',
-          { className: 'jasmine-seed-bar' },
-          ', randomized with seed ',
-          createDom(
-            'a',
-            {
-              title: 'randomized with seed ' + order.seed,
-              href: seedHref(order.seed)
-            },
-            order.seed
-          )
-        );
-      }
+      // let seedBar;
+      // if (order && order.random) {
+      //   seedBar = createDom(
+      //     'span',
+      //     { className: 'jasmine-seed-bar' },
+      //     'randomized with seed ',
+      //     createDom(
+      //       'a',
+      //       {
+      //         title: 'randomized with seed ' + order.seed,
+      //         href: seedHref(order.seed)
+      //       },
+      //       order.seed
+      //     )
+      //   );
+      // }
 
       alert.appendChild(
         createDom(
           'span',
           { className: statusBarClassName },
           statusBarMessage,
-          seedBar
+          // seedBar
         )
       );
 

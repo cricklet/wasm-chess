@@ -1,11 +1,17 @@
 @charset "UTF-8";
+
+* {
+  box-sizing: border-box;
+}
 body {
-  overflow-y: scroll;
+  background: #fdf6e3;
+  overflow-y: auto;
 }
 
 .jasmine_html-reporter {
   width: 100%;
-  background-color: #eee;
+  /* background-color: #eee; */
+  background: #fdf6e3;
   padding: 5px;
   margin: -8px;
   font-size: 11px;

@@ -8,8 +8,6 @@ describe('entry.test.ts', function () {
 import './wasm-bindings.test'
 import './helpers.test'
 
-console.log('loaded tests')
-
 const env = jasmine.getEnv();
 env.execute();
 

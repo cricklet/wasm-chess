@@ -11,9 +11,21 @@ export function invert(rank: Rank): Rank {
     return 7 - rank;
 }
 
+export function rankStr(rank: Rank): string {
+    return (rank + 1).toString();
+}
+
+export function fileStr(file: File): string {
+    return 'abcdefgh'[file];
+}
+
 export function boardFromFen(fen: string): Board {
     if (fen == 'startpos') {
         fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - - 0 1';
+    }
+
+    if (fen.startsWith('fen ')) {
+        fen = fen.split('fen ')[1];
     }
 
     let board: Board = [
@@ -32,7 +44,7 @@ export function boardFromFen(fen: string): Board {
         row.split('').map(piece => {
             let pieceAsInt = parseInt(piece);
             if (isNaN(pieceAsInt)) {
-                board[invert(rank)][file] = piece as Piece;
+                board[rank][file] = piece as Piece;
                 file++
             } else {
                 file += pieceAsInt;
@@ -44,5 +56,5 @@ export function boardFromFen(fen: string): Board {
 }
 
 export function boardString(board: Board): string {
-    return [...board].reverse().map(row => row.join('')).join('\n');
+    return [...board].map(row => row.join('')).join('\n');
 }

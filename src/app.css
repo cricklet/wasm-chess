@@ -1,12 +1,35 @@
- 
-:root {
-  --dark-square: #707a7b;
-  --light-square: #808b8c;
-  --background: var(--light-square);
-  --dark-piece: #345;
-  --light-piece: #d8d8cc;
 
-  --square-size: min(4rem, 10vw);
+@media (prefers-color-scheme: dark) {
+  :root {
+    --dark-square: #707a7b;
+    --light-square: #808b8c;
+    --background: var(--light-square);
+    --dark-piece: #345;
+    --light-piece: #d8d8cc;
+
+    --label: #a2b1b3;
+    --invalid: rgb(170, 118, 118);
+    --complete: rgb(110, 156, 117);
+  }
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --dark-square: #a0aaab;
+    --light-square: #b0bbbc;
+    --background: var(--light-square);
+    --dark-piece: #345;
+    --light-piece: #f8f8ec;
+
+    --label: #808a8b;
+    --invalid: rgb(255, 180, 180);
+    --complete: rgb(180, 255, 193);
+  }
+}
+
+:root {
+  --square-size: min(min(8rem, 10vw), 10vh);
+  font-family: monospace;
 }
 
 * {
@@ -22,18 +45,23 @@ body {
   background-color: var(--background);
 }
 
-.App {
+.app {
   height: 100%;
   width: 100%;
   display: flex;
-  justify-content: center;
-  align-items: top;
+  justify-content: start;
+  align-items: center;
   padding-top: var(--square-size);
+  flex-direction: column;
 }
 
-.Log {
-  margin-top: var(--square-size);
+.log {
+  padding-block: calc(var(--square-size) / 4);
+  padding-inline: calc(var(--square-size) / 8);
   font-size: 1rem;
+  flex-grow: 1;
+  overflow-y: scroll;
+  width: calc(var(--square-size) * 8);
 }
 
 .row {
@@ -50,10 +78,37 @@ span {
 
 .square {
   cursor: default;
+
   display: grid;
-  width: 1em;
-  height: 1em;
-  line-height: 1em;
+  position: relative;
+
+  width: var(--square-size);
+  height: var(--square-size);
+  line-height: var(--square-size);
+}
+
+.square-hint {
+  position: absolute;
+
+  width: var(--square-size);
+  height: var(--square-size);
+  line-height: var(--square-size);
+
+  text-align: center;
+
+  font-size: calc(var(--square-size) / 2);
+  color: var(--label);
+}
+
+.input {
+  font-size: calc(var(--square-size) / 2);
+  margin-top: calc(var(--square-size) / 4);
+}
+.complete-input {
+  background-color: var(--complete);
+}
+.invalid-input {
+  background-color: var(--invalid);
 }
 
 .dark {
