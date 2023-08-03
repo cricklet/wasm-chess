@@ -8,9 +8,9 @@ import BishopSvg from './assets/bishop.svg'
 import KingSvg from './assets/king.svg'
 import QueenSvg from './assets/queen.svg'
 import PawnSvg from './assets/pawn.svg'
-import { Board, FileRank, Piece, Rank, Row, fileStr, invert, rankStr } from './helpers'
+import { Board, Piece, Row, locationStr, rankStr, } from './helpers'
 import { atom, useAtom, useAtomValue, useSetAtom } from 'jotai'
-import { boardAtom, logAtom, inputAtom, allMovesAtom, possibleInputsAtom, validInputSubstrAtom, inputIsCompleteAtom } from './state'
+import { boardAtom, logAtom, inputAtom, allMovesAtom, possibleInputsAtom, validInputSubstrAtom, inputIsCompleteAtom, validStartSquaresAtom, startIsCompleteAtom, validEndSquaresAtom, endIsCompleteAtom } from './state'
 import { isValidElement, useEffect } from 'react'
 import * as wasm from './wasm-bindings'
 
@@ -51,19 +51,52 @@ function PieceComponent(props: { piece: Piece }) {
   return pieceEl
 }
 
-function FileRankHint(props: { fileRank: FileRank }) {
+function FileRankHint(props: { location: string }) {
+  let validStartSquares = useAtomValue(validStartSquaresAtom)
+  let startIsComplete = useAtomValue(startIsCompleteAtom)
+
+  let validEndSquares = useAtomValue(validEndSquaresAtom)
+  let endIsComplete = useAtomValue(endIsCompleteAtom)
+
+  let isStart = false
+  let isEnd = false
+
+  if (startIsComplete) {
+    if (validStartSquares.has(props.location)) {
+      isStart = true
+    } else if (validEndSquares.has(props.location)) {
+      isEnd = true
+    }
+  } else {
+    if (validStartSquares.has(props.location)) {
+      isStart = true
+    }
+  }
+
+  if (!isStart && !isEnd) {
+    return <></>
+  }
+
+  let className = ''
+  if (isStart && startIsComplete) {
+    className = 'is-start'
+  }
+  if (isEnd && endIsComplete) {
+    className = 'is-end'
+  }
+
   return (
-    <div className="square square-hint">
+    <div className={`square square-hint ${className}`}>
       <span>
-        {fileStr(props.fileRank[0])}
-        {rankStr(props.fileRank[1])}
+        {props.location}
       </span>
     </div>
   )
 }
 
-function Square(props: { piece: Piece, fileRank: FileRank }) {
-  let colorClass = (props.fileRank[0] + props.fileRank[1]) % 2 === 0 ? 'light' : 'dark'
+function Square(props: { piece: Piece, file: number, rank: number }) {
+  let colorClass = (props.file + props.rank) % 2 === 0 ? 'light' : 'dark'
+  let location = locationStr(props.file, props.rank)
 
   let { piece } = props
 
@@ -71,44 +104,37 @@ function Square(props: { piece: Piece, fileRank: FileRank }) {
   if (piece !== ' ') {
     pieceEl = <PieceComponent piece={piece} />
   }
+
   return (
     <div className={`square ${colorClass}`}>
       {pieceEl}
-      <FileRankHint fileRank={props.fileRank} />
+      <FileRankHint location={location} />
     </div>
   )
 }
 
-function RowComponent(props: { row: Row, rank: Rank }) {
-  return (
-    <div className="row">
-      {props.row.map((piece, file) => {
-        return <Square piece={piece} fileRank={[file, props.rank]} key={file} />
-      })}
-      <div className="square rank-label">{rankStr(props.rank)}</div>
-    </div>
-  )
-}
-
-function RanksComponent() {
-  return (
-    <div className="row">
-      {['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map((file) => {
-        return <div className="square file-label" key={file}>{file}</div>
-      })}
-      <div className="square rank-label"></div>
-    </div>
-  )
-}
 
 function BoardComponent(props: { board: Board }) {
   return (
     <div className="board">
       {props.board.map((row, inverseRank) => {
-        let rank = invert(inverseRank)
-        return <RowComponent row={row} rank={rank} key={rank} />
+        let rank = 7 - inverseRank
+        return <>
+          <div className="row">
+            {row.map((piece, file) => {
+              return <Square piece={piece} file={file} rank={rank} key={file} />
+            })}
+            {/* <div className="square rank-label">{rankStr(rank)}</div> */}
+          </div>
+        </>
       })}
-      <RanksComponent />
+
+      {/* <div className="row file-labels">
+        {['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map((file) => {
+          return <div className="square file-label" key={file}>{file}</div>
+        })}
+        <div className="square rank-label"></div>
+      </div> */}
     </div>
   )
 }

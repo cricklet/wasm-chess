@@ -3,8 +3,6 @@
     --dark-square: #707a7b;
     --light-square: #808b8c;
     --background: var(--light-square);
-    --dark-piece: #345;
-    --light-piece: #d8d8cc;
 
     --label: #a2b1b3;
     --invalid: rgb(170, 118, 118);
@@ -17,18 +15,22 @@
     --dark-square: #a0aaab;
     --light-square: #b0bbbc;
     --background: var(--light-square);
-    --dark-piece: #345;
-    --light-piece: #f8f8ec;
 
     --label: #808a8b;
-    --invalid: rgb(255, 180, 180);
-    --complete: rgb(180, 255, 193);
+
+    --invalid: rgba(170, 85, 85, 0.667);
+    --partial: rgba(85, 136, 170, 0.667);
+    --complete: rgba(85, 170, 96, 0.667);
   }
 }
 
 :root {
   --square-size: min(min(8rem, 10vw), 9vh);
   font-family: monospace;
+
+  /* --dark-piece: #345; */
+  --dark-piece: #4a4c4f;
+  --light-piece: #f8f8ec;
 }
 
 * {
@@ -97,37 +99,59 @@ body {
   background-repeat: no-repeat;
   background-position: center;
 
-  padding: 10px;
+  padding: 6px;
 }
 
 .square .square-hint {
-  font-size: calc(var(--square-size) * 0.3);
-  font-family: monospace;
-
   display: flex;
   justify-content: flex-end;
   align-items: flex-end;
-
 }
 
 .square .square-hint span {
   z-index: 10;
 
-  background-color: rgba(0, 0, 0, 0.5);
-  color: var(--light-piece);
+  font-family: monospace;
+  font-size: calc(var(--square-size) * 0.3);
+  font-weight: 600;
+
+  padding: 4px;
+
+  background-color: #555a;
+  color: #fff;
 }
 
+.square .square-hint.is-start span {
+  background-color: var(--partial);
+  color: #fff;
+}
+
+.square .square-hint.is-end span {
+  background-color: var(--complete);
+  color: #fff;
+}
+
+/***********************************/
+
 .square.file-label {
+  height: calc(var(--square-size) * 0.5);
   line-height: calc(var(--square-size) * 0.5);
   font-size: calc(var(--square-size) * 0.4);
   color: var(--label);
   text-align: center;
+  align-items: top;
 }
+
+.row.file-labels {
+  height: calc(var(--square-size) * 0.5);
+}
+
 .square.rank-label {
   width: calc(var(--square-size) * 0.5);
   font-size: calc(var(--square-size) * 0.4);
   color: var(--label);
   text-align: center;
+  align-items: center;
 }
 
 .clickable {
@@ -137,14 +161,25 @@ body {
 /***********************************/
 
 .input {
-  font-size: calc(var(--square-size) / 2);
+  font-family: monospace;
+  font-size: calc(var(--square-size) * 0.5);
+  font-weight: 600;
+
+  color: var(--label);
   margin-top: calc(var(--square-size) / 4);
+}
+
+.partial-input {
+  background-color: var(--partial);
+  color: #fff;
 }
 
 .complete-input {
   background-color: var(--complete);
+  color: #fff;
 }
 
 .invalid-input {
   background-color: var(--invalid);
+  color: #fff;
 }

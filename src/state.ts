@@ -1,5 +1,5 @@
 import { atom } from "jotai";
-import { Board, boardFromFen, fileFromStr } from "./helpers";
+import { Board, boardFromFen,  } from "./helpers";
 import * as wasm from "./wasm-bindings";
 
 interface GameState {
@@ -56,6 +56,29 @@ export const validInputSubstrAtom = atom<string>(get => {
     return validInputSubstr
 })
 
+export const validStartSquaresAtom = atom<Set<string>>(get => {
+    let possibleInputs = get(possibleInputsAtom)
+    return new Set(possibleInputs.map(input => input.slice(0, 2)))
+})
+
+export const startIsCompleteAtom = atom<boolean>(get => {
+    let input = get(inputAtom)
+    let validStartSquares = get(validStartSquaresAtom)
+
+    return validStartSquares.size === 1 && input.length >= 2
+})
+
+export const validEndSquaresAtom = atom<Set<string>>(get => {
+    let possibleInputs = get(possibleInputsAtom)
+    return new Set(possibleInputs.map(input => input.slice(2, 4)))
+})
+
+export const endIsCompleteAtom = atom<boolean>(get => {
+    let input = get(inputAtom)
+    let validEndSquares = get(validEndSquaresAtom)
+
+    return validEndSquares.size === 1 && input.length >= 4
+})
 
 export const inputIsCompleteAtom = atom<boolean>(get => {
     let input = get(inputAtom)

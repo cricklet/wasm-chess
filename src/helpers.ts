@@ -3,20 +3,16 @@ export type Piece = 'R' | 'N' | 'B' | 'K' | 'Q' | 'P' | 'r' | 'n' | 'b' | 'k' | 
 export type Row = [Piece, Piece, Piece, Piece, Piece, Piece, Piece, Piece];
 export type Board = [Row, Row, Row, Row, Row, Row, Row, Row];
 
-export type File = number;
-export type Rank = number;
-export type FileRank = [File, Rank];
-
-export function invert(rank: Rank): Rank {
-    return 7 - rank;
-}
-
-export function rankStr(rank: Rank): string {
+export function rankStr(rank: number): string {
     return (rank + 1).toString();
 }
 
-export function fileStr(file: File): string {
+export function fileStr(file: number): string {
     return 'abcdefgh'[file];
+}
+
+export function locationStr(file: number, rank: number): string {
+    return fileStr(file) + rankStr(rank);
 }
 
 export function boardFromFen(fen: string): Board {
@@ -40,7 +36,7 @@ export function boardFromFen(fen: string): Board {
     ];
 
     fen.split(' ')[0].split('/').map((row, rank) => {
-        let file: File = 0;
+        let file = 0;
         row.split('').map(piece => {
             let pieceAsInt = parseInt(piece);
             if (isNaN(pieceAsInt)) {
