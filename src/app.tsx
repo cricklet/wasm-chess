@@ -51,6 +51,17 @@ function PieceComponent(props: { piece: Piece }) {
   return pieceEl
 }
 
+function FileRankHint(props: { fileRank: FileRank }) {
+  return (
+    <div className="square square-hint">
+      <span>
+        {fileStr(props.fileRank[0])}
+        {rankStr(props.fileRank[1])}
+      </span>
+    </div>
+  )
+}
+
 function Square(props: { piece: Piece, fileRank: FileRank }) {
   let colorClass = (props.fileRank[0] + props.fileRank[1]) % 2 === 0 ? 'light' : 'dark'
 
@@ -62,12 +73,8 @@ function Square(props: { piece: Piece, fileRank: FileRank }) {
   }
   return (
     <div className={`square ${colorClass}`}>
-      <div className="square-hint">
-        {fileStr(props.fileRank[0])}
-        {rankStr(props.fileRank[1])}
-      </div>
-
       {pieceEl}
+      <FileRankHint fileRank={props.fileRank} />
     </div>
   )
 }
@@ -78,6 +85,18 @@ function RowComponent(props: { row: Row, rank: Rank }) {
       {props.row.map((piece, file) => {
         return <Square piece={piece} fileRank={[file, props.rank]} key={file} />
       })}
+      <div className="square rank-label">{rankStr(props.rank)}</div>
+    </div>
+  )
+}
+
+function RanksComponent() {
+  return (
+    <div className="row">
+      {['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map((file) => {
+        return <div className="square file-label" key={file}>{file}</div>
+      })}
+      <div className="square rank-label"></div>
     </div>
   )
 }
@@ -89,6 +108,7 @@ function BoardComponent(props: { board: Board }) {
         let rank = invert(inverseRank)
         return <RowComponent row={row} rank={rank} key={rank} />
       })}
+      <RanksComponent />
     </div>
   )
 }
