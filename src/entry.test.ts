@@ -12,3 +12,5 @@ console.log('loaded tests')
 
 const env = jasmine.getEnv();
 env.execute();
+
+new EventSource('/esbuild').addEventListener('change', () => location.reload())

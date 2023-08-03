@@ -1,6 +1,6 @@
 
 
-import './App.css';
+import './app.css';
 
 import RookSvg from './assets/rook.svg';
 import KnightSvg from './assets/knight.svg';

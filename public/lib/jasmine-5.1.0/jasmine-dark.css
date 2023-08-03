@@ -1,3 +1,4 @@
+@media (prefers-color-scheme: dark) {
 body { overflow-y: scroll; background-color: #252525;}
 
 ::-webkit-scrollbar { width: 6px; }
@@ -59,3 +60,4 @@ body { overflow-y: scroll; background-color: #252525;}
 .jasmine_html-reporter .jasmine-result-message { padding-top: 14px; color: #fff; white-space: pre; }
 .jasmine_html-reporter .jasmine-result-message span.jasmine-result { display: block; }
 .jasmine_html-reporter .jasmine-stack-trace { margin: 5px 0 0 0; max-height: 224px; overflow: auto; font-size: 10px; color: #999; border: 2px solid #444; background: #333; white-space: pre; }
+}
