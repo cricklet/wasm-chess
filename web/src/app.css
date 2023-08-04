@@ -4,6 +4,9 @@
     --light-square: #808b8c;
     --background: var(--light-square);
 
+    --dark-piece: #4a4c4f;
+    --light-piece: #f8f8ec;
+
     --label: #a2b1b3;
     --invalid: rgb(170, 118, 118);
     --complete: rgb(110, 156, 117);
@@ -12,10 +15,13 @@
 
 @media (prefers-color-scheme: light) {
   :root {
-    --dark-square: #a0aaab;
-    --light-square: #b0bbbc;
+    --dark-square: #b0babf;
+    --light-square: #c0cbcf;
     --background: var(--light-square);
 
+    --dark-piece: #4a4c4f;
+    --light-piece: #fffffa;
+  
     --label: #808a8b;
 
     --invalid: rgba(170, 85, 85, 0.667);
@@ -27,10 +33,6 @@
 :root {
   --square-size: min(min(8rem, 10vw), 9vh);
   font-family: monospace;
-
-  /* --dark-piece: #345; */
-  --dark-piece: #4a4c4f;
-  --light-piece: #f8f8ec;
 }
 
 * {
