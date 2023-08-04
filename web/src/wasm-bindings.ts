@@ -32,8 +32,6 @@ globalThis.BindingsJs = {
     }
 }
 
-import 'crab-chess'
-
 export async function loadWasm(): Promise<void> {
     console.log('loading wasm')
     console.log(window.wasm_bindgen)
