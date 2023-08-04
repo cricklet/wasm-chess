@@ -18,50 +18,50 @@ function getOutputOfCommand(command: string) {
   }
 }
 
-function getArgs() {
-  let args = argv.slice(2)
-  let argsMap: { [key: string]: Array<string> } = {}
+// function getArgs() {
+//   let args = argv.slice(2)
+//   let argsMap: { [key: string]: Array<string> } = {}
 
-  let key: string | undefined = undefined
+//   let key: string | undefined = undefined
 
-  for (let i = 0; i < args.length; i++) {
-    let arg = args[i]
-    if (arg.indexOf('--') === 0) {
-      key = arg.slice(2)
-    } else {
-      if (key === undefined) {
-        console.error('args must be specified with --key1 value1 value2 --key2 value3')
-        console.error('invalid args: ' + args.join(' '))
-        process.exit(1)
-      }
+//   for (let i = 0; i < args.length; i++) {
+//     let arg = args[i]
+//     if (arg.indexOf('--') === 0) {
+//       key = arg.slice(2)
+//     } else {
+//       if (key === undefined) {
+//         console.error('args must be specified with --key1 value1 value2 --key2 value3')
+//         console.error('invalid args: ' + args.join(' '))
+//         process.exit(1)
+//       }
 
-      let val = args[i]
-      if (key in argsMap) {
-        argsMap[key].push(val)
-      } else {
-        argsMap[key] = [val]
-      }
-    }
+//       let val = args[i]
+//       if (key in argsMap) {
+//         argsMap[key].push(val)
+//       } else {
+//         argsMap[key] = [val]
+//       }
+//     }
 
-  }
+//   }
 
-  return argsMap
-}
+//   return argsMap
+// }
 
-let args = getArgs()
-let linkedWasmPackages = args['link'] || []
-for (let linkedWasmPackage of linkedWasmPackages) {
-  let isLinked = getOutputOfCommand('ls node_modules')
-    .split('\n')
-    .filter((line) => line.indexOf(linkedWasmPackage) > -1)
-    .length > 0
+// let args = getArgs()
+// let linkedWasmPackages = args['link'] || []
+// for (let linkedWasmPackage of linkedWasmPackages) {
+//   let isLinked = getOutputOfCommand('ls node_modules')
+//     .split('\n')
+//     .filter((line) => line.indexOf(linkedWasmPackage) > -1)
+//     .length > 0
 
-  if (!isLinked) {
-    console.log(`package ${linkedWasmPackage} is not linked`)
-    console.log(`either install via 'yarn install' or link via 'yarn link'`)
-    process.exit(1)
-  }
-}
+//   if (!isLinked) {
+//     console.log(`package ${linkedWasmPackage} is not linked`)
+//     console.log(`either install via 'yarn install' or link via 'yarn link'`)
+//     process.exit(1)
+//   }
+// }
 
 async function main() {
   try {
