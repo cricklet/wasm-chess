@@ -1,25 +1,25 @@
 
-import * as wasm from './wasm-bindings'
+import * as bindings from './wasm-bindings'
 
 describe('wasm-bindings.test.ts', function () {
     beforeAll(async function () {
-        await wasm.loadWasmBindgen()
+        await bindings.loadWasmBindgen()
     })
 
     it('d', function () {
-        wasm.setPosition('startpos', [])
-        expect(wasm.currentFen()).toBe('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1')
+        bindings.setPosition('startpos', [])
+        expect(bindings.currentFen()).toBe('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1')
     })
     it('e2e4', function () {
         let start = 'startpos'
         let moves = ['e2e4']
-        wasm.setPosition(start, moves)
-        expect(wasm.currentFen()).toBe('rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 1 1')
+        bindings.setPosition(start, moves)
+        expect(bindings.currentFen()).toBe('rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 1 1')
     })
     it('possibleMoves`', function () {
         let start = 'startpos'
         let moves = ['e2e4']
-        wasm.setPosition(start, moves)
+        bindings.setPosition(start, moves)
 
         const expectedMoves = [
             'a7a6',
@@ -45,14 +45,32 @@ describe('wasm-bindings.test.ts', function () {
         ]
         expectedMoves.sort()
 
-        const actualMoves = wasm.possibleMoves()
+        const actualMoves = bindings.possibleMoves()
         actualMoves.sort()
 
         expect(expectedMoves).toEqual(actualMoves)
     })
 
-    it('testWorker()', async function () {
-        const result = await wasm.testWorker()
-        expect(result).toBe('message received by worker: hello')
+    it('echoWorkerForTesting()', async function () {
+        const worker = bindings.jsWorkerForTesting()
+
+        expect(await worker.echo('hello'))
+            .toBe('message received by worker: hello')
+
+        expect(await worker.echo('bye'))
+            .toBe('message received by worker: bye')
+
+        worker.terminate()
+    })
+
+    it('wasmWorkerForTesting()', async function () {
+        const worker = await bindings.wasmWorkerForTesting()
+
+        worker.go()
+        await new Promise(resolve => setTimeout(resolve, 400))
+        worker.stop()
+
+        expect(await worker.count()).toBeGreaterThan(2)
+        worker.terminate()
     })
 })
