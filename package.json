@@ -16,7 +16,7 @@
     "zustand": "^4.4.0"
   },
   "scripts": {
-    "serve": "ts-node-esm ./scripts/esbuild.ts --link crab-chess"
+    "serve": "tsx ./scripts/esbuild.ts --link crab-chess"
   },
   "devDependencies": {
     "@svgr/plugin-jsx": "^8.0.1",
@@ -27,6 +27,6 @@
     "jasmine-browser-runner": "^2.1.0",
     "jasmine-core": "^5.1.0",
     "node-stdlib-browser": "^1.2.0",
-    "ts-node": "^10.9.1"
+    "tsx": "^3.12.7"
   }
 }

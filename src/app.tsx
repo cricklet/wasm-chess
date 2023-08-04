@@ -10,7 +10,7 @@ import QueenSvg from './assets/queen.svg'
 import PawnSvg from './assets/pawn.svg'
 import { Board, Piece, Row, locationStr, rankStr, } from './helpers'
 import { atom, useAtom, useAtomValue, useSetAtom } from 'jotai'
-import { boardAtom, logAtom, inputAtom, allMovesAtom, possibleInputsAtom, validInputSubstrAtom, inputIsCompleteAtom, validStartSquaresAtom, startIsCompleteAtom, validEndSquaresAtom, endIsCompleteAtom } from './state'
+import { atomBoard, logAtom, atomInput, atomLegalMoves, atomCompleteMovesMatchingInput, atomValidPortionOfInput, atomInputIsLegal as atomInputIsLegalMove, atomValidStartsForInput as atomValidStartsMatchingInput, atomStartFromInput, atomValidEndsForInput as atomValidEndsMatchingInput, atomGame, atomLegalStarts, atomEndFromInput, finalizeMove, performMove } from './state'
 import { isValidElement, useEffect } from 'react'
 import * as wasm from './wasm-bindings'
 
@@ -51,47 +51,76 @@ function PieceComponent(props: { piece: Piece }) {
   return pieceEl
 }
 
-function FileRankHint(props: { location: string }) {
-  let validStartSquares = useAtomValue(validStartSquaresAtom)
-  let startIsComplete = useAtomValue(startIsCompleteAtom)
+enum SquarePotential {
+  None,
+  Start,
+  End,
+}
 
-  let validEndSquares = useAtomValue(validEndSquaresAtom)
-  let endIsComplete = useAtomValue(endIsCompleteAtom)
+enum SquareHighlight {
+  None,
+  StartAvailable,
+  StartComplete,
+  EndAvailable,
+  EndComplete,
+}
 
-  let isStart = false
-  let isEnd = false
+function computeHighlightAndPotential(location: string): [SquarePotential, SquareHighlight] {
+  let allStarts = useAtomValue(atomLegalStarts)
 
-  if (startIsComplete) {
-    if (validStartSquares.has(props.location)) {
-      isStart = true
-    } else if (validEndSquares.has(props.location)) {
-      isEnd = true
+  let matchingStarts = useAtomValue(atomValidStartsMatchingInput)
+  let matchingEnds = useAtomValue(atomValidEndsMatchingInput)
+
+  let startFromInput = useAtomValue(atomStartFromInput)
+  let endFromInput = useAtomValue(atomEndFromInput)
+
+  let isStart = allStarts.has(location)
+  let isEnd = startFromInput !== undefined && matchingEnds.has(location)
+
+  let squareHighlight = SquareHighlight.None
+  if (isEnd) {
+    if (endFromInput === location) {
+      squareHighlight = SquareHighlight.EndComplete
+    } else {
+      squareHighlight = SquareHighlight.EndAvailable
     }
-  } else {
-    if (validStartSquares.has(props.location)) {
-      isStart = true
+  } else if (isStart) {
+    if (startFromInput === location) {
+      squareHighlight = SquareHighlight.StartComplete
+    } else if (matchingStarts.has(location)) {
+      squareHighlight = SquareHighlight.StartAvailable
     }
   }
 
-  if (!isStart && !isEnd) {
+  let squarePotential = SquarePotential.None
+  if (isStart) {
+    squarePotential = SquarePotential.Start
+  } else if (isEnd) {
+    squarePotential = SquarePotential.End
+  }
+
+  return [squarePotential, squareHighlight]
+}
+
+function SquareHint(props: { highlight: SquareHighlight, location: string }) {
+  const { highlight, location } = props
+
+  if (highlight === SquareHighlight.None) {
     return <></>
   }
 
   let className = ''
-  if (isStart && startIsComplete) {
+  if (highlight === SquareHighlight.StartComplete) {
     className = 'is-start'
-  }
-  if (isEnd && endIsComplete) {
+  } else if (highlight === SquareHighlight.EndComplete) {
     className = 'is-end'
   }
 
-  return (
-    <div className={`square square-hint ${className}`}>
-      <span>
-        {props.location}
-      </span>
-    </div>
-  )
+  return <div className={`square square-hint ${className}`}>
+    <span>
+      {location}
+    </span>
+  </div>
 }
 
 function Square(props: { piece: Piece, file: number, rank: number }) {
@@ -99,16 +128,41 @@ function Square(props: { piece: Piece, file: number, rank: number }) {
   let location = locationStr(props.file, props.rank)
 
   let { piece } = props
+  let [potential, highlight] = computeHighlightAndPotential(location)
 
   let pieceEl = <></>
   if (piece !== ' ') {
     pieceEl = <PieceComponent piece={piece} />
   }
 
+  let allMoves = useAtomValue(atomLegalMoves)
+  let [input, setInput] = useAtom(atomInput)
+  let setGame = useSetAtom(atomGame);
+
+  const onClick = () => {
+    if (potential === SquarePotential.None) {
+      setInput("")
+    } else if (potential === SquarePotential.Start) {
+      setInput(location)
+    } else if (potential === SquarePotential.End) {
+      let move = finalizeMove(input.slice(0, 2) + location, allMoves)
+      if (move === undefined) {
+        throw new Error(`move ${input.slice(0, 2) + location} is not legal`)
+      } else {
+        setGame((game) => performMove(move as string, game))
+        setInput("")
+      }
+    }
+  }
+
+  const clickableClass = potential !== SquarePotential.None ? '' : 'clickable'
+
   return (
-    <div className={`square ${colorClass}`}>
+    <div
+      className={`square ${colorClass} ${clickableClass}`}
+      onClick={onClick}>
       {pieceEl}
-      <FileRankHint location={location} />
+      <SquareHint highlight={highlight} location={location} />
     </div>
   )
 }
@@ -119,14 +173,14 @@ function BoardComponent(props: { board: Board }) {
     <div className="board">
       {props.board.map((row, inverseRank) => {
         let rank = 7 - inverseRank
-        return <>
-          <div className="row">
+        return (
+          <div className="row" key={rank}>
             {row.map((piece, file) => {
               return <Square piece={piece} file={file} rank={rank} key={file} />
             })}
             {/* <div className="square rank-label">{rankStr(rank)}</div> */}
           </div>
-        </>
+        )
       })}
 
       {/* <div className="row file-labels">
@@ -140,19 +194,19 @@ function BoardComponent(props: { board: Board }) {
 }
 
 function InputComponent() {
-  let input = useAtomValue(inputAtom)
-  let isComplete = useAtomValue(inputIsCompleteAtom)
+  let input = useAtomValue(atomInput)
+  let isLegal = useAtomValue(atomInputIsLegalMove)
 
-  let validInputSubstr = useAtomValue(validInputSubstrAtom)
-  let invalidInputSuffix = input.slice(validInputSubstr.length)
+  let inputToValidSubstr = useAtomValue(atomValidPortionOfInput)
+  let invalidInputSuffix = input.slice(inputToValidSubstr.length)
 
   return (
     <div className="input">
-      {isComplete ? (
+      {isLegal ? (
         <span className="complete-input">{input}</span>
       ) : (
         <>
-          <span className="valid-input">{validInputSubstr}</span>
+          <span className="valid-input">{inputToValidSubstr}</span>
           <span className="invalid-input">{invalidInputSuffix}</span>
         </>
       )}
@@ -161,10 +215,11 @@ function InputComponent() {
 }
 
 function App() {
-  let board = useAtomValue(boardAtom)
+  let board = useAtomValue(atomBoard)
+  let setGame = useSetAtom(atomGame)
   let setLog = useSetAtom(logAtom)
-  let possibleInputs = useAtomValue(possibleInputsAtom)
-  let [input, setInput] = useAtom(inputAtom)
+  let [input, setInput] = useAtom(atomInput)
+  let allMoves = useAtomValue(atomLegalMoves)
 
   useEffect(() => {
     let cleanup = wasm.listen((line: string) => {
@@ -176,6 +231,12 @@ function App() {
   useEffect(() => {
     document.onkeydown = (event) => {
       if (event.key === 'Enter') {
+        let move = finalizeMove(input, allMoves);
+        if (move !== undefined) {
+          setGame((game) => performMove(move as string, game))
+          setInput('')
+          return
+        }
         return
       } else if (event.key === 'Backspace') {
         if (event.getModifierState('Control')) {
@@ -187,6 +248,11 @@ function App() {
       } else if (event.key === 'Escape') {
         setInput('')
         return
+      } else if (event.key === 'Enter') {
+        let move = finalizeMove(input, allMoves);
+        if (move !== undefined) {
+
+        }
       } else if (event.key.length > 1) {
         return
       }
@@ -197,7 +263,7 @@ function App() {
     return () => {
       document.onkeydown = null
     }
-  }, [input, possibleInputs, setInput])
+  }, [input, setInput])
 
   return (
     <div className="app">

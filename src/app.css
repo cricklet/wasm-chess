@@ -91,6 +91,12 @@ body {
   grid-area: 1/1;
 }
 
+.square * {
+  -webkit-user-select: none; /* Safari */
+  -ms-user-select: none; /* IE 10 and IE 11 */
+  user-select: none; /* Standard syntax */
+}
+
 .square .piece {
   width: var(--square-size);
   height: var(--square-size);
@@ -154,8 +160,8 @@ body {
   align-items: center;
 }
 
-.clickable {
-  cursor: pointer;
+.clickable * {
+  cursor: pointer!important;
 }
 
 /***********************************/

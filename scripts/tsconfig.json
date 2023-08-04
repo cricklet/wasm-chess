@@ -6,6 +6,6 @@
         "moduleResolution": "NodeNext"
     },
     "include": [
-        ".",
+        "./*.ts",
     ]
 }

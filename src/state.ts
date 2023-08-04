@@ -1,4 +1,4 @@
-import { atom } from "jotai";
+import { SetStateAction, atom } from "jotai";
 import { Board, boardFromFen,  } from "./helpers";
 import * as wasm from "./wasm-bindings";
 
@@ -7,83 +7,113 @@ interface GameState {
     moves: string[],
 }
 
-export const gameAtom = atom<GameState>({
+export const atomGame = atom<GameState>({
     start: 'startpos',
     moves: ['e2e4'],
 })
 
-export const boardAtom = atom<Board>(get => {
-    let state = get(gameAtom)
+const atomEngine = atom(null, (get, set) => {
+    const game = get(atomGame)
+    if (game.moves.length % 2 === 0) {
+        // engine's turn
+        wasm.setPosition(game.start, game.moves)
+    }
+})
+
+export function performMove(move: string, game: GameState): GameState {
+    return {
+        ...game,
+        moves: [...game.moves, move as string],
+    }
+}
+
+export const atomBoard = atom<Board>(get => {
+    let state = get(atomGame)
     wasm.setPosition(state.start, state.moves)
     let currentFen = wasm.currentFen()
 
     return boardFromFen(currentFen)
 })
 
-export const inputAtom = atom<string>('')
+export const atomInput = atom<string>('')
 
-export const allMovesAtom = atom<string[]>(get => {
-    get(boardAtom)
+export const atomLegalMoves = atom<string[]>(get => {
+    get(atomBoard)
     return wasm.possibleMoves()
 })
 
-export const possibleInputsAtom = atom<string[]>(get => {
-    let input = get(inputAtom)
-    let allMoves = get(allMovesAtom)
+export const atomLegalStarts = atom<Set<string>>(get => {
+    let allMoves = get(atomLegalMoves)
+    return new Set(allMoves.map(move => move.slice(0, 2)))
+})
+
+export const atomCompleteMovesMatchingInput = atom<string[]>(get => {
+    let input = get(atomInput)
+    let allMoves = get(atomLegalMoves)
     return allMoves.filter(move => move.startsWith(input))
 })
 
-export const inputIsValidAtom = atom<boolean>(get => {
-    let input = get(inputAtom)
-    let possibleInputs = get(possibleInputsAtom)
-    return possibleInputs
-        .filter(possibleInput => possibleInput.startsWith(input)).length > 0
-})
+export const atomValidPortionOfInput = atom<string>(get => {
+    let input = get(atomInput)
+    let allMoves = get(atomLegalMoves)
 
-export const validInputSubstrAtom = atom<string>(get => {
-    let input = get(inputAtom)
-    let allMoves = get(allMovesAtom)
-
-    let validInputSubstr = ''
+    let inputToValidSubstr = ''
     for (let i = 0; i < input.length; i++) {
         let substr = input.slice(0, i + 1)
         let possibleInputs = allMoves.filter(move => move.startsWith(substr))
         if (possibleInputs.length > 0) {
-            validInputSubstr = substr
+            inputToValidSubstr = substr
         }
     }
 
-    return validInputSubstr
+    return inputToValidSubstr
 })
 
-export const validStartSquaresAtom = atom<Set<string>>(get => {
-    let possibleInputs = get(possibleInputsAtom)
-    return new Set(possibleInputs.map(input => input.slice(0, 2)))
+export const atomValidStartsForInput = atom<Set<string>>(get => {
+    let moves = get(atomCompleteMovesMatchingInput)
+    return new Set(moves.map(input => input.slice(0, 2)))
 })
 
-export const startIsCompleteAtom = atom<boolean>(get => {
-    let input = get(inputAtom)
-    let validStartSquares = get(validStartSquaresAtom)
+export const atomStartFromInput = atom<string | undefined>(get => {
+    let input = get(atomInput)
+    let starts = get(atomValidStartsForInput)
 
-    return validStartSquares.size === 1 && input.length >= 2
+    return starts.size === 1 && input.length >= 2 ? input.slice(0, 2) : undefined
 })
 
-export const validEndSquaresAtom = atom<Set<string>>(get => {
-    let possibleInputs = get(possibleInputsAtom)
-    return new Set(possibleInputs.map(input => input.slice(2, 4)))
+export const atomValidEndsForInput = atom<Set<string>>(get => {
+    let moves = get(atomCompleteMovesMatchingInput)
+    return new Set(moves.map(input => input.slice(2, 4)))
 })
 
-export const endIsCompleteAtom = atom<boolean>(get => {
-    let input = get(inputAtom)
-    let validEndSquares = get(validEndSquaresAtom)
+export const atomEndFromInput = atom<string | undefined>(get => {
+    let input = get(atomInput)
+    let ends = get(atomValidEndsForInput)
 
-    return validEndSquares.size === 1 && input.length >= 4
+    return ends.size === 1 && input.length >= 4 ? input.slice(2, 4) : undefined
 })
 
-export const inputIsCompleteAtom = atom<boolean>(get => {
-    let input = get(inputAtom)
-    let inputs = get(possibleInputsAtom)
-    return inputs.filter(possibleInput => possibleInput === input).length > 0
+export function finalizeMove(input: string, allMoves: string[]): string | undefined {
+    if (input.length < 4) {
+        return undefined
+    }
+
+    if (allMoves.includes(input)) {
+        return input
+    }
+
+    if (allMoves.includes(input + 'q')) {
+        return input + 'q'
+    }
+
+    return undefined
+}
+
+export const atomInputIsLegal = atom<boolean>(get => {
+    let input = get(atomInput)
+    let allMoves = get(atomLegalMoves)
+
+    return finalizeMove(input, allMoves) !== undefined
 })
 
 export const logAtom = atom<string[]>([])
