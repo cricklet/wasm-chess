@@ -32,10 +32,13 @@ globalThis.BindingsJs = {
     }
 }
 
-import * as wasm from 'crab-chess'
+import 'crab-chess'
 
-export let greet = wasm.greet
-export let process = wasm.process
+export async function loadWasm(): Promise<void> {
+    console.log('loading wasm')
+    console.log(window.wasm_bindgen)
+    await wasm_bindgen()
+}
 
 export function currentFen(): string {
     let fenLine: string = ''
@@ -44,7 +47,7 @@ export function currentFen(): string {
             fenLine = line
         }
     }, () => {
-        wasm.process('d')
+        wasm_bindgen.process('d')
     })
     return fenLine.split('Fen: ')[1].trim()
 }
@@ -69,7 +72,7 @@ export function possibleMoves(): string[] {
         }
         moves.push(move)
     }, () => {
-        wasm.process('go perft 1')
+        wasm_bindgen.process('go perft 1')
     })
 
     return moves
@@ -77,8 +80,8 @@ export function possibleMoves(): string[] {
 
 export function setPosition(position: string, moves: string[]) {
     if (position === 'startpos') {
-        wasm.process(`position ${position} moves ${moves.join(' ')}`)
+        wasm_bindgen.process(`position ${position} moves ${moves.join(' ')}`)
     } else {
-        wasm.process(`position fen ${position} moves ${moves.join(' ')}`)
+        wasm_bindgen.process(`position fen ${position} moves ${moves.join(' ')}`)
     }
 }

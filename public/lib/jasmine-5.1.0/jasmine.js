@@ -7706,6 +7706,7 @@ getJasmineRequireObj().QueueRunner = function(j$) {
     let completedSynchronously = true;
 
     const onException = e => {
+      console.error(e);
       this.onException(e);
       this.recordError_(iterativeIndex);
     };

@@ -2,6 +2,10 @@
 import * as wasm from './wasm-bindings'
 
 describe('wasm-bindings.test.ts', function () {
+    beforeAll(async function () {
+        await wasm.loadWasm()
+    })
+
     it('d', function () {
         wasm.setPosition('startpos', [])
         expect(wasm.currentFen()).toBe('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1')
