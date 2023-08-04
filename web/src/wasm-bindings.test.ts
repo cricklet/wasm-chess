@@ -3,7 +3,7 @@ import * as wasm from './wasm-bindings'
 
 describe('wasm-bindings.test.ts', function () {
     beforeAll(async function () {
-        await wasm.loadWasm()
+        await wasm.loadWasmBindgen()
     })
 
     it('d', function () {

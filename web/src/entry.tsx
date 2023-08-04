@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './app'
+import { loadWasmBindgen } from './wasm-bindings'
 
 
 new EventSource('/esbuild').addEventListener('change', () => location.reload())
@@ -10,8 +11,12 @@ rootEl.style.filter = `hue-rotate(${Math.random() * 20}deg)`
 
 const root = ReactDOM.createRoot(rootEl);
 
-root.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+(async () => {
+  await loadWasmBindgen()
+
+  root.render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+  );
+})()

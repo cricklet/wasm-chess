@@ -32,10 +32,28 @@ globalThis.BindingsJs = {
     }
 }
 
-export async function loadWasm(): Promise<void> {
-    console.log('loading wasm')
-    console.log(window.wasm_bindgen)
+// This loads the .d.ts type definitions. However, because web worker support
+// for modules isn't very mature, the wasm bindings are instead imported via a
+// <script> tag which sets a global variable called `wasm_bindgen`.
+import '../public/lib/wasm-pack'
+
+let wasmLoaded = false
+
+export async function loadWasmBindgen(): Promise<void> {
+    if (wasmLoaded) {
+        return
+    }
+
+    try {
+        wasm_bindgen
+    } catch (e) {
+        if (e instanceof ReferenceError) {
+            throw new Error('wasm_bindgen is undefined, please include via <script> tag')
+        }
+    }
+
     await wasm_bindgen()
+    wasmLoaded = true
 }
 
 export function currentFen(): string {
