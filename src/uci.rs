@@ -18,6 +18,7 @@ impl Uci {
                 return Box::new(iter::once(Err(e.clone())));
             }
             self.game = game.unwrap();
+            println!("Game: {}", self.game);
             Box::new(iter::empty())
         } else if line.starts_with("go perft") {
             let depth = line["go perft".len()..].trim();
@@ -41,7 +42,8 @@ impl Uci {
             let perft_overall = iter::once(format!("Nodes searched: {}", perft_overall));
             Box::new(perft_per_move.chain(perft_overall).map(Ok))
         } else if line == "d" {
-            let debug_iter = iter::once(prefix(&format!("{}", self.game), "> "));
+            let debug_str = format!("{}\nFen: {}", self.game, self.game.to_fen());
+            let debug_iter = iter::once(debug_str);
             Box::new(debug_iter.map(Ok))
         } else if line == "stop" {
             Box::new(iter::empty())

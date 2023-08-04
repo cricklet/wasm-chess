@@ -20,9 +20,9 @@ use lazy_static::lazy_static;
 
 use crate::{game::Game, uci::Uci};
 
-#[wasm_bindgen]
+#[wasm_bindgen(js_namespace = ["globalThis", "BindingsJs"])]
 extern "C" {
-    #[wasm_bindgen(js_namespace = console)]
+    #[wasm_bindgen()]
     fn log(s: &str);
 }
 
