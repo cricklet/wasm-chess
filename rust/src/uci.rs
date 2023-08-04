@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use std::iter;
 
 use crate::{
@@ -39,8 +40,12 @@ impl Uci {
             let perft_per_move = perft_per_move
                 .into_iter()
                 .map(|(mv, count)| format!("{}: {}", mv, count));
-            let perft_overall = iter::once(format!("Nodes searched: {}", perft_overall));
-            Box::new(perft_per_move.chain(perft_overall).map(Ok))
+            let perft_output = format!(
+                "{}\nNodes searched: {}",
+                perft_per_move.into_iter().join("\n"),
+                perft_overall,
+            );
+            Box::new(iter::once(perft_output).map(Ok))
         } else if line == "d" {
             let debug_str = format!("{}\nFen: {}", self.game, self.game.to_fen());
             let debug_iter = iter::once(debug_str);

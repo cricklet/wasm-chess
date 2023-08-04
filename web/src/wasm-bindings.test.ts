@@ -50,4 +50,9 @@ describe('wasm-bindings.test.ts', function () {
 
         expect(expectedMoves).toEqual(actualMoves)
     })
+
+    it('testWorker()', async function () {
+        const result = await wasm.testWorker()
+        expect(result).toBe('message received by worker: hello')
+    })
 })

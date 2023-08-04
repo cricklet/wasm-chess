@@ -31,7 +31,7 @@
 }
 
 :root {
-  --square-size: min(min(8rem, 10vw), 9vh);
+  --square-size: min(min(8rem, 10vw), 10vh);
   font-family: monospace;
 }
 
@@ -54,7 +54,7 @@ body {
   display: flex;
   justify-content: start;
   align-items: center;
-  padding-top: var(--square-size);
+  padding-top: calc(var(--square-size) / 2);
   flex-direction: column;
 }
 

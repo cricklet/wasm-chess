@@ -59,6 +59,21 @@ export async function loadWasmBindgen(): Promise<void> {
     wasm_bindgen.hello()
 }
 
+export async function testWorker(): Promise<string> {
+    const worker = new Worker('test-worker.js')
+    const result = new Promise<string>((resolve) => {
+        worker.onmessage = (e) => {
+            console.log('message received by typescript:', e.data)
+            resolve(e.data)
+
+            worker.onmessage = null
+        }
+    })
+
+    worker.postMessage('hello')
+    return result
+}
+
 export function currentFen(): string {
     let fenLine: string = ''
     listenScope((line: string) => {
@@ -66,7 +81,7 @@ export function currentFen(): string {
             fenLine = line
         }
     }, () => {
-        wasm_bindgen.process('d')
+        wasm_bindgen.process_sync('d')
     })
     return fenLine.split('Fen: ')[1].trim()
 }
@@ -91,7 +106,7 @@ export function possibleMoves(): string[] {
         }
         moves.push(move)
     }, () => {
-        wasm_bindgen.process('go perft 1')
+        wasm_bindgen.process_sync('go perft 1')
     })
 
     return moves
@@ -99,8 +114,8 @@ export function possibleMoves(): string[] {
 
 export function setPosition(position: string, moves: string[]) {
     if (position === 'startpos') {
-        wasm_bindgen.process(`position ${position} moves ${moves.join(' ')}`)
+        wasm_bindgen.process_sync(`position ${position} moves ${moves.join(' ')}`)
     } else {
-        wasm_bindgen.process(`position fen ${position} moves ${moves.join(' ')}`)
+        wasm_bindgen.process_sync(`position fen ${position} moves ${moves.join(' ')}`)
     }
 }

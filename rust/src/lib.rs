@@ -17,6 +17,7 @@ use std::sync::Mutex;
 use wasm_bindgen::prelude::*;
 
 use lazy_static::lazy_static;
+use web_sys::console;
 
 use crate::{game::Game, uci::Uci};
 
@@ -38,7 +39,8 @@ pub fn hello() {
 }
 
 #[wasm_bindgen]
-pub fn process(input: &str) {
+pub fn process_sync(input: &str) {
+    console::log_1(&format!("> {}", input).into());
     for line in input.split("\n") {
         if line.is_empty() {
             continue;
@@ -55,3 +57,5 @@ pub fn process(input: &str) {
         }
     }
 }
+
+pub fn process_async(input: &str) {}
