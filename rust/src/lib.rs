@@ -33,8 +33,8 @@ lazy_static! {
 }
 
 #[wasm_bindgen]
-pub fn greet() {
-    log("wasm loaded")
+pub fn hello() {
+    log("hello from wasm")
 }
 
 #[wasm_bindgen]

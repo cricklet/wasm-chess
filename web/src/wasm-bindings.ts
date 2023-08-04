@@ -26,6 +26,7 @@ export function listen(listener: WasmListener): () => void {
 
 globalThis.BindingsJs = {
     log: (message: string): void => {
+        console.log(message)
         message.split('\n').forEach((line) => {
             listeners.forEach((listener) => listener(line))
         })
@@ -35,7 +36,7 @@ globalThis.BindingsJs = {
 // This loads the .d.ts type definitions. However, because web worker support
 // for modules isn't very mature, the wasm bindings are instead imported via a
 // <script> tag which sets a global variable called `wasm_bindgen`.
-import '../public/lib/wasm-pack'
+import '../public/lib/wasm-pack/crab_chess'
 
 let wasmLoaded = false
 
@@ -54,6 +55,8 @@ export async function loadWasmBindgen(): Promise<void> {
 
     await wasm_bindgen()
     wasmLoaded = true
+
+    wasm_bindgen.hello()
 }
 
 export function currentFen(): string {
