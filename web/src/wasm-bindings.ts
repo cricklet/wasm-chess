@@ -1,6 +1,6 @@
 
 interface IBindingsJs {
-    log(message: string): void
+    log_to_js(message: string): void
 }
 
 declare global {
@@ -25,7 +25,7 @@ export function listen(listener: WasmListener): () => void {
 }
 
 globalThis.BindingsJs = {
-    log: (message: string): void => {
+    log_to_js: (message: string): void => {
         console.log(message)
         message.split('\n').forEach((line) => {
             listeners.forEach((listener) => listener(line))

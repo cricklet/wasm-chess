@@ -2,7 +2,7 @@
 importScripts('lib/wasm-pack/crab_chess.js');
 
 globalThis.BindingsJs = {
-    log: function (msg) {
+    log_to_js: function (msg) {
         self.postMessage(`${msg}`);
     }
 };
