@@ -1,11 +1,15 @@
 use itertools::Itertools;
-use std::iter;
+use std::{iter, sync::Mutex};
 
 use crate::{
     game::Game,
     helpers::{err_result, prefix, ErrorResult},
     perft::run_perft_counting_first_move,
 };
+
+pub struct UciAsync {
+    game: Mutex<Game>,
+}
 
 pub struct Uci {
     pub game: Game,
