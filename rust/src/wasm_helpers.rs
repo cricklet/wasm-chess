@@ -20,10 +20,14 @@ extern "C" {
     pub fn log_to_js(s: &str);
 }
 
+struct AsyncCounterData {
+    counter: i32,
+    stop: bool,
+}
+
 #[wasm_bindgen]
 pub struct AsyncCounter {
-    counter: Mutex<i32>,
-    stop: Mutex<bool>,
+    data: Mutex<AsyncCounterData>,
 }
 
 pub async fn yield_to_js() {
@@ -58,20 +62,49 @@ impl AsyncCounter {
     pub fn new() -> Self {
         set_panic_hook();
         Self {
-            counter: Mutex::new(0),
-            stop: Mutex::new(false),
+            data: Mutex::new(AsyncCounterData {
+                counter: 0,
+                stop: false,
+            }),
         }
     }
     pub fn count(&self) -> i32 {
-        self.counter.lock().unwrap().clone()
+        let data = self.data.lock().unwrap();
+        data.counter
     }
+
+    // Let's try to avoid async recursion for now -- it requires heap allocations
+    // (boxing the returned future).
+
+    // pub async fn start(&self) {
+    //     log_to_js(&"start");
+
+    //     if self.stop.lock().unwrap().clone() {
+    //         return;
+    //     }
+    //     *self.counter.lock().unwrap() += 1;
+
+    //     // Pretend to work
+    //     pretend_to_work(100);
+
+    //     // Give control back to the JS event loop
+    //     yield_to_js().await;
+
+    //     self.start().await;
+    // }
+
     pub async fn start(&self) {
         log_to_js(&"start");
+
         loop {
-            if self.stop.lock().unwrap().clone() {
-                break;
+            {
+                let mut data = self.data.lock().unwrap();
+
+                if data.stop {
+                    return;
+                }
+                data.counter += 1;
             }
-            *self.counter.lock().unwrap() += 1;
 
             // Pretend to work
             pretend_to_work(100);
@@ -80,8 +113,9 @@ impl AsyncCounter {
             yield_to_js().await;
         }
     }
+
     pub async fn stop(&self) {
         log_to_js(&"stop");
-        *self.stop.lock().unwrap() = true;
+        self.data.lock().unwrap().stop = true;
     }
 }
