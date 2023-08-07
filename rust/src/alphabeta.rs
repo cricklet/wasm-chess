@@ -24,6 +24,7 @@ impl<'h> Drop for MoveHistory<'h> {
 pub enum Evaluation {
     Centipawns(Player, isize),
     WinInN(Player, usize),
+    EarlyExit,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -31,6 +32,7 @@ pub enum Comparison {
     Better,
     Equal,
     Worse,
+    Unknown,
 }
 
 impl Comparison {
@@ -43,28 +45,35 @@ impl Comparison {
 }
 
 impl Evaluation {
-    fn comparison_points(&self, current_player: Player) -> (isize, isize) {
+    fn comparison_points(&self, current_player: Player) -> Option<(isize, isize)> {
         match self {
             Evaluation::Centipawns(player, score) => {
                 if *player == current_player {
-                    (0, *score)
+                    Some((0, *score))
                 } else {
-                    (0, -*score)
+                    Some((0, -*score))
                 }
             }
             Evaluation::WinInN(player, n) => {
                 if *player == current_player {
-                    (1000 - *n as isize, 0)
+                    Some((1000 - *n as isize, 0))
                 } else {
-                    (-1000 + *n as isize, 0)
+                    Some((-1000 + *n as isize, 0))
                 }
             }
+            Evaluation::EarlyExit => None,
         }
     }
 
     pub fn compare(current_player: Player, left: Evaluation, right: Evaluation) -> Comparison {
-        let (left_mate, left_eval) = left.comparison_points(current_player);
-        let (right_mate, right_eval) = right.comparison_points(current_player);
+        let left_points = left.comparison_points(current_player);
+        let right_points = right.comparison_points(current_player);
+
+        if left_points.is_none() || right_points.is_none() {
+            return Comparison::Unknown;
+        }
+        let (left_mate, left_eval) = left_points.unwrap();
+        let (right_mate, right_eval) = right_points.unwrap();
 
         if left_mate > right_mate {
             Comparison::Better
