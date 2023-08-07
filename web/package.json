@@ -2,6 +2,9 @@
   "name": "web",
   "version": "0.1.0",
   "private": true,
+  "engines" : { 
+    "node" : ">=20.0.0"
+  },
   "dependencies": {
     "@types/node": "^20.4.5",
     "@types/react": "^18.2.18",

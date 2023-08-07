@@ -34,7 +34,7 @@ wasm-bindgen-futures = "0.4.37"
 async-std = "1.12.0"
 chrono = "0.4.26"
 async-recursion = "1.0.4"
-wasm-pack = "0.12.1"
+watch = "0.2.3"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.34"
