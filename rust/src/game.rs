@@ -1,4 +1,5 @@
 use std::iter;
+use std::rc::Rc;
 
 use strum::IntoEnumIterator;
 
@@ -264,9 +265,16 @@ impl Game {
     }
 
     pub fn move_from_str(&self, move_str: &str) -> Option<Move> {
-        let moves = all_moves(self.player, self, MoveOptions::default());
-        for m in moves {
-            let m = m.unwrap();
+        let mut moves_buffer = MoveBuffer::default();
+        all_moves(
+            &mut moves_buffer,
+            self.player,
+            &self,
+            MoveOptions::default(),
+        )
+        .unwrap();
+
+        for &m in moves_buffer.iter() {
             let mut next_game = *self;
             next_game.make_move(m).unwrap();
 
@@ -290,16 +298,18 @@ impl Game {
         options: MoveOptions,
     ) -> Box<dyn Iterator<Item = ErrorResult<(Game, Move)>> + '_> {
         let player: Player = self.player;
-        let moves = all_moves(player, self, options);
 
-        let games = moves.map(|m| -> ErrorResult<(Game, Move)> {
-            let m = m?;
+        let mut moves_buffer = Box::new(MoveBuffer::default());
+        all_moves(&mut moves_buffer, player, &self, options).unwrap();
 
-            let mut next_game = *self;
-            next_game.make_move(m)?;
+        let games = moves_buffer
+            .into_iter()
+            .map(move |m| -> ErrorResult<(Game, Move)> {
+                let mut next_game = *self;
+                next_game.make_move(m)?;
 
-            Ok((next_game, m))
-        });
+                Ok((next_game, m))
+            });
 
         Box::new(games)
     }
@@ -310,11 +320,13 @@ impl Game {
         options: MoveOptions,
     ) -> ErrorResult<()> {
         let player: Player = self.player;
-        let moves = all_moves(player, self, options);
+
+        let mut moves_buffer = Box::new(MoveBuffer::default());
+        all_moves(&mut moves_buffer, player, &self, options).unwrap();
 
         let mut num = 0;
-        for m in moves {
-            *buffer.get_mut(num) = m?;
+        for &m in moves_buffer.iter() {
+            *buffer.get_mut(num) = m;
             num += 1;
         }
 
@@ -533,9 +545,11 @@ fn test_en_passsant_2() {
         Some(index_from_file_rank_str("b3").unwrap())
     );
 
-    for m in all_moves(game.player, &game, MoveOptions::default()) {
-        let mut next_game = game;
-        next_game.make_move(m.unwrap()).unwrap();
+    for result in game
+        .for_each_pseudo_move(MoveOptions::default())
+        .into_iter()
+    {
+        result.unwrap();
     }
 }
 
@@ -571,9 +585,10 @@ fn test_castling_disallowed() {
     assert_eq!(false, game.can_castle[game.player][CastlingSide::Kingside]);
     assert_eq!(true, game.can_castle[game.player][CastlingSide::Queenside]);
 
-    let castling = all_moves(game.player, &game, MoveOptions::default())
+    let castling = game
+        .for_each_pseudo_move(MoveOptions::default())
         .map(|m| m.unwrap())
-        .filter(|m| match m.move_type {
+        .filter(|(_, m)| match m.move_type {
             MoveType::Quiet(Quiet::Castle { .. }) => true,
             _ => false,
         });

@@ -117,6 +117,25 @@ impl MoveBuffer {
     pub fn set_size(&mut self, size: usize) {
         self.size = size;
     }
+
+    pub fn add(&mut self) -> &mut Move {
+        self.size += 1;
+        let m = self.get_mut(self.size - 1);
+        m
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &Move> {
+        self.moves[..self.size].iter()
+    }
+}
+
+impl IntoIterator for MoveBuffer {
+    type Item = Move;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.moves[..self.size].to_vec().into_iter()
+    }
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
@@ -523,10 +542,11 @@ pub fn castling_moves<'game>(
 }
 
 pub fn all_moves<'game>(
+    buffer: &mut MoveBuffer,
     player: Player,
     state: &'game Game,
     options: MoveOptions,
-) -> impl Iterator<Item = ErrorResult<Move>> + 'game {
+) -> ErrorResult<()> {
     let pawn_moves = pawn_moves(
         player,
         &state.board,
@@ -565,7 +585,7 @@ pub fn all_moves<'game>(
     let en_passant = en_passant_move(player, &state.board, state.en_passant);
     let en_passant = en_passant.map(Ok);
 
-    pawn_moves
+    for m in pawn_moves
         .chain(en_passant)
         .chain(knight_moves)
         .chain(king_moves)
@@ -573,6 +593,12 @@ pub fn all_moves<'game>(
         .chain(rook_moves)
         .chain(queen_moves)
         .chain(castling_moves)
+    {
+        let buffer_move = buffer.add();
+        *buffer_move = m?;
+    }
+
+    Ok(())
 }
 
 pub fn index_in_danger(
@@ -628,8 +654,17 @@ fn test_castling_repeat_moves() {
     let game = Game::from_position_uci(position).unwrap();
 
     let mut count_moves = HashMap::<String, usize>::new();
-    for m in all_moves(game.player, &game, MoveOptions::default()) {
-        let m = m.unwrap();
+
+    let mut moves_buffer = MoveBuffer::default();
+    all_moves(
+        &mut moves_buffer,
+        game.player,
+        &game,
+        MoveOptions::default(),
+    )
+    .unwrap();
+
+    for m in moves_buffer.iter() {
         let count = count_moves.entry(m.to_uci().to_string()).or_insert(0);
         *count += 1;
     }
@@ -646,8 +681,16 @@ fn test_promotion_moves() {
     let game = Game::from_position_uci(position).unwrap();
 
     let mut count_moves = HashMap::<String, usize>::new();
-    for m in all_moves(game.player, &game, MoveOptions::default()) {
-        let m = m.unwrap();
+    let mut moves_buffer = MoveBuffer::default();
+    all_moves(
+        &mut moves_buffer,
+        game.player,
+        &game,
+        MoveOptions::default(),
+    )
+    .unwrap();
+
+    for m in moves_buffer.iter() {
         let count = count_moves.entry(m.to_uci().to_string()).or_insert(0);
         *count += 1;
     }

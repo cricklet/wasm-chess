@@ -1,12 +1,18 @@
 
 check-deps:
-	cargo --version; yarn --version; node --version;
+	cargo --version; yarn --version; node --version; wasm-pack --version;
 
 serve-web:
 	cd web; yarn; yarn serve --dev
 
 watch-wasm:
-	export CARGO_BUILD_JOBS=3; cd rust; cargo install wasm-pack; cargo watch -i .gitignore -i "pkg/*" -s "wasm-pack build --debug --target=no-modules"
+	export CARGO_BUILD_JOBS=3; cd rust; cargo watch -i .gitignore -i "pkg/*" -s "wasm-pack build --debug --target=no-modules"
+
+watch-main-tests:
+	export CARGO_BUILD_JOBS=3; cd rust; cargo watch -i .gitignore -i "pkg/*" -s "cargo test --bin crab-chess"
+
+watch-lib-tests:
+	export CARGO_BUILD_JOBS=3; cd rust; cargo watch -i .gitignore -i "pkg/*" -s "cargo test --lib"
 
 perft:
-	cd rust; cargo test --release test_perft_start_board -- --nocapture --test-threads=1 
+	cd rust; cargo test --release test_perft_start_board -- --nocapture --test-threads=1
