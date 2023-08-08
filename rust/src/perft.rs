@@ -390,7 +390,7 @@ impl PerftStackFrame {
 }
 
 struct PerftData {
-    stack: [PerftStackFrame; 40],
+    stack: [PerftStackFrame; 10],
     depth: usize,
 }
 
@@ -407,7 +407,7 @@ impl Debug for PerftData {
 impl PerftData {
     fn new(game: Game) -> ErrorResult<Self> {
         let mut data = Self {
-            stack: [PerftStackFrame::default(); 40],
+            stack: [PerftStackFrame::default(); 10],
             depth: 0,
         };
         let start = &mut data.stack[0];
@@ -458,6 +458,23 @@ impl PerftData {
     }
 }
 
+pub fn run_perft_recursively(game: Game, max_depth: usize) -> ErrorResult<usize> {
+    let mut perft_overall = 0;
+    let mut moves_stack = vec![];
+
+    traverse_game_callback(&mut moves_stack, &game, 0, max_depth, &mut |params| {
+        if params.depth == max_depth {
+            perft_overall += 1;
+
+            if params.depth == 0 {
+                return;
+            }
+        }
+    })?;
+
+    Ok(perft_overall)
+}
+
 pub fn run_perft_iteratively(
     game: Game,
     max_depth: usize,
@@ -472,14 +489,10 @@ pub fn run_perft_iteratively(
     }
 
     for _ in 0..num_iterations {
-        // println!("{:#?}", data.current()?.game);
-        let current_depth = data.depth;
-
         // Leaf node case:
-        if current_depth + 1 >= max_depth {
+        if data.depth + 1 >= max_depth {
             overall_count += 1;
             data.depth -= 1;
-            continue;
         }
 
         // We have moves to traverse, dig deeper
@@ -497,7 +510,7 @@ pub fn run_perft_iteratively(
         }
 
         // We're out of moves to traverse, pop back up.
-        if current_depth == 0 {
+        if data.depth == 0 {
             break;
         } else {
             data.depth -= 1;
@@ -512,29 +525,39 @@ pub fn run_perft_iteratively(
 fn test_perft_start_board() {
     let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
-    // Run once to warm up the magics cache
-    let expected_count = [1, 20];
-    assert_perft_matches(fen, &expected_count);
+    let expected_count = [
+        1, 20, 400, 8902, 197281, 4865609, // 119060324,
+                // 3195901860,
+    ];
 
-    {
-        // let p = Profiler::new("perft_start_board".to_string());
-        let expected_count = [
-            1, 20, 400, 8902, 197281, 4865609,
-            // 119060324,
-            // 3195901860,
-        ];
-        assert_perft_matches(fen, &expected_count);
-        // p.flush();
+    run_perft_recursively(Game::from_fen(fen).unwrap(), 2).unwrap();
+
+    for (i, expected_count) in expected_count.into_iter().enumerate().collect::<Vec<_>>() {
+        let start_time = std::time::Instant::now();
+
+        let max_depth = i;
+
+        let count = run_perft_recursively(Game::from_fen(fen).unwrap(), max_depth).unwrap();
+        assert_eq!(count, expected_count);
+
+        let end_time = std::time::Instant::now();
+
+        println!(
+            "calculated perft for max_depth: {}, expected_count: {}, in {} ms",
+            max_depth,
+            expected_count,
+            (end_time - start_time).as_millis()
+        );
     }
 }
+
 #[test]
 fn test_perft_start_board_iteratively() {
     let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
     let expected_count = [
-        1, 20, 400, 8902, 197281, 4865609,
-        // 119060324,
-        // 3195901860,
+        1, 20, 400, 8902, 197281, 4865609, // 119060324,
+                // 3195901860,
     ];
 
     run_perft_iteratively(Game::from_fen(fen).unwrap(), 2, 1000).unwrap();

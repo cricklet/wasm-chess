@@ -15,4 +15,7 @@ watch-lib-tests:
 	export CARGO_BUILD_JOBS=3; cd rust; cargo watch -i .gitignore -i "pkg/*" -s "cargo test --lib"
 
 perft:
-	cd rust; cargo test --release test_perft_start_board -- --nocapture --test-threads=1
+	cd rust; cargo test --bin crab-chess --release test_perft_start_board -- --nocapture --test-threads=1
+
+profile-perft:
+	cd rust; cargo test --bin crab-chess --release test_profile_perft_start_board -- --nocapture --test-threads=1
