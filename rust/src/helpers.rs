@@ -1,5 +1,7 @@
 use std::{backtrace::Backtrace, fs::File, io::Write, iter};
 
+use lazy_static::__Deref;
+
 #[derive(Clone, PartialEq, Eq)]
 pub struct Error {
     pub msg: String,
@@ -373,28 +375,17 @@ fn test_map_results() {
     }
 }
 
-pub trait OptionToResult<T> {
-    fn expect(&self, msg: &str) -> ErrorResult<&T>;
-    fn expect_mut(&mut self, msg: &str) -> ErrorResult<&mut T>;
-
-    fn as_result(&self) -> ErrorResult<&T>;
-    fn as_result_mut(&mut self) -> ErrorResult<&mut T>;
+pub trait OptionResult<T> {
+    fn expect_ok(self, msg: &str) -> ErrorResult<T>;
+    fn as_result(self) -> ErrorResult<T>;
 }
 
-impl<T> OptionToResult<T> for Option<T> {
-    fn expect(&self, msg: &str) -> ErrorResult<&T> {
-        self.as_ref().ok_or_else(|| err(msg))
+impl<T> OptionResult<T> for Option<T> {
+    fn expect_ok(self, msg: &str) -> ErrorResult<T> {
+        self.ok_or_else(|| err(msg))
     }
 
-    fn expect_mut(&mut self, msg: &str) -> ErrorResult<&mut T> {
-        self.as_mut().ok_or_else(|| err(msg))
-    }
-
-    fn as_result(&self) -> ErrorResult<&T> {
-        self.as_ref().ok_or_else(|| err("expected Some, got None"))
-    }
-
-    fn as_result_mut(&mut self) -> ErrorResult<&mut T> {
-        self.as_mut().ok_or_else(|| err("expected Some, got None"))
+    fn as_result(self) -> ErrorResult<T> {
+        self.ok_or_else(|| err("expected Some, got None"))
     }
 }

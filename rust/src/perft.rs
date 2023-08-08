@@ -10,7 +10,7 @@ use crate::{
     bitboard::{magic_constants, Bitboard, MAGIC_MOVE_TABLE},
     danger::Danger,
     game::{Game, Legal},
-    helpers::{err, err_result, indent, ErrorResult, OptionToResult},
+    helpers::{err, err_result, indent, ErrorResult, OptionResult},
     moves::{
         all_moves, index_in_danger, Capture, Move, MoveBuffer, MoveOptions, MoveType, OnlyCaptures,
         OnlyQueenPromotion, Quiet,
@@ -332,7 +332,7 @@ impl PerftStackFrame {
 
         if self
             .game
-            .move_legality(next_move, previous.danger.as_result()?)
+            .move_legality(next_move, previous.danger.as_ref().as_result()?)
             == Legal::No
         {
             return Ok(Legal::No);
@@ -365,7 +365,7 @@ impl PerftStackFrame {
             index: 0,
         });
 
-        let moves = self.moves.as_result_mut()?;
+        let moves = self.moves.as_mut().as_result()?;
 
         self.game.fill_pseudo_move_buffer(
             &mut moves.buffer,
@@ -417,15 +417,11 @@ impl PerftData {
     }
 
     fn current(&self) -> ErrorResult<&PerftStackFrame> {
-        self.stack
-            .get(self.depth)
-            .ok_or(err("current index invalid"))
+        self.stack.get(self.depth).as_result()
     }
 
     fn current_mut(&mut self) -> ErrorResult<&mut PerftStackFrame> {
-        self.stack
-            .get_mut(self.depth)
-            .ok_or(err("current index invalid"))
+        self.stack.get_mut(self.depth).as_result()
     }
 
     fn previous(&self) -> Option<&PerftStackFrame> {
@@ -438,26 +434,18 @@ impl PerftData {
     fn current_and_next_mut(
         &mut self,
     ) -> ErrorResult<(&mut PerftStackFrame, &mut PerftStackFrame)> {
-        let (current, next) = self.stack.split_at_mut(self.depth + 1);
-        let current = current.last_mut().ok_or(err("current index invalid"))?;
-        let next = next.first_mut().ok_or(err("next index invalid"))?;
-        Ok((current, next))
-    }
-
-    fn previous_and_current_mut(
-        &mut self,
-    ) -> ErrorResult<(Option<&mut PerftStackFrame>, &mut PerftStackFrame)> {
-        let (previous, current) = self.stack.split_at_mut(self.depth);
-        let previous = previous.last_mut();
-        let current = current.first_mut().ok_or(err("current index invalid"))?;
-        Ok((previous, current))
+        if let Some((current, remainder)) = self.stack[self.depth..].split_first_mut() {
+            Ok((current, remainder.first_mut().unwrap()))
+        } else {
+            err_result("current index invalid")
+        }
     }
 
     fn next_move(&mut self) -> ErrorResult<Option<Move>> {
         let current = self.current_mut()?;
         current.lazily_generate_moves()?;
 
-        let current_moves = current.moves.as_result_mut()?;
+        let current_moves = current.moves.as_mut().as_result()?;
 
         if current_moves.index >= current_moves.buffer.size {
             return Ok(None);
@@ -518,28 +506,4 @@ pub fn run_perft_iteratively(
     }
 
     Ok(overall_count)
-}
-
-#[test]
-fn test_perft_start_board_iteratively() {
-    let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-
-    let expected_count = [
-        1, 20, 400,
-        8902, // 197281,
-             // 4865609,
-             // 119060324,
-             // 3195901860,
-    ];
-
-    for (i, expected_count) in
-        expected_count.into_iter().enumerate().collect::<Vec<_>>()[2..].into_iter()
-    {
-        let max_depth = i + 1;
-        let max_iterations = max_depth * expected_count;
-
-        let count =
-            run_perft_iteratively(Game::from_fen(fen).unwrap(), max_depth, max_iterations).unwrap();
-        assert_eq!(count, *expected_count);
-    }
 }

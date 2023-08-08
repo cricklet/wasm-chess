@@ -185,7 +185,7 @@ impl Game {
         for m in moves {
             let m = game
                 .move_from_str(m)
-                .ok_or(err(&format!("invalid move '{}'", m)))?;
+                .expect_ok(&format!("invalid move '{}'", m))?;
             game.make_move(m)?;
         }
 

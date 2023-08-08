@@ -21,6 +21,7 @@ pub mod game;
 pub mod helpers;
 pub mod moves;
 pub mod perft;
+pub mod profiling;
 pub mod types;
 pub mod uci;
 
