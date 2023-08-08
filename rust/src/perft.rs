@@ -197,28 +197,6 @@ fn assert_perft_matches(fen: &str, expected_counts: &[usize]) {
     }
 }
 
-#[test]
-fn test_perft_start_board() {
-    let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-
-    // Run once to warm up the magics cache
-    let expected_count = [1, 20];
-    assert_perft_matches(fen, &expected_count);
-
-    {
-        // let p = Profiler::new("perft_start_board".to_string());
-        let expected_count = [
-            1, 20, 400, 8902,
-            197281,
-            // 4865609,
-            // 119060324,
-            // 3195901860,
-        ];
-        assert_perft_matches(fen, &expected_count);
-        // p.flush();
-    }
-}
-
 // #[test]
 // fn test_perft_start_board_depth_5() {
 //     let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -506,4 +484,56 @@ pub fn run_perft_iteratively(
     }
 
     Ok(overall_count)
+}
+
+#[test]
+fn test_perft_start_board() {
+    let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
+    // Run once to warm up the magics cache
+    let expected_count = [1, 20];
+    assert_perft_matches(fen, &expected_count);
+
+    {
+        // let p = Profiler::new("perft_start_board".to_string());
+        let expected_count = [
+            1, 20, 400, 8902, 197281, 4865609,
+            // 119060324,
+            // 3195901860,
+        ];
+        assert_perft_matches(fen, &expected_count);
+        // p.flush();
+    }
+}
+#[test]
+fn test_perft_start_board_iteratively() {
+    let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
+    let expected_count = [
+        1, 20, 400, 8902, 197281, 4865609,
+        // 119060324,
+        // 3195901860,
+    ];
+
+    run_perft_iteratively(Game::from_fen(fen).unwrap(), 2, 1000).unwrap();
+
+    for (i, expected_count) in expected_count.into_iter().enumerate().collect::<Vec<_>>() {
+        let start_time = std::time::Instant::now();
+
+        let max_depth = i + 1;
+        let max_iterations = max_depth * expected_count;
+
+        let count =
+            run_perft_iteratively(Game::from_fen(fen).unwrap(), max_depth, max_iterations).unwrap();
+        assert_eq!(count, expected_count);
+
+        let end_time = std::time::Instant::now();
+
+        println!(
+            "calculated perft for max_depth: {}, expected_count: {}, in {} ms",
+            max_depth,
+            expected_count,
+            (end_time - start_time).as_millis()
+        );
+    }
 }
