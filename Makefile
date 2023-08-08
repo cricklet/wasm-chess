@@ -8,14 +8,11 @@ serve-web:
 watch-wasm:
 	export CARGO_BUILD_JOBS=3; cd rust; cargo watch -i .gitignore -i "pkg/*" -s "wasm-pack build --debug --target=no-modules"
 
-watch-main-tests:
-	export CARGO_BUILD_JOBS=3; cd rust; cargo watch -i .gitignore -i "pkg/*" -s "cargo test --bin crab-chess"
+test:
+	export CARGO_BUILD_JOBS=3; cd rust; cargo test
 
-watch-lib-tests:
-	export CARGO_BUILD_JOBS=3; cd rust; cargo watch -i .gitignore -i "pkg/*" -s "cargo test --lib"
+watch-test:
+	export CARGO_BUILD_JOBS=3; cd rust; cargo watch -i .gitignore -i "pkg/*" -s "cargo test --bin wasm-chess"
 
 perft:
-	cd rust; cargo test --bin crab-chess --release test_perft_start_board -- --nocapture --test-threads=1
-
-profile-perft:
-	cd rust; cargo test --bin crab-chess --release test_profile_perft_start_board -- --nocapture --test-threads=1
+	cd rust; cargo build --release; cd ..; ./target/release/wasm-chess perft

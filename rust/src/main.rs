@@ -1,16 +1,16 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 
-use std::thread::current;
+use std::{env::args, thread::current};
 
 use helpers::{err_result, ErrorResult};
-use perft::run_perft;
+use itertools::Itertools;
+use profiler::perft_main;
 use uci::Uci;
 
 use crate::{
     game::Game,
     helpers::{indent, prefix},
-    perft::run_perft_counting_first_move,
 };
 
 pub mod alphabeta;
@@ -19,9 +19,10 @@ pub mod danger;
 pub mod evaluation;
 pub mod game;
 pub mod helpers;
+pub mod iterative_traversal;
 pub mod moves;
 pub mod perft;
-pub mod profiling;
+pub mod profiler;
 pub mod types;
 pub mod uci;
 
@@ -55,5 +56,10 @@ fn run() -> ErrorResult<()> {
 }
 
 fn main() {
+    if args().len() > 1 && args().contains(&"perft".to_string()) {
+        perft_main();
+        return;
+    }
+
     run().unwrap();
 }

@@ -82,30 +82,32 @@ pub enum MoveType {
 }
 
 #[derive(Copy, Clone)]
-pub struct MoveBuffer {
-    pub moves: [Move; 80],
+pub struct SizedMoveBuffer<const N: usize> {
+    pub moves: [Move; N],
     pub size: usize,
 }
 
-impl Debug for MoveBuffer {
+pub type MoveBuffer = SizedMoveBuffer<80>;
+
+impl<const N: usize> Debug for SizedMoveBuffer<N> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("MoveBuffer")
+        f.debug_struct("SizedMoveBuffer")
             .field("moves", &self.moves[..self.size].iter())
             .field("size", &self.size)
             .finish()
     }
 }
 
-impl Default for MoveBuffer {
+impl<const N: usize> Default for SizedMoveBuffer<N> {
     fn default() -> Self {
         Self {
-            moves: [Move::invalid(); 80],
+            moves: [Move::invalid(); N],
             size: 0,
         }
     }
 }
 
-impl MoveBuffer {
+impl<const N: usize> SizedMoveBuffer<N> {
     pub fn clear(&mut self) {
         self.size = 0;
     }
@@ -138,7 +140,7 @@ impl MoveBuffer {
     }
 }
 
-impl IntoIterator for MoveBuffer {
+impl<const N: usize> IntoIterator for SizedMoveBuffer<N> {
     type Item = Move;
     type IntoIter = std::vec::IntoIter<Self::Item>;
 

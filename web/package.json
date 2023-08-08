@@ -19,7 +19,7 @@
     "zustand": "^4.4.0"
   },
   "scripts": {
-    "serve": "yarn; tsx ./scripts/esbuild.ts --link crab-chess"
+    "serve": "yarn; tsx ./scripts/esbuild.ts --link wasm-chess"
   },
   "devDependencies": {
     "@svgr/plugin-jsx": "^8.0.1",
