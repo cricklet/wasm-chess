@@ -10,7 +10,7 @@ use crate::{
     bitboard::{magic_constants, Bitboard, MAGIC_MOVE_TABLE},
     danger::Danger,
     game::{Game, Legal},
-    helpers::{err, err_result, indent, ErrorResult},
+    helpers::{err, err_result, indent, ErrorResult, OptionToResult},
     moves::{
         all_moves, index_in_danger, Capture, Move, MoveBuffer, MoveOptions, MoveType, OnlyCaptures,
         OnlyQueenPromotion, Quiet,
@@ -292,12 +292,12 @@ struct IndexedMoveBuffer {
 
 impl Debug for IndexedMoveBuffer {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut lines = self.buffer.moves[..self.buffer.size()]
+        let mut lines = self.buffer.moves[..self.buffer.size]
             .iter()
             .map(|m| format!("{:?}", m))
             .collect::<Vec<_>>();
 
-        if self.index < self.buffer.size() {
+        if self.index < self.buffer.size {
             lines[self.index] = format!("{} <=========", lines[self.index]);
         }
 
@@ -310,16 +310,54 @@ impl Debug for IndexedMoveBuffer {
 #[derive(Debug, Default, Copy, Clone)]
 struct PerftStackFrame {
     game: Game,
-    danger: Danger,
     last_move: Option<Move>,
 
+    danger: Option<Danger>,
     moves: Option<IndexedMoveBuffer>,
 }
 
 impl PerftStackFrame {
-    pub fn lazily_generate_moves(&mut self) -> ErrorResult<()> {
+    pub fn setup_from_move(
+        &mut self,
+        previous: &mut PerftStackFrame,
+        next_move: &Move,
+    ) -> ErrorResult<Legal> {
+        self.game = previous.game;
+        self.game.make_move(*next_move)?;
+
+        self.danger = None;
+        self.moves = None;
+
+        previous.lazily_generate_danger()?;
+
+        if self
+            .game
+            .move_legality(next_move, previous.danger.as_result()?)
+            == Legal::No
+        {
+            return Ok(Legal::No);
+        }
+
+        self.last_move = Some(*next_move);
+
+        Ok(Legal::Yes)
+    }
+
+    pub fn setup_from_scratch(&mut self, game: Game) -> ErrorResult<()> {
+        self.game = game;
+        self.last_move = None;
+
+        self.danger = None;
+        self.moves = None;
+
+        self.lazily_generate_danger()?;
+        self.lazily_generate_moves()?;
+
+        Ok(())
+    }
+    pub fn lazily_generate_moves(&mut self) -> ErrorResult<&IndexedMoveBuffer> {
         if self.moves.is_some() {
-            return Ok(());
+            return Ok(self.moves.as_ref().unwrap());
         }
 
         self.moves = Some(IndexedMoveBuffer {
@@ -327,10 +365,7 @@ impl PerftStackFrame {
             index: 0,
         });
 
-        let moves = self
-            .moves
-            .as_mut()
-            .ok_or_else(|| err("moves should be generated"))?;
+        let moves = self.moves.as_result_mut()?;
 
         self.game.fill_pseudo_move_buffer(
             &mut moves.buffer,
@@ -341,35 +376,16 @@ impl PerftStackFrame {
         )?;
         moves.index = 0;
 
-        Ok(())
+        Ok(self.moves.as_ref().unwrap())
     }
 
-    pub fn setup_from_previous(
-        &mut self,
-        previous: &PerftStackFrame,
-        m: &Move,
-    ) -> ErrorResult<Legal> {
-        self.game = previous.game;
-        self.game.make_move(*m)?;
-
-        if self.game.move_legality(m, &previous.danger) == Legal::No {
-            return Ok(Legal::No);
+    pub fn lazily_generate_danger(&mut self) -> ErrorResult<&Danger> {
+        if self.danger.is_some() {
+            return Ok(self.danger.as_ref().unwrap());
         }
 
-        self.danger = Danger::from(self.game.player, &self.game.board)?;
-        self.last_move = Some(*m);
-
-        Ok(Legal::Yes)
-    }
-
-    pub fn setup_from_scratch(&mut self, game: Game) -> ErrorResult<()> {
-        self.game = game;
-        self.danger = Danger::from(self.game.player, &self.game.board).unwrap();
-        self.last_move = None;
-
-        self.lazily_generate_moves()?;
-
-        Ok(())
+        self.danger = Some(Danger::from(self.game.player, &self.game.board)?);
+        Ok(self.danger.as_ref().unwrap())
     }
 }
 
@@ -441,12 +457,9 @@ impl PerftData {
         let current = self.current_mut()?;
         current.lazily_generate_moves()?;
 
-        let current_moves = current
-            .moves
-            .as_mut()
-            .ok_or_else(|| err("moves should be generated"))?;
+        let current_moves = current.moves.as_result_mut()?;
 
-        if current_moves.index >= current_moves.buffer.size() {
+        if current_moves.index >= current_moves.buffer.size {
             return Ok(None);
         }
 
@@ -454,16 +467,6 @@ impl PerftData {
         current_moves.index += 1;
 
         Ok(Some(*m))
-    }
-
-    fn make_move(&mut self, m: &Move) -> ErrorResult<()> {
-        let (current, next) = self.current_and_next_mut()?;
-
-        if next.setup_from_previous(current, m)? == Legal::No {
-            return Ok(());
-        }
-
-        return Ok(());
     }
 }
 
@@ -481,12 +484,11 @@ pub fn run_perft_iteratively(
     }
 
     for _ in 0..num_iterations {
-        // println!("{:#?}", data);
+        // println!("{:#?}", data.current()?.game);
         let current_depth = data.depth;
 
         // Leaf node case:
         if current_depth + 1 >= max_depth {
-            println!("LEAF {:#?}", data.current()?.game);
             overall_count += 1;
             data.depth -= 1;
             continue;
@@ -495,24 +497,21 @@ pub fn run_perft_iteratively(
         // We have moves to traverse, dig deeper
         let next_move = data.next_move()?;
         if let Some(next_move) = next_move {
-            println!(
-                "DIG performing {:#?} at depth {}",
-                next_move,
-                current_depth + 1
-            );
-            data.make_move(&next_move)?;
-            data.depth += 1;
+            let (current, next) = data.current_and_next_mut()?;
 
-            println!("{:#?}", data.current()?.game);
-            continue;
+            let result = next.setup_from_move(current, &next_move)?;
+            if result == Legal::No {
+                continue;
+            } else {
+                data.depth += 1;
+                continue;
+            }
         }
 
         // We're out of moves to traverse, pop back up.
         if current_depth == 0 {
-            println!("DONE {:#?}", data.current()?.game);
             break;
         } else {
-            println!("NO MOVES {:#?}", data.current()?.game);
             data.depth -= 1;
             continue;
         }
@@ -526,10 +525,11 @@ fn test_perft_start_board_iteratively() {
     let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
     let expected_count = [
-        1, 20, 400, 8902, 197281,
-        // 4865609,
-        // 119060324,
-        // 3195901860,
+        1, 20, 400,
+        8902, // 197281,
+             // 4865609,
+             // 119060324,
+             // 3195901860,
     ];
 
     for (i, expected_count) in

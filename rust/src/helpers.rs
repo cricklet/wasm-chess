@@ -372,3 +372,29 @@ fn test_map_results() {
         )
     }
 }
+
+pub trait OptionToResult<T> {
+    fn expect(&self, msg: &str) -> ErrorResult<&T>;
+    fn expect_mut(&mut self, msg: &str) -> ErrorResult<&mut T>;
+
+    fn as_result(&self) -> ErrorResult<&T>;
+    fn as_result_mut(&mut self) -> ErrorResult<&mut T>;
+}
+
+impl<T> OptionToResult<T> for Option<T> {
+    fn expect(&self, msg: &str) -> ErrorResult<&T> {
+        self.as_ref().ok_or_else(|| err(msg))
+    }
+
+    fn expect_mut(&mut self, msg: &str) -> ErrorResult<&mut T> {
+        self.as_mut().ok_or_else(|| err(msg))
+    }
+
+    fn as_result(&self) -> ErrorResult<&T> {
+        self.as_ref().ok_or_else(|| err("expected Some, got None"))
+    }
+
+    fn as_result_mut(&mut self) -> ErrorResult<&mut T> {
+        self.as_mut().ok_or_else(|| err("expected Some, got None"))
+    }
+}

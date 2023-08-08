@@ -117,10 +117,6 @@ impl MoveBuffer {
     pub fn set_size(&mut self, size: usize) {
         self.size = size;
     }
-
-    pub fn size(&self) -> usize {
-        self.size
-    }
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
