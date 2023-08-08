@@ -23,7 +23,7 @@ impl Default for MoveOptions {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum OnlyCaptures {
     No,
     Yes,
@@ -122,10 +122,15 @@ impl MoveBuffer {
         self.size = size;
     }
 
-    pub fn add(&mut self) -> &mut Move {
+    pub fn push_mut(&mut self) -> &mut Move {
         self.size += 1;
         let m = self.get_mut(self.size - 1);
         m
+    }
+
+    pub fn push(&mut self, m: Move) {
+        self.size += 1;
+        self.moves[self.size - 1] = m;
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &Move> {
@@ -213,12 +218,13 @@ pub enum JumpingPiece {
 }
 
 pub fn potential_bb_to_moves(
+    buffer: &mut MoveBuffer,
     PlayerPiece { player, piece }: PlayerPiece,
     piece_index: BoardIndex,
     potential: Bitboard,
     bitboards: &Bitboards,
     only_captures: OnlyCaptures,
-) -> Box<dyn Iterator<Item = ErrorResult<Move>> + '_> {
+) -> ErrorResult<()> {
     let self_occupied = bitboards.occupied[player];
     let enemy_occupied = bitboards.occupied[other_player(player)];
 
@@ -229,36 +235,43 @@ pub fn potential_bb_to_moves(
 
     let start_index = piece_index;
 
-    let capture_moves = each_index_of_one(capture).map(move |end_index| {
+    for end_index in each_index_of_one(capture) {
         let taken_piece = bitboards.piece_at_index(end_index);
 
         match taken_piece {
-            Some(taken_piece) => Ok(Move {
-                piece: PlayerPiece { player, piece },
-                start_index,
-                end_index,
-                move_type: MoveType::Capture(Capture::Take { taken_piece }),
-                promotion: None,
-            }),
-            None => err_result(&format!(
-                "no piece at index {:} but marked as capture",
-                end_index
-            )),
-        }
-    });
-
-    let quiet_moves = each_index_of_one(quiet).map(move |end_index| Move {
-        piece: PlayerPiece::new(player, piece),
-        start_index,
-        end_index,
-        move_type: MoveType::Quiet(Quiet::Move),
-        promotion: None,
-    });
-
-    match only_captures {
-        OnlyCaptures::No => Box::new(capture_moves.chain(quiet_moves.map(Ok))),
-        OnlyCaptures::Yes => Box::new(capture_moves),
+            Some(taken_piece) => {
+                buffer.push(Move {
+                    piece: PlayerPiece { player, piece },
+                    start_index,
+                    end_index,
+                    move_type: MoveType::Capture(Capture::Take { taken_piece }),
+                    promotion: None,
+                });
+            }
+            None => {
+                return err_result(&format!(
+                    "no piece at index {:} but marked as capture",
+                    end_index
+                ));
+            }
+        };
     }
+
+    if only_captures == OnlyCaptures::Yes {
+        return Ok(());
+    }
+
+    for end_index in each_index_of_one(quiet) {
+        buffer.push(Move {
+            piece: PlayerPiece::new(player, piece),
+            start_index,
+            end_index,
+            move_type: MoveType::Quiet(Quiet::Move),
+            promotion: None,
+        });
+    }
+
+    Ok(())
 }
 
 pub fn walk_potential_bb(
@@ -280,26 +293,30 @@ pub fn walk_potential_bb(
 }
 
 pub fn walk_moves(
+    buffer: &mut MoveBuffer,
     PlayerPiece { player, piece }: PlayerPiece,
     bitboards: &Bitboards,
     only_captures: OnlyCaptures,
-) -> Box<dyn Iterator<Item = ErrorResult<Move>> + '_> {
-    let moves = each_index_of_one(bitboards.pieces[player][piece]).flat_map(move |piece_index| {
+) -> ErrorResult<()> {
+    for piece_index in each_index_of_one(bitboards.pieces[player][piece]) {
         let potential_bb = walk_potential_bb(piece_index, bitboards.all_occupied(), piece);
 
         match potential_bb {
-            Err(err) => Box::new(iter::once(Err(err))),
-            Ok(potential) => potential_bb_to_moves(
-                PlayerPiece::new(player, piece),
-                piece_index,
-                potential,
-                bitboards,
-                only_captures,
-            ),
+            Err(err) => return Err(err),
+            Ok(potential) => {
+                potential_bb_to_moves(
+                    buffer,
+                    PlayerPiece::new(player, piece),
+                    piece_index,
+                    potential,
+                    bitboards,
+                    only_captures,
+                )?;
+            }
         }
-    });
+    }
 
-    Box::new(moves)
+    Ok(())
 }
 
 pub fn jumping_bitboard(index: BoardIndex, jumping_piece: JumpingPiece) -> Bitboard {
@@ -311,25 +328,29 @@ pub fn jumping_bitboard(index: BoardIndex, jumping_piece: JumpingPiece) -> Bitbo
 }
 
 pub fn jump_moves(
+    buffer: &mut MoveBuffer,
     player: Player,
     bitboards: &Bitboards,
     jumping_piece: JumpingPiece,
     only_captures: OnlyCaptures,
-) -> impl Iterator<Item = ErrorResult<Move>> + '_ {
+) -> ErrorResult<()> {
     let piece = match jumping_piece {
         JumpingPiece::Knight => Piece::Knight,
         JumpingPiece::King => Piece::King,
     };
-    each_index_of_one(bitboards.pieces[player][piece]).flat_map(move |piece_index| {
+    for piece_index in each_index_of_one(bitboards.pieces[player][piece]) {
         let potential = jumping_bitboard(piece_index, jumping_piece);
         potential_bb_to_moves(
+            buffer,
             PlayerPiece::new(player, piece),
             piece_index,
             potential,
             bitboards,
             only_captures,
-        )
-    })
+        )?;
+    }
+
+    Ok(())
 }
 
 pub fn pawn_attacking_bb(start_bb: Bitboard, capture_dir: Direction) -> Bitboard {
@@ -374,100 +395,96 @@ pub fn pawn_quiet_move(
 }
 
 pub fn pawn_moves(
+    buffer: &mut MoveBuffer,
     player: Player,
     bitboards: &Bitboards,
     only_captures: OnlyCaptures,
     only_queen_promotion: OnlyQueenPromotion,
-) -> Box<dyn Iterator<Item = ErrorResult<Move>> + '_> {
+) -> ErrorResult<()> {
     let pawns = bitboards.pieces[player][Piece::Pawn];
 
-    let capture_moves = {
-        let offsets = pawn_capture_directions_for_player(player);
-        offsets.iter().flat_map(move |capture_dir| {
-            let attacking_bb = pawn_attacking_bb(pawns, *capture_dir);
-            let capture_bb = attacking_bb & bitboards.occupied[other_player(player)];
+    let offsets = pawn_capture_directions_for_player(player);
+    for capture_dir in offsets {
+        let attacking_bb = pawn_attacking_bb(pawns, *capture_dir);
+        let capture_bb = attacking_bb & bitboards.occupied[other_player(player)];
 
-            let capture_pawns = capture_bb & !*PAWN_PROMOTION_BITBOARD;
-            let promotion_pawns = capture_bb & *PAWN_PROMOTION_BITBOARD;
+        let capture_pawns = capture_bb & !*PAWN_PROMOTION_BITBOARD;
+        let promotion_pawns = capture_bb & *PAWN_PROMOTION_BITBOARD;
 
-            let capture_pawns = each_index_of_one(capture_pawns).map(move |end_index| {
-                pawn_capture_move(bitboards, player, end_index, *capture_dir)
-            });
-            let promotion_pawns = each_index_of_one(promotion_pawns).flat_map(move |end_index| {
-                only_queen_promotion
-                    .pieces()
-                    .iter()
-                    .map(move |&promo_piece| -> ErrorResult<Move> {
-                        let mut m = pawn_capture_move(bitboards, player, end_index, *capture_dir)?;
-                        m.promotion = Some(promo_piece);
-                        Ok(m)
-                    })
-            });
-
-            capture_pawns.chain(promotion_pawns)
-        })
-    };
+        for end_index in each_index_of_one(capture_pawns) {
+            buffer.push(pawn_capture_move(
+                bitboards,
+                player,
+                end_index,
+                *capture_dir,
+            )?);
+        }
+        for end_index in each_index_of_one(promotion_pawns) {
+            for &promo_piece in only_queen_promotion.pieces() {
+                let mut m = pawn_capture_move(bitboards, player, end_index, *capture_dir)?;
+                m.promotion = Some(promo_piece);
+                buffer.push(m);
+            }
+        }
+    }
 
     if let OnlyCaptures::Yes = only_captures {
-        return Box::new(capture_moves);
+        return Ok(());
     }
 
     let quiet_push_dir = pawn_push_direction_for_player(player);
 
-    let push_moves = {
-        let masked_pawns = pawns & pre_move_mask(quiet_push_dir);
+    let masked_pawns = pawns & pre_move_mask(quiet_push_dir);
 
-        let moved_pawns = rotate_toward_index_63(masked_pawns, quiet_push_dir.offset())
-            & !bitboards.all_occupied();
+    let moved_pawns =
+        rotate_toward_index_63(masked_pawns, quiet_push_dir.offset()) & !bitboards.all_occupied();
 
-        let pushed_pawns = moved_pawns & !*PAWN_PROMOTION_BITBOARD;
-        let promotion_pawns = moved_pawns & *PAWN_PROMOTION_BITBOARD;
+    let pushed_pawns = moved_pawns & !*PAWN_PROMOTION_BITBOARD;
+    let promotion_pawns = moved_pawns & *PAWN_PROMOTION_BITBOARD;
 
-        let pushed_pawns = each_index_of_one(pushed_pawns)
-            .map(move |end_index| pawn_quiet_move(player, end_index, quiet_push_dir));
-        let promotion_pawns = each_index_of_one(promotion_pawns).flat_map(move |end_index| {
-            only_queen_promotion
-                .pieces()
-                .iter()
-                .map(move |&promo_piece| -> ErrorResult<Move> {
-                    let mut m = pawn_quiet_move(player, end_index, quiet_push_dir)?;
-                    m.promotion = Some(promo_piece);
-                    Ok(m)
-                })
-        });
+    for end_index in each_index_of_one(pushed_pawns) {
+        buffer.push(pawn_quiet_move(player, end_index, quiet_push_dir)?);
+    }
 
-        pushed_pawns.chain(promotion_pawns)
-    };
-    let skip_moves = {
+    for end_index in each_index_of_one(promotion_pawns) {
+        for &promo_piece in only_queen_promotion.pieces() {
+            let mut m = pawn_quiet_move(player, end_index, quiet_push_dir)?;
+            m.promotion = Some(promo_piece);
+            buffer.push(m);
+        }
+    }
+
+    {
         let masked_pawns = pawns & starting_pawns_mask(player);
         let push1 = rotate_toward_index_63(masked_pawns, quiet_push_dir.offset())
             & !bitboards.all_occupied();
         let push2 =
             rotate_toward_index_63(push1, quiet_push_dir.offset()) & !bitboards.all_occupied();
 
-        each_index_of_one(push2).map(move |end_index| {
+        for end_index in each_index_of_one(push2) {
             let start_index =
                 BoardIndex::from((end_index.i as isize - 2 * quiet_push_dir.offset()) as usize);
             let skipped_index =
                 BoardIndex::from((end_index.i as isize - quiet_push_dir.offset()) as usize);
-            Ok(Move {
+            buffer.push(Move {
                 piece: PlayerPiece::new(player, Piece::Pawn),
                 start_index,
                 end_index,
                 move_type: MoveType::Quiet(Quiet::PawnSkip { skipped_index }),
                 promotion: None,
             })
-        })
-    };
+        }
+    }
 
-    Box::new(push_moves.chain(skip_moves).chain(capture_moves))
+    Ok(())
 }
 
 pub fn en_passant_move(
+    buffer: &mut MoveBuffer,
     player: Player,
     bitboards: &Bitboards,
     en_passant_index: Option<BoardIndex>,
-) -> Option<Move> {
+) -> ErrorResult<()> {
     let pawns = bitboards.pieces[player][Piece::Pawn];
 
     if let Some(en_passant_index) = en_passant_index {
@@ -483,7 +500,7 @@ pub fn en_passant_move(
                 let taken_index =
                     BoardIndex::from((start_index.i as isize + target_dir.offset()) as usize);
 
-                return Some(Move {
+                buffer.push(Move {
                     piece: PlayerPiece::new(player, Piece::Pawn),
                     start_index,
                     end_index: en_passant_index,
@@ -494,13 +511,10 @@ pub fn en_passant_move(
         }
     }
 
-    None
+    Ok(())
 }
 
-pub fn castling_moves<'game>(
-    player: Player,
-    state: &'game Game,
-) -> impl Iterator<Item = ErrorResult<Move>> + 'game {
+pub fn castling_moves(buffer: &mut MoveBuffer, player: Player, state: &Game) -> ErrorResult<()> {
     let allowed_castling_sides = CASTLING_SIDES
         .iter()
         .filter(move |&&castling_side| state.can_castle[player][castling_side]);
@@ -529,8 +543,9 @@ pub fn castling_moves<'game>(
         })
         .filter_map(|req| req.transpose());
 
-    let moves = safe_castling_sides.map(move |req| {
-        req.map(|req| Move {
+    for req in safe_castling_sides {
+        let req = req?;
+        buffer.push(Move {
             piece: PlayerPiece::new(player, Piece::King),
             start_index: req.king_start,
             end_index: req.king_end,
@@ -539,10 +554,10 @@ pub fn castling_moves<'game>(
                 rook_end: req.rook_end,
             }),
             promotion: None,
-        })
-    });
+        });
+    }
 
-    moves
+    Ok(())
 }
 
 pub fn all_moves<'game>(
@@ -553,56 +568,48 @@ pub fn all_moves<'game>(
 ) -> ErrorResult<()> {
     buffer.clear();
 
-    let pawn_moves = pawn_moves(
+    pawn_moves(
+        buffer,
         player,
         &state.board,
         options.only_captures,
         options.only_queen_promotion,
-    );
-    let knight_moves = jump_moves(
+    )?;
+    jump_moves(
+        buffer,
         player,
         &state.board,
         JumpingPiece::Knight,
         options.only_captures,
-    );
-    let king_moves = jump_moves(
+    )?;
+    jump_moves(
+        buffer,
         player,
         &state.board,
         JumpingPiece::King,
         options.only_captures,
-    );
-    let bishop_moves = walk_moves(
+    )?;
+    walk_moves(
+        buffer,
         PlayerPiece::new(player, Piece::Bishop),
         &state.board,
         options.only_captures,
-    );
-    let rook_moves = walk_moves(
+    )?;
+    walk_moves(
+        buffer,
         PlayerPiece::new(player, Piece::Rook),
         &state.board,
         options.only_captures,
-    );
-    let queen_moves = walk_moves(
+    )?;
+    walk_moves(
+        buffer,
         PlayerPiece::new(player, Piece::Queen),
         &state.board,
         options.only_captures,
-    );
-    let castling_moves = castling_moves(player, state);
+    )?;
+    castling_moves(buffer, player, state)?;
 
-    let en_passant = en_passant_move(player, &state.board, state.en_passant);
-    let en_passant = en_passant.map(Ok);
-
-    for m in pawn_moves
-        .chain(en_passant)
-        .chain(knight_moves)
-        .chain(king_moves)
-        .chain(bishop_moves)
-        .chain(rook_moves)
-        .chain(queen_moves)
-        .chain(castling_moves)
-    {
-        let buffer_move = buffer.add();
-        *buffer_move = m?;
-    }
+    en_passant_move(buffer, player, &state.board, state.en_passant)?;
 
     Ok(())
 }
