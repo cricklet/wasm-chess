@@ -110,8 +110,19 @@ fn traverse_game_callback(
         return Ok(());
     }
 
-    for result in game.for_each_legal_move(MoveOptions::default()) {
-        let (next_game, m) = result?;
+    let danger = Danger::from(game.player, &game.board)?;
+
+    let mut moves = MoveBuffer::default();
+    game.fill_pseudo_move_buffer(&mut moves, MoveOptions::default())?;
+
+    for &m in moves.iter() {
+        let mut next_game = game.clone();
+        next_game.make_move(m)?;
+
+        if next_game.move_legality(&m, &danger) == Legal::No {
+            continue;
+        }
+
         moves_stack.push(m);
         traverse_game_callback(moves_stack, &next_game, depth + 1, max_depth, callback)?;
         moves_stack.pop();
@@ -145,8 +156,19 @@ pub fn run_perft_counting_first_move(
     let mut total_count = 0;
     let mut count_per_move: HashMap<String, usize> = HashMap::new();
 
-    for result in game.for_each_legal_move(MoveOptions::default()) {
-        let (next_game, next_move) = result?;
+    let danger = Danger::from(game.player, &game.board)?;
+
+    let mut moves = MoveBuffer::default();
+    game.fill_pseudo_move_buffer(&mut moves, MoveOptions::default())?;
+
+    for &next_move in moves.iter() {
+        let mut next_game = game.clone();
+        next_game.make_move(next_move)?;
+
+        if next_game.move_legality(&next_move, &danger) == Legal::No {
+            continue;
+        }
+
         let move_str = next_move.to_uci();
         let count = count_per_move.entry(move_str).or_insert(0);
 

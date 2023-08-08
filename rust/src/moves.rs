@@ -106,6 +106,10 @@ impl Default for MoveBuffer {
 }
 
 impl MoveBuffer {
+    pub fn clear(&mut self) {
+        self.size = 0;
+    }
+
     pub fn get(&self, index: usize) -> &Move {
         &self.moves[index]
     }
@@ -547,6 +551,8 @@ pub fn all_moves<'game>(
     state: &'game Game,
     options: MoveOptions,
 ) -> ErrorResult<()> {
+    buffer.clear();
+
     let pawn_moves = pawn_moves(
         player,
         &state.board,

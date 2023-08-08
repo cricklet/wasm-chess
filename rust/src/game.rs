@@ -6,12 +6,12 @@ use strum::IntoEnumIterator;
 use crate::bitboard::{self, castling_allowed_after_move, Bitboards, BoardIndex};
 use crate::bitboard::{index_from_file_rank_str, ForPlayer};
 use crate::danger::Danger;
-use crate::helpers::*;
 use crate::moves::{
     all_moves, index_in_danger, Capture, Move, MoveBuffer, MoveOptions, MoveType, OnlyCaptures,
     OnlyQueenPromotion, Quiet,
 };
 use crate::types::{self, CastlingSide, Piece, Player, PlayerPiece, CASTLING_SIDES};
+use crate::{helpers::*, moves};
 
 #[derive(Debug, Default, Copy, Clone)]
 pub struct CanCastleOnSide {
@@ -293,27 +293,6 @@ impl Game {
         None
     }
 
-    pub fn for_each_pseudo_move(
-        &self,
-        options: MoveOptions,
-    ) -> Box<dyn Iterator<Item = ErrorResult<(Game, Move)>> + '_> {
-        let player: Player = self.player;
-
-        let mut moves_buffer = Box::new(MoveBuffer::default());
-        all_moves(&mut moves_buffer, player, &self, options).unwrap();
-
-        let games = moves_buffer
-            .into_iter()
-            .map(move |m| -> ErrorResult<(Game, Move)> {
-                let mut next_game = *self;
-                next_game.make_move(m)?;
-
-                Ok((next_game, m))
-            });
-
-        Box::new(games)
-    }
-
     pub fn fill_pseudo_move_buffer(
         &self,
         buffer: &mut MoveBuffer,
@@ -350,33 +329,6 @@ impl Game {
             }
         }
         Legal::Yes
-    }
-
-    pub fn for_each_legal_move(
-        &self,
-        options: MoveOptions,
-    ) -> Box<dyn Iterator<Item = ErrorResult<(Game, Move)>> + '_> {
-        let player = self.player;
-        let danger = match Danger::from(player, &self.board) {
-            Ok(danger) => danger,
-            Err(e) => return Box::new(iter::once(Err(e))),
-        };
-
-        self.for_each_legal_move_with_danger(danger, options)
-    }
-
-    pub fn for_each_legal_move_with_danger<'t>(
-        &'t self,
-        danger: Danger,
-        options: MoveOptions,
-    ) -> Box<dyn Iterator<Item = ErrorResult<(Game, Move)>> + 't> {
-        let games = self.for_each_pseudo_move(options);
-
-        let legal_games = games.filter_results(move |(next_game, m)| -> bool {
-            next_game.move_legality(m, &danger) == Legal::Yes
-        });
-
-        Box::new(legal_games)
     }
 
     pub fn make_move(&mut self, m: Move) -> ErrorResult<()> {
@@ -545,11 +497,13 @@ fn test_en_passsant_2() {
         Some(index_from_file_rank_str("b3").unwrap())
     );
 
-    for result in game
-        .for_each_pseudo_move(MoveOptions::default())
-        .into_iter()
-    {
-        result.unwrap();
+    let mut moves = MoveBuffer::default();
+    game.fill_pseudo_move_buffer(&mut moves, MoveOptions::default())
+        .unwrap();
+
+    for m in moves.iter() {
+        let mut next_game = game.clone();
+        next_game.make_move(*m).unwrap();
     }
 }
 
@@ -585,15 +539,18 @@ fn test_castling_disallowed() {
     assert_eq!(false, game.can_castle[game.player][CastlingSide::Kingside]);
     assert_eq!(true, game.can_castle[game.player][CastlingSide::Queenside]);
 
-    let castling = game
-        .for_each_pseudo_move(MoveOptions::default())
-        .map(|m| m.unwrap())
-        .filter(|(_, m)| match m.move_type {
-            MoveType::Quiet(Quiet::Castle { .. }) => true,
-            _ => false,
-        });
+    let mut moves = MoveBuffer::default();
+    game.fill_pseudo_move_buffer(&mut moves, MoveOptions::default())
+        .unwrap();
 
-    assert_eq!(castling.count(), 0);
+    let mut castling_count = 0;
+    for m in moves.iter() {
+        if let MoveType::Quiet(Quiet::Castle { .. }) = m.move_type {
+            castling_count += 1;
+        }
+    }
+
+    assert_eq!(castling_count, 0);
 }
 
 #[test]

@@ -1,6 +1,13 @@
 use strum::IntoEnumIterator;
 
-use crate::{danger::Danger, evaluation::*, game::Game, helpers::ErrorResult, moves::*, types::*};
+use crate::{
+    danger::Danger,
+    evaluation::*,
+    game::{Game, Legal},
+    helpers::ErrorResult,
+    moves::*,
+    types::*,
+};
 
 struct MoveHistory<'h> {
     history: &'h mut Vec<Move>,
@@ -209,9 +216,16 @@ impl AlphaBeta {
             }
         }
 
-        let moves = game.for_each_legal_move_with_danger(danger, in_quiescence.move_options());
-        for m in moves {
-            let (next_game, m) = m?;
+        let mut moves = MoveBuffer::default();
+        game.fill_pseudo_move_buffer(&mut moves, in_quiescence.move_options())?;
+
+        for &m in moves.iter() {
+            let mut next_game = game.clone();
+            next_game.make_move(m)?;
+
+            if next_game.move_legality(&m, &danger) == Legal::No {
+                continue;
+            }
 
             let _ = MoveHistory::track(&mut self.move_history, m);
 
