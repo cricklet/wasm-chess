@@ -55,6 +55,8 @@ pub fn perft_main() {
         // 3195901860,
     ];
 
+    println!("recursive");
+
     run_perft_recursively(Game::from_fen(fen).unwrap(), 2).unwrap();
     {
         let p = Profiler::new("recursive_perft".to_string());
@@ -84,6 +86,9 @@ pub fn perft_main() {
         }
         p.flush();
     }
+
+    println!("\niterative");
+
     run_perft_iteratively_to_depth(Game::from_fen(fen).unwrap(), 2).unwrap();
     {
         let p = Profiler::new("iterative_perft".to_string());

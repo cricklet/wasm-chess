@@ -1218,6 +1218,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "rust-chess"
+version = "0.1.0"
+dependencies = [
+ "array-init",
+ "async-recursion",
+ "async-std",
+ "chrono",
+ "console_error_panic_hook",
+ "enum-map",
+ "fallible-streaming-iterator",
+ "getrandom",
+ "id-arena",
+ "itertools 0.11.0",
+ "lazy_static",
+ "memoize",
+ "num",
+ "pprof",
+ "rand",
+ "scopeguard",
+ "streaming-iterator",
+ "strum",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wasm-bindgen-test",
+ "watch",
+ "web-sys",
+]
+
+[[package]]
 name = "rustc-demangle"
 version = "0.1.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1575,35 +1604,6 @@ checksum = "ecb993dd8c836930ed130e020e77d9b2e65dd0fbab1b67c790b0f5d80b11a575"
 dependencies = [
  "proc-macro2",
  "quote",
-]
-
-[[package]]
-name = "wasm-chess"
-version = "0.1.0"
-dependencies = [
- "array-init",
- "async-recursion",
- "async-std",
- "chrono",
- "console_error_panic_hook",
- "enum-map",
- "fallible-streaming-iterator",
- "getrandom",
- "id-arena",
- "itertools 0.11.0",
- "lazy_static",
- "memoize",
- "num",
- "pprof",
- "rand",
- "scopeguard",
- "streaming-iterator",
- "strum",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "wasm-bindgen-test",
- "watch",
- "web-sys",
 ]
 
 [[package]]
