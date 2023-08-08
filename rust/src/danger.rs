@@ -8,7 +8,7 @@ use crate::{
     types::{other_player, Piece, Player},
 };
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Danger {
     pub check: bool,
     pub pinned: Bitboard,

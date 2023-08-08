@@ -131,9 +131,9 @@ pub fn display_rows_and_columns(rows_and_columns: &Vec<Vec<&str>>) -> ErrorResul
 
     let mut output = String::new();
     for row in rows_and_columns {
-        for value in row {
+        for (col, value) in row.iter().enumerate() {
             output += value;
-            output += &" ".repeat(col_sizes[0] - value.len());
+            output += &" ".repeat(col_sizes[col] - value.len());
             output += " ";
         }
         output += "\n";

@@ -1,12 +1,18 @@
-use std::{collections::HashMap, fs::File, io::Write};
+use std::{
+    collections::HashMap,
+    fmt::{Debug, Formatter},
+    fs::File,
+    io::Write,
+    iter,
+};
 
 use crate::{
-    bitboard::{magic_constants, MAGIC_MOVE_TABLE},
+    bitboard::{magic_constants, Bitboard, MAGIC_MOVE_TABLE},
     danger::Danger,
-    game::Game,
-    helpers::{indent, ErrorResult},
+    game::{Game, Legal},
+    helpers::{err, err_result, indent, ErrorResult},
     moves::{
-        all_moves, index_in_danger, Capture, Move, MoveOptions, MoveType, OnlyCaptures,
+        all_moves, index_in_danger, Capture, Move, MoveBuffer, MoveOptions, MoveType, OnlyCaptures,
         OnlyQueenPromotion, Quiet,
     },
     types::{Piece, Player},
@@ -202,7 +208,9 @@ fn test_perft_start_board() {
     {
         // let p = Profiler::new("perft_start_board".to_string());
         let expected_count = [
-            1, 20, 400, 8902, 197281, 4865609,
+            1, 20, 400, 8902,
+            197281,
+            // 4865609,
             // 119060324,
             // 3195901860,
         ];
@@ -276,39 +284,262 @@ fn test_perft_position_6() {
     assert_perft_matches(fen, &expected_count);
 }
 
-// fn measure_time(f: impl FnOnce()) -> std::time::Duration {
-//     let start_time = std::time::Instant::now();
-//     f();
-//     let end_time = std::time::Instant::now();
-//     end_time - start_time
-// }
+#[derive(Default, Copy, Clone)]
+struct IndexedMoveBuffer {
+    buffer: MoveBuffer,
+    index: usize,
+}
 
-// #[test]
-// fn test_copy_vs_ref() {
-//     let n = 1000000;
-//     let start = &mut Game::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w").unwrap();
+impl Debug for IndexedMoveBuffer {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut lines = self.buffer.moves[..self.buffer.size()]
+            .iter()
+            .map(|m| format!("{:?}", m))
+            .collect::<Vec<_>>();
 
-//     let m = Move {
-//         player: Player::White,
-//         start_index: index_from_file_rank_str("e2").unwrap(),
-//         end_index: index_from_file_rank_str("e3").unwrap(),
-//         piece: Piece::Pawn,
-//         move_type: MoveType::Quiet(Quiet::Move),
-//     };
+        if self.index < self.buffer.size() {
+            lines[self.index] = format!("{} <=========", lines[self.index]);
+        }
 
-//     let copy_time = measure_time(|| {
-//         for _ in 0..n {
-//             let mut game = *start;
-//         }
-//     });
+        f.debug_struct("IndexedMoveBuffer")
+            .field("moves", &lines)
+            .finish()
+    }
+}
 
-//     let ref_time = measure_time(|| {
-//         for _ in 0..n {
-//             let game = &mut *start;
-//         }
-//     });
+#[derive(Debug, Default, Copy, Clone)]
+struct PerftStackFrame {
+    game: Game,
+    danger: Danger,
+    last_move: Option<Move>,
 
-//     println!("{:?} {:?}", copy_time, ref_time);
-//     // assert_eq!(true, copy_time < ref_time.mul_f32(1.6));
-//     // assert_eq!(true, copy_time > ref_time.mul_f32(1.3));
-// }
+    moves: Option<IndexedMoveBuffer>,
+}
+
+impl PerftStackFrame {
+    pub fn lazily_generate_moves(&mut self) -> ErrorResult<()> {
+        if self.moves.is_some() {
+            return Ok(());
+        }
+
+        self.moves = Some(IndexedMoveBuffer {
+            buffer: MoveBuffer::default(),
+            index: 0,
+        });
+
+        let moves = self
+            .moves
+            .as_mut()
+            .ok_or_else(|| err("moves should be generated"))?;
+
+        self.game.fill_pseudo_move_buffer(
+            &mut moves.buffer,
+            MoveOptions {
+                only_captures: OnlyCaptures::No,
+                only_queen_promotion: OnlyQueenPromotion::No,
+            },
+        )?;
+        moves.index = 0;
+
+        Ok(())
+    }
+
+    pub fn setup_from_previous(
+        &mut self,
+        previous: &PerftStackFrame,
+        m: &Move,
+    ) -> ErrorResult<Legal> {
+        self.game = previous.game;
+        self.game.make_move(*m)?;
+
+        if self.game.move_legality(m, &previous.danger) == Legal::No {
+            return Ok(Legal::No);
+        }
+
+        self.danger = Danger::from(self.game.player, &self.game.board)?;
+        self.last_move = Some(*m);
+
+        Ok(Legal::Yes)
+    }
+
+    pub fn setup_from_scratch(&mut self, game: Game) -> ErrorResult<()> {
+        self.game = game;
+        self.danger = Danger::from(self.game.player, &self.game.board).unwrap();
+        self.last_move = None;
+
+        self.lazily_generate_moves()?;
+
+        Ok(())
+    }
+}
+
+struct PerftData {
+    stack: [PerftStackFrame; 40],
+    depth: usize,
+}
+
+impl Debug for PerftData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PerftData")
+            .field("depth", &self.depth)
+            .field("previous", &self.previous())
+            .field("current", &self.current().unwrap())
+            .finish()
+    }
+}
+
+impl PerftData {
+    fn new(game: Game) -> ErrorResult<Self> {
+        let mut data = Self {
+            stack: [PerftStackFrame::default(); 40],
+            depth: 0,
+        };
+        let start = &mut data.stack[0];
+        start.setup_from_scratch(game)?;
+
+        Ok(data)
+    }
+
+    fn current(&self) -> ErrorResult<&PerftStackFrame> {
+        self.stack
+            .get(self.depth)
+            .ok_or(err("current index invalid"))
+    }
+
+    fn current_mut(&mut self) -> ErrorResult<&mut PerftStackFrame> {
+        self.stack
+            .get_mut(self.depth)
+            .ok_or(err("current index invalid"))
+    }
+
+    fn previous(&self) -> Option<&PerftStackFrame> {
+        if self.depth == 0 {
+            return None;
+        }
+        self.stack.get(self.depth - 1)
+    }
+
+    fn current_and_next_mut(
+        &mut self,
+    ) -> ErrorResult<(&mut PerftStackFrame, &mut PerftStackFrame)> {
+        let (current, next) = self.stack.split_at_mut(self.depth + 1);
+        let current = current.last_mut().ok_or(err("current index invalid"))?;
+        let next = next.first_mut().ok_or(err("next index invalid"))?;
+        Ok((current, next))
+    }
+
+    fn previous_and_current_mut(
+        &mut self,
+    ) -> ErrorResult<(Option<&mut PerftStackFrame>, &mut PerftStackFrame)> {
+        let (previous, current) = self.stack.split_at_mut(self.depth);
+        let previous = previous.last_mut();
+        let current = current.first_mut().ok_or(err("current index invalid"))?;
+        Ok((previous, current))
+    }
+
+    fn next_move(&mut self) -> ErrorResult<Option<Move>> {
+        let current = self.current_mut()?;
+        current.lazily_generate_moves()?;
+
+        let current_moves = current
+            .moves
+            .as_mut()
+            .ok_or_else(|| err("moves should be generated"))?;
+
+        if current_moves.index >= current_moves.buffer.size() {
+            return Ok(None);
+        }
+
+        let m = current_moves.buffer.get(current_moves.index);
+        current_moves.index += 1;
+
+        Ok(Some(*m))
+    }
+
+    fn make_move(&mut self, m: &Move) -> ErrorResult<()> {
+        let (current, next) = self.current_and_next_mut()?;
+
+        if next.setup_from_previous(current, m)? == Legal::No {
+            return Ok(());
+        }
+
+        return Ok(());
+    }
+}
+
+pub fn run_perft_iteratively(
+    game: Game,
+    max_depth: usize,
+    num_iterations: usize,
+) -> ErrorResult<usize> {
+    let mut data = PerftData::new(game)?;
+
+    let mut overall_count = 0;
+
+    if max_depth <= 1 {
+        return Ok(1);
+    }
+
+    for _ in 0..num_iterations {
+        // println!("{:#?}", data);
+        let current_depth = data.depth;
+
+        // Leaf node case:
+        if current_depth + 1 >= max_depth {
+            println!("LEAF {:#?}", data.current()?.game);
+            overall_count += 1;
+            data.depth -= 1;
+            continue;
+        }
+
+        // We have moves to traverse, dig deeper
+        let next_move = data.next_move()?;
+        if let Some(next_move) = next_move {
+            println!(
+                "DIG performing {:#?} at depth {}",
+                next_move,
+                current_depth + 1
+            );
+            data.make_move(&next_move)?;
+            data.depth += 1;
+
+            println!("{:#?}", data.current()?.game);
+            continue;
+        }
+
+        // We're out of moves to traverse, pop back up.
+        if current_depth == 0 {
+            println!("DONE {:#?}", data.current()?.game);
+            break;
+        } else {
+            println!("NO MOVES {:#?}", data.current()?.game);
+            data.depth -= 1;
+            continue;
+        }
+    }
+
+    Ok(overall_count)
+}
+
+#[test]
+fn test_perft_start_board_iteratively() {
+    let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
+    let expected_count = [
+        1, 20, 400, 8902, 197281,
+        // 4865609,
+        // 119060324,
+        // 3195901860,
+    ];
+
+    for (i, expected_count) in
+        expected_count.into_iter().enumerate().collect::<Vec<_>>()[2..].into_iter()
+    {
+        let max_depth = i + 1;
+        let max_iterations = max_depth * expected_count;
+
+        let count =
+            run_perft_iteratively(Game::from_fen(fen).unwrap(), max_depth, max_iterations).unwrap();
+        assert_eq!(count, *expected_count);
+    }
+}

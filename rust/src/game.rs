@@ -7,7 +7,7 @@ use crate::bitboard::{index_from_file_rank_str, ForPlayer};
 use crate::danger::Danger;
 use crate::helpers::*;
 use crate::moves::{
-    all_moves, index_in_danger, Capture, Move, MoveOptions, MoveType, OnlyCaptures,
+    all_moves, index_in_danger, Capture, Move, MoveBuffer, MoveOptions, MoveType, OnlyCaptures,
     OnlyQueenPromotion, Quiet,
 };
 use crate::types::{self, CastlingSide, Piece, Player, PlayerPiece, CASTLING_SIDES};
@@ -85,6 +85,12 @@ impl ForPlayer<CanCastleOnSide> {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum Legal {
+    No,
+    Yes,
+}
+
 #[derive(Copy, Clone)]
 pub struct Game {
     pub board: bitboard::Bitboards,
@@ -107,9 +113,9 @@ impl std::fmt::Debug for Game {
     }
 }
 
-impl Game {
-    pub fn new() -> Game {
-        Game {
+impl Default for Game {
+    fn default() -> Self {
+        Self {
             board: bitboard::state::Bitboards::new(),
             player: types::Player::White,
             can_castle: ForPlayer {
@@ -121,7 +127,9 @@ impl Game {
             full_moves_total: 1,
         }
     }
+}
 
+impl Game {
     pub fn err<T>(&self, msg: &str) -> ErrorResult<T> {
         err_result::<T>(&format!("{}\n\n{}", msg, self))
     }
@@ -185,7 +193,7 @@ impl Game {
     }
 
     pub fn from_fen(fen: &str) -> ErrorResult<Game> {
-        let mut game = Game::new();
+        let mut game = Game::default();
 
         let split: Vec<&str> = fen.split(' ').filter(|v| !v.is_empty()).collect();
 
@@ -296,7 +304,25 @@ impl Game {
         Box::new(games)
     }
 
-    pub fn move_is_illegal(&self, m: &Move, previous_danger: &Danger) -> bool {
+    pub fn fill_pseudo_move_buffer(
+        &self,
+        buffer: &mut MoveBuffer,
+        options: MoveOptions,
+    ) -> ErrorResult<()> {
+        let player: Player = self.player;
+        let moves = all_moves(player, self, options);
+
+        let mut num = 0;
+        for m in moves {
+            *buffer.get_mut(num) = m?;
+            num += 1;
+        }
+
+        buffer.set_size(num);
+        Ok(())
+    }
+
+    pub fn move_legality(&self, m: &Move, previous_danger: &Danger) -> Legal {
         let previous_player = self.player.other();
 
         let be_extra_careful = previous_danger.check
@@ -308,10 +334,10 @@ impl Game {
             let king_index = self.board.index_of_piece(previous_player, Piece::King);
             let illegal_move = index_in_danger(previous_player, king_index, &self.board).unwrap();
             if illegal_move {
-                return false;
+                return Legal::No;
             }
         }
-        true
+        Legal::Yes
     }
 
     pub fn for_each_legal_move(
@@ -335,7 +361,7 @@ impl Game {
         let games = self.for_each_pseudo_move(options);
 
         let legal_games = games.filter_results(move |(next_game, m)| -> bool {
-            next_game.move_is_illegal(m, &danger)
+            next_game.move_legality(m, &danger) == Legal::Yes
         });
 
         Box::new(legal_games)
@@ -369,6 +395,9 @@ impl Game {
         self.en_passant = None;
 
         match m.move_type {
+            MoveType::Invalid => {
+                return self.err(&format!("invalid move ({:?})", m));
+            }
             MoveType::Quiet(q) => {
                 if self.board.is_occupied(m.end_index) {
                     return self.err(&format!(

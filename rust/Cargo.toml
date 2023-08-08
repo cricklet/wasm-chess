@@ -36,7 +36,6 @@ chrono = "0.4.26"
 async-recursion = "1.0.4"
 watch = "0.2.3"
 
-[dev-dependencies]
 wasm-bindgen-test = "0.3.34"
 pprof = { version = "0.12.0", features = ["flamegraph", "prost-codec", "protobuf-codec"] }
 

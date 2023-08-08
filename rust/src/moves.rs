@@ -1,4 +1,8 @@
-use std::{collections::HashMap, iter};
+use std::{
+    collections::HashMap,
+    fmt::{Debug, Formatter},
+    iter,
+};
 
 use strum::IntoEnumIterator;
 
@@ -74,6 +78,49 @@ pub enum Capture {
 pub enum MoveType {
     Quiet(Quiet),
     Capture(Capture),
+    Invalid,
+}
+
+#[derive(Copy, Clone)]
+pub struct MoveBuffer {
+    pub moves: [Move; 80],
+    pub size: usize,
+}
+
+impl Debug for MoveBuffer {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MoveBuffer")
+            .field("moves", &self.moves[..self.size].iter())
+            .field("size", &self.size)
+            .finish()
+    }
+}
+
+impl Default for MoveBuffer {
+    fn default() -> Self {
+        Self {
+            moves: [Move::invalid(); 80],
+            size: 0,
+        }
+    }
+}
+
+impl MoveBuffer {
+    pub fn get(&self, index: usize) -> &Move {
+        &self.moves[index]
+    }
+
+    pub fn get_mut(&mut self, index: usize) -> &mut Move {
+        &mut self.moves[index]
+    }
+
+    pub fn set_size(&mut self, size: usize) {
+        self.size = size;
+    }
+
+    pub fn size(&self) -> usize {
+        self.size
+    }
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
@@ -85,7 +132,23 @@ pub struct Move {
     pub promotion: Option<Piece>,
 }
 
+impl Default for Move {
+    fn default() -> Self {
+        Self::invalid()
+    }
+}
+
 impl Move {
+    pub fn invalid() -> Self {
+        Self {
+            piece: PlayerPiece::new(Player::White, Piece::Pawn),
+            start_index: BoardIndex::from(0),
+            end_index: BoardIndex::from(0),
+            move_type: MoveType::Invalid,
+            promotion: None,
+        }
+    }
+
     pub fn to_uci(&self) -> String {
         let promo = self.promotion.map(|p| p.to_uci());
         let promo = promo.unwrap_or(&"");
