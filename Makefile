@@ -1,6 +1,6 @@
 
 check-deps:
-	cargo --version; yarn --version; node --version; wasm-pack --version;
+	cargo --version; yarn --version; node --version; wasm-pack --version; cargo watch --version;
 
 serve-web:
 	cd web; yarn; yarn serve --dev

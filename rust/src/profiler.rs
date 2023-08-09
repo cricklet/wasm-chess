@@ -41,12 +41,6 @@ impl<'a> Profiler<'a> {
     }
 }
 
-impl<'a> Drop for Profiler<'a> {
-    fn drop(&mut self) {
-        drop(&mut self.guard)
-    }
-}
-
 pub fn perft_main() {
     let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -59,7 +53,7 @@ pub fn perft_main() {
 
     run_perft_recursively(Game::from_fen(fen).unwrap(), 2).unwrap();
     {
-        let p = Profiler::new("recursive_perft".to_string());
+        // let p = Profiler::new("recursive_perft".to_string());
         for (i, expected_count) in expected_count.into_iter().enumerate() {
             let start_time = std::time::Instant::now();
 
@@ -84,14 +78,14 @@ pub fn perft_main() {
                 (end_time - start_time).as_millis()
             );
         }
-        p.flush();
+        // p.flush();
     }
 
     println!("\niterative");
 
     run_perft_iteratively_to_depth(Game::from_fen(fen).unwrap(), 2).unwrap();
     {
-        let p = Profiler::new("iterative_perft".to_string());
+        // let p = Profiler::new("iterative_perft".to_string());
         for (i, expected_count) in expected_count.into_iter().enumerate() {
             let start_time = std::time::Instant::now();
 
@@ -117,6 +111,6 @@ pub fn perft_main() {
                 (end_time - start_time).as_millis()
             );
         }
-        p.flush();
+        // p.flush();
     }
 }
