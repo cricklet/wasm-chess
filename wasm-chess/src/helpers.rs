@@ -1,6 +1,5 @@
 use std::{sync::Mutex, time::Duration};
 
-use async_std::task::sleep;
 use wasm_bindgen::prelude::wasm_bindgen;
 
 pub fn set_panic_hook() {
@@ -33,7 +32,7 @@ pub struct AsyncCounter {
 }
 
 pub async fn yield_to_js() {
-    sleep(Duration::from_millis(0)).await;
+    async_std::task::sleep(Duration::from_millis(0)).await;
 }
 
 fn pretend_to_work(ms: i64) {

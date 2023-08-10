@@ -190,6 +190,10 @@ impl Game {
     }
 
     pub fn from_fen(fen: &str) -> ErrorResult<Game> {
+        if fen == "startpos" {
+            return Game::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+        }
+
         let mut game = Game::default();
 
         let split = fen.split(' ');
