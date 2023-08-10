@@ -1,22 +1,19 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-mod chess;
-use chess::*;
 
-mod wasm;
-use wasm::*;
+mod helpers;
 
 use async_std::task::sleep;
+use helpers::{log_to_js, set_panic_hook};
 use std::{
     ops::{Div, Mul},
     sync::Mutex,
     time::Duration,
 };
-use wasm::log_to_js;
 use wasm_bindgen::prelude::*;
 
 use lazy_static::lazy_static;
 use web_sys::console;
+
+use rust_chess::{*};
 
 lazy_static! {
     static ref UCI: Mutex<uci::Uci> = Mutex::new(uci::Uci {

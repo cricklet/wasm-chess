@@ -1,8 +1,21 @@
+
 use std::{backtrace::Backtrace, fs::File, io::Write, iter};
 
 use pprof::protos::Message;
 
-use super::chess::{
+pub mod alphabeta;
+pub mod bitboard;
+pub mod danger;
+pub mod evaluation;
+pub mod game;
+pub mod helpers;
+pub mod iterative_traversal;
+pub mod moves;
+pub mod perft;
+pub mod types;
+pub mod uci;
+
+use {
     game::Game,
     perft::run_perft_recursively,
     perft::{run_perft_iteratively, run_perft_iteratively_to_depth},
@@ -41,7 +54,7 @@ impl<'a> Profiler<'a> {
     }
 }
 
-pub fn perft_main() {
+fn main() {
     let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
     let expected_count = [

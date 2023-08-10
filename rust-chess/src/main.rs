@@ -1,15 +1,21 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
 
-pub mod chess;
-mod profiler;
+pub mod alphabeta;
+pub mod bitboard;
+pub mod danger;
+pub mod evaluation;
+pub mod game;
+pub mod helpers;
+pub mod iterative_traversal;
+pub mod moves;
+pub mod perft;
+pub mod types;
+pub mod uci;
 
 use std::{env::args, thread::current};
 
 use itertools::Itertools;
-use profiler::perft_main;
 
-use chess::{
+use {
     game::Game,
     helpers::{err_result, ErrorResult},
     helpers::{indent, prefix},
@@ -46,10 +52,5 @@ fn run() -> ErrorResult<()> {
 }
 
 fn main() {
-    if args().len() > 1 && args().contains(&"perft".to_string()) {
-        perft_main();
-        return;
-    }
-
     run().unwrap();
 }
