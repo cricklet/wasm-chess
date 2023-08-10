@@ -1,3 +1,9 @@
+use std::{future::Future, sync::Mutex};
+
+use crate::game::{Game, Legal};
+
+use super::iterative_traversal::TraversalStack;
+
 #[derive(Debug)]
 struct AsyncPerftData {
     stack: TraversalStack<MAX_PERFT_DEPTH>,
@@ -5,28 +11,45 @@ struct AsyncPerftData {
 }
 
 #[derive(Debug)]
-pub struct AsyncPerft {
+pub struct AsyncPerft<C, F>
+where
+    C: Fn(AsyncPerftMessage) -> F,
+    F: Future<Output = ()>,
+{
     data: Mutex<Option<AsyncPerftData>>,
     stop: Mutex<bool>,
 
-    yield_callback: fn(&AsyncPerftMessage),
+    js_callback: C,
 }
 
 const MAX_PERFT_DEPTH: usize = 10;
 pub enum AsyncPerftMessage {
     Count(usize),
     Log(String),
+    Yield,
 }
 
-impl AsyncPerft {
-    pub fn new(callback: fn(&AsyncPerftMessage)) -> Self {
-        set_panic_hook();
+impl<C, F> AsyncPerft<C, F>
+where
+    C: Fn(AsyncPerftMessage) -> F,
+    F: Future<Output = ()>,
+{
+    pub fn new(js_callback: C) -> Self {
         Self {
             data: Mutex::new(None),
             stop: Mutex::new(false),
-            yield_callback: callback,
+            js_callback,
         }
     }
+
+    async fn log(&self, s: &str) {
+        (self.js_callback)(AsyncPerftMessage::Log(s.to_string())).await;
+    }
+
+    async fn yield_to_js(&self) {
+        (self.js_callback)(AsyncPerftMessage::Yield).await;
+    }
+
     pub fn count(&self) -> usize {
         let data = self.data.lock();
         let data = data.unwrap();
@@ -44,19 +67,17 @@ impl AsyncPerft {
     }
 
     pub async fn start(&self, fen: String, max_depth: usize) {
-        log_to_js(&"perft start");
-        yield_to_js().await;
+        self.log("perft start").await;
 
         if max_depth > MAX_PERFT_DEPTH {
             panic!("max_depth must be <= {}", MAX_PERFT_DEPTH);
         }
 
         loop {
-            log_to_js("perft loop");
-            yield_to_js().await;
+            self.log("perft loop").await;
 
             if *self.stop.lock().unwrap() {
-                return;
+                break;
             }
 
             self.lazy_init(&fen);
@@ -66,15 +87,14 @@ impl AsyncPerft {
                 let data = data.as_mut().unwrap();
                 let ref mut traversal = data.stack;
 
-                log_to_js(&format!("{:#?}", traversal.current()));
-                yield_to_js().await;
+                self.log(&format!("{:#?}", traversal.current())).await;
 
                 // Leaf node case:
                 if traversal.depth + 1 >= max_depth {
                     data.count += 1;
                     traversal.depth -= 1;
 
-                    yield_to_js().await;
+                    self.yield_to_js().await;
                 }
 
                 // We have moves to traverse, dig deeper
@@ -84,11 +104,11 @@ impl AsyncPerft {
 
                     let result = next.setup_from_move(current, &next_move).unwrap();
                     if result == Legal::No {
-                        yield_to_js().await;
+                        self.yield_to_js().await;
                         continue;
                     } else {
                         traversal.depth += 1;
-                        yield_to_js().await;
+                        self.yield_to_js().await;
                         continue;
                     }
                 }
@@ -98,15 +118,18 @@ impl AsyncPerft {
                     break;
                 } else {
                     traversal.depth -= 1;
-                    yield_to_js().await;
+                    self.yield_to_js().await;
                     continue;
                 }
             }
         }
+
+        self.log("perft done").await;
     }
 
-    pub fn stop(&self) {
-        log_to_js(&"perft stop");
+    pub async fn stop(&self) {
+        self.log("perft stopping").await;
         *self.stop.lock().unwrap() = true;
+        self.log("perft stopped").await;
     }
 }

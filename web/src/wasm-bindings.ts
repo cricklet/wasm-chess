@@ -131,6 +131,8 @@ export async function loadWasmBindgen(): Promise<void> {
 
     await wasm_bindgen()
     wasmLoaded = true
+
+    wasm_bindgen.hello()
 }
 
 export function currentFen(): string {

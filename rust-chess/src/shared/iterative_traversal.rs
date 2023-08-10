@@ -151,7 +151,7 @@ impl<const N: usize> TraversalStack<N> {
         Ok(data)
     }
 
-    fn current(&self) -> ErrorResult<&TraversalStackFrame> {
+    pub fn current(&self) -> ErrorResult<&TraversalStackFrame> {
         self.stack.get(self.depth).as_result()
     }
 

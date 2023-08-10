@@ -19,7 +19,8 @@
     "zustand": "^4.4.0"
   },
   "scripts": {
-    "serve": "yarn; tsx ./scripts/esbuild.ts --link rust-chess"
+    "serve": "yarn; tsx ./scripts/esbuild.ts --serve --watch",
+    "tsx": "yarn; tsx ./scripts/esbuild.ts"
   },
   "devDependencies": {
     "@svgr/plugin-jsx": "^8.0.1",
