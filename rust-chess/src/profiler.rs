@@ -5,17 +5,8 @@ use std::{fs::File, io::Write};
 
 use pprof::protos::Message;
 
-pub mod alphabeta;
-pub mod bitboard;
-pub mod danger;
-pub mod evaluation;
-pub mod game;
-pub mod helpers;
-pub mod iterative_traversal;
-pub mod moves;
-pub mod perft;
-pub mod types;
-pub mod uci;
+pub mod shared;
+pub use shared::*;
 
 use {game::Game, perft::run_perft_iteratively_to_depth, perft::run_perft_recursively};
 
