@@ -1,11 +1,11 @@
 @media (prefers-color-scheme: dark) {
   :root {
-    --dark-square: #707a7b;
-    --light-square: #808b8c;
-    --background: var(--light-square);
+    --dark-square: #404a4b;
+    --light-square: #505b5c;
+    --background: #303a3b;
 
-    --dark-piece: #4a4c4f;
-    --light-piece: #f8f8ec;
+    --dark-piece: #0a0c0f;
+    --light-piece: #c8c8bc;
 
     --label: #a2b1b3;
     --invalid: rgb(170, 118, 118);
@@ -63,7 +63,7 @@ body {
   padding-inline: calc(var(--square-size) / 8);
   font-size: 1rem;
   flex-grow: 1;
-  overflow-y: scroll;
+  overflow-y: auto;
   width: calc(var(--square-size) * 8);
 }
 
