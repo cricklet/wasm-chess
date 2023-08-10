@@ -1,5 +1,6 @@
-use std::{sync::Mutex, time::Duration};
+use std::{sync::Mutex, time::Duration, future::Future};
 
+use rust_chess::async_perft::{AsyncPerftRunner, AsyncPerftMessage};
 use wasm_bindgen::prelude::wasm_bindgen;
 
 pub fn set_panic_hook() {
@@ -74,26 +75,6 @@ impl AsyncCounter {
         data.counter
     }
 
-    // Let's try to avoid async recursion for now -- it requires heap allocations
-    // (boxing the returned future).
-
-    // pub async fn start(&self) {
-    //     log_to_js(&"start");
-
-    //     if self.stop.lock().unwrap().clone() {
-    //         return;
-    //     }
-    //     *self.counter.lock().unwrap() += 1;
-
-    //     // Pretend to work
-    //     pretend_to_work(100);
-
-    //     // Give control back to the JS event loop
-    //     yield_to_js().await;
-
-    //     self.start().await;
-    // }
-
     pub async fn start(&self) {
         log_to_js("start");
 
@@ -120,3 +101,37 @@ impl AsyncCounter {
         self.data.lock().unwrap().stop = true;
     }
 }
+
+async fn js_callback(message: AsyncPerftMessage) {
+    match message {
+        AsyncPerftMessage::Log(s) => {
+            log_to_js(&s);
+        }
+        AsyncPerftMessage::Continue => {
+            yield_to_js().await;
+        }
+    }
+}
+
+// #[wasm_bindgen]
+// pub struct AsyncPerft {
+//     runner: AsyncPerftRunner,
+// }
+
+// impl AsyncPerft {
+//     pub fn new() -> Self {
+//         Self {
+//             runner: AsyncPerftRunner::from(|message| async {
+//                 match message {
+//                     AsyncPerftMessage::Log(s) => {
+//                         log_to_js(&s);
+//                     }
+//                     AsyncPerftMessage::Continue => {
+//                         yield_to_js().await;
+//                     }
+//                 }
+//             }),
+//         }
+//     }
+// }
+

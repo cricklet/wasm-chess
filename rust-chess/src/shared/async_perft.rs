@@ -79,7 +79,7 @@ impl AsyncPerftData {
 }
 
 #[derive(Debug)]
-pub struct AsyncPerft<C, F>
+pub struct AsyncPerftRunner<C, F>
 where
     C: Fn(AsyncPerftMessage) -> F,
     F: Future<Output = ()>,
@@ -92,24 +92,23 @@ where
 
 const MAX_PERFT_DEPTH: usize = 10;
 pub enum AsyncPerftMessage {
-    Count(usize),
     Log(String),
     Continue,
 }
 
 #[derive(Debug, PartialEq, Eq)]
-enum AsyncPerftIterationResult {
+pub enum AsyncPerftIterationResult {
     Continue,
     Done,
     Interrupted,
 }
 
-impl<C, F> AsyncPerft<C, F>
+impl<C, F> AsyncPerftRunner<C, F>
 where
     C: Fn(AsyncPerftMessage) -> F,
     F: Future<Output = ()>,
 {
-    pub fn new(js_callback: C) -> Self {
+    pub fn from(js_callback: C) -> Self {
         Self {
             data: Mutex::new(None),
             stop: Mutex::new(false),
@@ -181,7 +180,7 @@ mod test {
     async fn test_async_perft_short() {
         use crate::game::Game;
 
-        let perft = AsyncPerft::new(|_| async {
+        let perft = AsyncPerftRunner::from(|_| async {
             tokio::time::sleep(Duration::from_millis(1)).await;
         });
         perft.start("startpos".to_string(), 2).await;
@@ -193,11 +192,8 @@ mod test {
     async fn test_async_perft_long() {
         use crate::game::Game;
 
-        let perft = Arc::new(AsyncPerft::new(|message| async {
+        let perft = Arc::new(AsyncPerftRunner::from(|message| async {
             match message {
-                AsyncPerftMessage::Count(count) => {
-                    println!("count: {}", count);
-                }
                 AsyncPerftMessage::Log(s) => {
                     println!("{}", s);
                 }

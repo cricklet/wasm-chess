@@ -64,26 +64,21 @@ export function jsWorkerForTesting() {
 export async function wasmWorkerForTesting() {
     let worker = new Worker('wasm-worker-for-testing.js')
 
-    let current = -1
     let listeners: Array<(e: MessageEvent) => void> = [
         (e: MessageEvent) => console.log('>', e.data),
-        (e: MessageEvent) => {
-            if (typeof e.data === 'number') {
-                current = e.data
-            }
-        }
     ]
 
     worker.onmessage = (e) => {
         listeners.forEach((l) => l(e))
     }
 
-    async function waitFor(f: (e: MessageEvent) => boolean): Promise<void> {
+    async function waitFor<T>(f: (e: MessageEvent) => T | undefined): Promise<T | undefined> {
         return new Promise((resolve) => {
             let callback = (e: MessageEvent) => {
-                if (f(e)) {
+                let t = f(e)
+                if (t != null) {
                     listeners = listeners.filter((l) => l !== callback)
-                    resolve()
+                    resolve(t)
                 }
             }
 
@@ -95,18 +90,32 @@ export async function wasmWorkerForTesting() {
         typeof e.data === 'string' && e.data.indexOf('ready') !== -1)
 
     return {
-        go: function () {
-            worker.postMessage('go')
+        counter: {
+            go: function () {
+                worker.postMessage('counter-go')
+            },
+
+            stop: function () {
+                worker.postMessage('counter-stop')
+            },
+
+            count: async function () {
+                worker.postMessage('counter-count')
+                return await waitFor(e => typeof e.data === 'number' ? e.data : undefined)
+            },
         },
 
-        stop: function () {
-            worker.postMessage('stop')
-        },
-
-        count: async function () {
-            worker.postMessage('count')
-            await waitFor(e => typeof e.data === 'number')
-            return current
+        perft: {
+            go: function () {
+                worker.postMessage(`perft-go`)
+            },
+            stop: function () {
+                worker.postMessage(`perft-stop`)
+            },
+            count: async function () {
+                worker.postMessage('perft-count')
+                return await waitFor(e => typeof e.data === 'number' ? e.data : undefined)
+            },
         },
 
         terminate: function () {

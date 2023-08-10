@@ -19,7 +19,7 @@
     "zustand": "^4.4.0"
   },
   "scripts": {
-    "serve": "yarn; tsx ./scripts/esbuild.ts --serve --watch",
+    "serve": "yarn; tsx ./scripts/esbuild.ts --serve --watch --clear",
     "tsx": "yarn; tsx ./scripts/esbuild.ts"
   },
   "devDependencies": {
