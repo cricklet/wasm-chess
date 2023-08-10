@@ -11,14 +11,13 @@ pub mod perft;
 pub mod types;
 pub mod uci;
 
-use std::{env::args, thread::current};
 
-use itertools::Itertools;
+
+
 
 use {
     game::Game,
-    helpers::{err_result, ErrorResult},
-    helpers::{indent, prefix},
+    helpers::{ErrorResult},
     uci::Uci,
 };
 
