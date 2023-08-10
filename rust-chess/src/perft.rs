@@ -1,22 +1,15 @@
 use std::{
     collections::HashMap,
-    fmt::{Debug, Formatter},
-    fs::File,
-    io::Write,
-    iter,
 };
 
 use super::{
-    bitboard::{magic_constants, Bitboard, MAGIC_MOVE_TABLE},
     danger::Danger,
     game::{Game, Legal},
-    helpers::{err, err_result, indent, ErrorResult, OptionResult},
+    helpers::{err_result, indent, ErrorResult},
     iterative_traversal::TraversalStack,
     moves::{
-        all_moves, index_in_danger, Capture, Move, MoveBuffer, MoveOptions, MoveType, OnlyCaptures,
-        OnlyQueenPromotion, Quiet,
+        Move, MoveBuffer, MoveOptions,
     },
-    types::{Piece, Player},
 };
 
 fn assert_fen_matches(expected_fen: &str) {

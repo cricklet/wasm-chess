@@ -3,7 +3,7 @@ use std::{iter, sync::Mutex};
 
 use super::{
     game::Game,
-    helpers::{err_result, prefix, ErrorResult},
+    helpers::{err_result, ErrorResult},
     perft::run_perft_counting_first_move,
 };
 

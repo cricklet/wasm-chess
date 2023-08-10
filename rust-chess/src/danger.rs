@@ -1,11 +1,11 @@
 use super::{
     bitboard::{
         each_index_of_one, moves_bb_for_piece_and_blockers, single_bitboard, Bitboard, Bitboards,
-        BoardIndex, ForPlayer, WalkType,
+        BoardIndex, WalkType,
     },
     helpers::ErrorResult,
     moves::index_in_danger,
-    types::{other_player, Piece, Player},
+    types::{Piece, Player},
 };
 
 #[derive(Debug, Clone, Copy, Default)]

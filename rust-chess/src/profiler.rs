@@ -1,5 +1,5 @@
 
-use std::{backtrace::Backtrace, fs::File, io::Write, iter};
+use std::{fs::File, io::Write};
 
 use pprof::protos::Message;
 
@@ -18,7 +18,7 @@ pub mod uci;
 use {
     game::Game,
     perft::run_perft_recursively,
-    perft::{run_perft_iteratively, run_perft_iteratively_to_depth},
+    perft::{run_perft_iteratively_to_depth},
 };
 
 pub struct Profiler<'a> {

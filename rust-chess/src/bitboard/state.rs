@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use strum::IntoEnumIterator;
 
-use super::super::{helpers::*, moves::walk_potential_bb, types::*};
+use super::super::{helpers::*, types::*};
 
 use super::*;
 

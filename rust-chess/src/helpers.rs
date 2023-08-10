@@ -1,6 +1,6 @@
-use std::{backtrace::Backtrace, fs::File, io::Write, iter};
+use std::{backtrace::Backtrace, io::Write, iter};
 
-use lazy_static::__Deref;
+
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct Error {

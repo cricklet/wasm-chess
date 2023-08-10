@@ -1,7 +1,5 @@
 use std::{
-    collections::HashMap,
     fmt::{Debug, Formatter},
-    iter,
 };
 
 use strum::IntoEnumIterator;

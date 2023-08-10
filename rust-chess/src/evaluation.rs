@@ -4,8 +4,7 @@ use lazy_static::lazy_static;
 use strum::IntoEnumIterator;
 
 use super::{
-    bitboard::{pretty_bitboard, single_bitboard, Bitboard, BoardIndex, FileRank},
-    danger::Danger,
+    bitboard::{single_bitboard, Bitboard, BoardIndex, FileRank},
     game::Game,
     types::{Piece, Player},
 };
