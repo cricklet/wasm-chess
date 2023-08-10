@@ -1,12 +1,10 @@
 
 mod helpers;
 
-use async_std::task::sleep;
+
 use helpers::{log_to_js, set_panic_hook};
 use std::{
-    ops::{Div, Mul},
     sync::Mutex,
-    time::Duration,
 };
 use wasm_bindgen::prelude::*;
 
