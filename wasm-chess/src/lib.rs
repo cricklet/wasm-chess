@@ -11,7 +11,7 @@ use rust_chess::*;
 
 lazy_static! {
     static ref UCI: Mutex<uci::Uci> = Mutex::new(uci::Uci {
-        game: game::Game::from_position_uci(&"position startpos").unwrap(),
+        game: game::Game::from_position_uci("position startpos").unwrap(),
     });
 }
 
@@ -25,7 +25,7 @@ pub fn process_sync(input: &str) {
     set_panic_hook();
 
     console::log_1(&format!("> {}", input).into());
-    for line in input.split("\n") {
+    for line in input.split('\n') {
         if line.is_empty() {
             continue;
         }

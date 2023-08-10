@@ -51,7 +51,7 @@ fn pretend_to_work(ms: i64) {
             break;
         }
 
-        if (now - start).num_milliseconds() > checkpoint as i64 {
+        if (now - start).num_milliseconds() > checkpoint {
             log_to_js(&output);
             checkpoint += iteration_ms;
             output += ".";
@@ -96,7 +96,7 @@ impl AsyncCounter {
     // }
 
     pub async fn start(&self) {
-        log_to_js(&"start");
+        log_to_js("start");
 
         loop {
             {
@@ -117,7 +117,7 @@ impl AsyncCounter {
     }
 
     pub async fn stop(&self) {
-        log_to_js(&"stop");
+        log_to_js("stop");
         self.data.lock().unwrap().stop = true;
     }
 }
