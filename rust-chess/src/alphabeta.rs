@@ -1,5 +1,3 @@
-use strum::IntoEnumIterator;
-
 use super::{
     danger::Danger,
     evaluation::*,

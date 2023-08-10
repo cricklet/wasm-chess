@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+
 pub mod alphabeta;
 pub mod bitboard;
 pub mod danger;
