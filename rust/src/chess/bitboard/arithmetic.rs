@@ -1,6 +1,6 @@
 use lazy_static::*;
 
-use crate::helpers::{err_result, ErrorResult};
+use super::super::helpers::{err_result, ErrorResult};
 
 pub type Bitboard = u64;
 

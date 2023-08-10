@@ -6,7 +6,7 @@ use std::{
     iter,
 };
 
-use crate::{
+use super::{
     bitboard::{magic_constants, Bitboard, MAGIC_MOVE_TABLE},
     danger::Danger,
     game::{Game, Legal},

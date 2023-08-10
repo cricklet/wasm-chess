@@ -3,15 +3,15 @@ use std::rc::Rc;
 
 use strum::IntoEnumIterator;
 
-use crate::bitboard::{self, castling_allowed_after_move, Bitboards, BoardIndex};
-use crate::bitboard::{index_from_file_rank_str, ForPlayer};
-use crate::danger::Danger;
-use crate::moves::{
+use super::bitboard::{self, castling_allowed_after_move, Bitboards, BoardIndex};
+use super::bitboard::{index_from_file_rank_str, ForPlayer};
+use super::danger::Danger;
+use super::moves::{
     all_moves, index_in_danger, Capture, Move, MoveBuffer, MoveOptions, MoveType, OnlyCaptures,
     OnlyQueenPromotion, Quiet,
 };
-use crate::types::{self, CastlingSide, Piece, Player, PlayerPiece, CASTLING_SIDES};
-use crate::{helpers::*, moves};
+use super::types::{self, CastlingSide, Piece, Player, PlayerPiece, CASTLING_SIDES};
+use super::{helpers::*, moves};
 
 #[derive(Debug, Default, Copy, Clone)]
 pub struct CanCastleOnSide {
@@ -415,7 +415,7 @@ impl Game {
                 }
             }
             MoveType::Capture(c) => match c {
-                crate::moves::Capture::EnPassant { taken_index } => {
+                Capture::EnPassant { taken_index } => {
                     let taken_piece = PlayerPiece::new(enemy, Piece::Pawn);
                     if self.board.piece_at_index(taken_index) != Some(taken_piece) {
                         return self.err(&format!(
@@ -428,7 +428,7 @@ impl Game {
                     self.board.clear_square(m.start_index, m.piece);
                     self.board.set_square(m.end_index, m.piece);
                 }
-                crate::moves::Capture::Take { taken_piece } => {
+                Capture::Take { taken_piece } => {
                     if taken_piece.player != enemy {
                         return self.err(&format!(
                             "invalid en-passant {:?}: taken piece isn't enemy piece",

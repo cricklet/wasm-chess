@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use std::{iter, sync::Mutex};
 
-use crate::{
+use super::{
     game::Game,
     helpers::{err_result, prefix, ErrorResult},
     perft::run_perft_counting_first_move,

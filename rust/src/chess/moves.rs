@@ -6,7 +6,7 @@ use std::{
 
 use strum::IntoEnumIterator;
 
-use crate::{bitboard::*, game::Game, helpers::*, types::*};
+use super::{bitboard::*, game::Game, helpers::*, types::*};
 
 #[derive(Debug, Copy, Clone)]
 pub struct MoveOptions {

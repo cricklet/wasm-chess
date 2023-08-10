@@ -5,17 +5,15 @@ check-deps:
 serve-web:
 	cd web; yarn; yarn serve --dev
 
+# wasm
+
 watch-wasm:
 	export CARGO_BUILD_JOBS=3; cd rust; cargo watch -i .gitignore -i "pkg/*" -s "wasm-pack build --debug --target=no-modules"
 
+# main
+
 test:
-	export CARGO_BUILD_JOBS=3; cd rust; cargo test --lib
-
-test-main:
 	export CARGO_BUILD_JOBS=3; cd rust; cargo test --release --bin main --features profiling
-
-watch-test:
-	export CARGO_BUILD_JOBS=3; cd rust; cargo watch -i .gitignore -i "pkg/*" -s "cargo test --lib"
 
 perft:
 	cd rust; cargo build --release --bin main --features profiling; cd ..; ./target/release/main perft

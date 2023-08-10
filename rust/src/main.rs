@@ -1,30 +1,20 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 
+pub mod chess;
+mod profiler;
+
 use std::{env::args, thread::current};
 
-use helpers::{err_result, ErrorResult};
 use itertools::Itertools;
 use profiler::perft_main;
-use uci::Uci;
 
-use crate::{
+use chess::{
     game::Game,
+    helpers::{err_result, ErrorResult},
     helpers::{indent, prefix},
+    uci::Uci,
 };
-
-pub mod alphabeta;
-pub mod bitboard;
-pub mod danger;
-pub mod evaluation;
-pub mod game;
-pub mod helpers;
-pub mod iterative_traversal;
-pub mod moves;
-pub mod perft;
-pub mod profiler;
-pub mod types;
-pub mod uci;
 
 fn next_stdin() -> String {
     let mut input = String::new();

@@ -1,17 +1,17 @@
 use std::fmt::Debug;
 use std::fmt::Formatter;
 
-use crate::danger::Danger;
-use crate::game::Game;
-use crate::game::Legal;
-use crate::helpers::err_result;
-use crate::helpers::ErrorResult;
-use crate::helpers::OptionResult;
-use crate::moves::Move;
-use crate::moves::MoveBuffer;
-use crate::moves::MoveOptions;
-use crate::moves::OnlyCaptures;
-use crate::moves::OnlyQueenPromotion;
+use super::danger::Danger;
+use super::game::Game;
+use super::game::Legal;
+use super::helpers::err_result;
+use super::helpers::ErrorResult;
+use super::helpers::OptionResult;
+use super::moves::Move;
+use super::moves::MoveBuffer;
+use super::moves::MoveOptions;
+use super::moves::OnlyCaptures;
+use super::moves::OnlyQueenPromotion;
 
 #[derive(PartialEq, Eq)]
 pub enum FinishedTraversing {

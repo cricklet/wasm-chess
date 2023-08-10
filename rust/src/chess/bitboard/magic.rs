@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::{
+use super::super::{
     helpers::{err_result, ErrorResult},
     types::Piece,
 };

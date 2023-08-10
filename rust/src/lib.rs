@@ -1,19 +1,10 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
-mod wasm_helpers;
+mod chess;
+use chess::*;
 
-pub mod alphabeta;
-pub mod bitboard;
-pub mod danger;
-pub mod evaluation;
-pub mod game;
-pub mod helpers;
-
-pub mod iterative_traversal;
-pub mod moves;
-pub mod perft;
-pub mod types;
-pub mod uci;
+mod wasm;
+use wasm::*;
 
 use async_std::task::sleep;
 use std::{
@@ -21,17 +12,15 @@ use std::{
     sync::Mutex,
     time::Duration,
 };
+use wasm::log_to_js;
 use wasm_bindgen::prelude::*;
-use wasm_helpers::log_to_js;
 
 use lazy_static::lazy_static;
 use web_sys::console;
 
-use crate::{game::Game, uci::Uci, wasm_helpers::set_panic_hook};
-
 lazy_static! {
-    static ref UCI: Mutex<Uci> = Mutex::new(Uci {
-        game: Game::from_position_uci(&"position startpos").unwrap(),
+    static ref UCI: Mutex<uci::Uci> = Mutex::new(uci::Uci {
+        game: game::Game::from_position_uci(&"position startpos").unwrap(),
     });
 }
 

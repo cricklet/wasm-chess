@@ -2,7 +2,7 @@ use lazy_static::lazy_static;
 use memoize::memoize;
 use strum::EnumIter;
 
-use crate::{
+use super::super::{
     helpers::{err_result, ErrorResult},
     types::Player,
 };

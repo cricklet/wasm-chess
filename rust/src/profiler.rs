@@ -2,7 +2,7 @@ use std::{backtrace::Backtrace, fs::File, io::Write, iter};
 
 use pprof::protos::Message;
 
-use crate::{
+use super::chess::{
     game::Game,
     perft::run_perft_recursively,
     perft::{run_perft_iteratively, run_perft_iteratively_to_depth},

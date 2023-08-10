@@ -1,6 +1,6 @@
 use strum::IntoEnumIterator;
 
-use crate::{
+use super::{
     danger::Danger,
     evaluation::*,
     game::{Game, Legal},

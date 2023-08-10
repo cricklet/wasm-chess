@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use lazy_static::lazy_static;
 use strum::IntoEnumIterator;
 
-use crate::{
+use super::{
     bitboard::{pretty_bitboard, single_bitboard, Bitboard, BoardIndex, FileRank},
     danger::Danger,
     game::Game,
