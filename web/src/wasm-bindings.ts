@@ -36,7 +36,7 @@ globalThis.BindingsJs = {
 // This loads the .d.ts type definitions. However, because web worker support
 // for modules isn't very mature, the wasm bindings are instead imported via a
 // <script> tag which sets a global variable called `wasm_bindgen`.
-import '../public/lib/wasm-pack/rust_chess'
+import '../public/lib/wasm-pack/wasm_chess'
 
 
 export function jsWorkerForTesting() {

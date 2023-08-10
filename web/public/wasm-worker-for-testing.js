@@ -1,5 +1,5 @@
 
-importScripts('lib/wasm-pack/rust_chess.js');
+importScripts('lib/wasm-pack/wasm_chess.js');
 
 globalThis.BindingsJs = {
     log_to_js: function (msg) {
@@ -9,7 +9,7 @@ globalThis.BindingsJs = {
 
 async function init_wasm_in_worker() {
     // load the wasm
-    await wasm_bindgen('./lib/wasm-pack/rust_chess_bg.wasm');
+    await wasm_bindgen('./lib/wasm-pack/wasm_chess_bg.wasm');
 
     let asyncCounter = await wasm_bindgen.AsyncCounter.new();
 
