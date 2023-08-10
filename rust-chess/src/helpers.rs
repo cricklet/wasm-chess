@@ -1,7 +1,5 @@
 use std::{backtrace::Backtrace, io::Write, iter};
 
-
-
 #[derive(Clone, PartialEq, Eq)]
 pub struct Error {
     pub msg: String,

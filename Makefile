@@ -22,3 +22,5 @@ perft:
 
 uci:
 	cd rust-chess; cargo run --release --bin main
+
+# all

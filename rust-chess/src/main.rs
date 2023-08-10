@@ -1,4 +1,3 @@
-
 pub mod alphabeta;
 pub mod bitboard;
 pub mod danger;
@@ -11,15 +10,7 @@ pub mod perft;
 pub mod types;
 pub mod uci;
 
-
-
-
-
-use {
-    game::Game,
-    helpers::{ErrorResult},
-    uci::Uci,
-};
+use {game::Game, helpers::ErrorResult, uci::Uci};
 
 fn next_stdin() -> String {
     let mut input = String::new();

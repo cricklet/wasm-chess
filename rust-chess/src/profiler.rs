@@ -1,4 +1,3 @@
-
 use std::{fs::File, io::Write};
 
 use pprof::protos::Message;
@@ -15,11 +14,7 @@ pub mod perft;
 pub mod types;
 pub mod uci;
 
-use {
-    game::Game,
-    perft::run_perft_recursively,
-    perft::{run_perft_iteratively_to_depth},
-};
+use {game::Game, perft::run_perft_iteratively_to_depth, perft::run_perft_recursively};
 
 pub struct Profiler<'a> {
     name: String,

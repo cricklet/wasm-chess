@@ -192,11 +192,12 @@ impl Game {
     pub fn from_fen(fen: &str) -> ErrorResult<Game> {
         let mut game = Game::default();
 
-        let split: Vec<&str> = fen.split(' ').filter(|v| !v.is_empty()).collect();
+        let split = fen.split(' ');
+        let split = split.filter(|v| !v.is_empty()).collect::<Vec<_>>();
 
         // parse a string like "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 
-        if split.len() <= 0 {
+        if split.len() == 0 {
             return err_result(&format!("empty fen {}", fen));
         }
 

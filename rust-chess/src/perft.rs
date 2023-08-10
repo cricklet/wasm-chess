@@ -1,15 +1,11 @@
-use std::{
-    collections::HashMap,
-};
+use std::collections::HashMap;
 
 use super::{
     danger::Danger,
     game::{Game, Legal},
     helpers::{err_result, indent, ErrorResult},
     iterative_traversal::TraversalStack,
-    moves::{
-        Move, MoveBuffer, MoveOptions,
-    },
+    moves::{Move, MoveBuffer, MoveOptions},
 };
 
 fn assert_fen_matches(expected_fen: &str) {

@@ -1,17 +1,13 @@
-
 mod helpers;
 
-
 use helpers::{log_to_js, set_panic_hook};
-use std::{
-    sync::Mutex,
-};
+use std::sync::Mutex;
 use wasm_bindgen::prelude::*;
 
 use lazy_static::lazy_static;
 use web_sys::console;
 
-use rust_chess::{*};
+use rust_chess::*;
 
 lazy_static! {
     static ref UCI: Mutex<uci::Uci> = Mutex::new(uci::Uci {
