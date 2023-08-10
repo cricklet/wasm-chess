@@ -1,6 +1,6 @@
-use std::{sync::Mutex, time::Duration, future::Future};
+use std::{sync::Mutex, time::Duration};
 
-use rust_chess::async_perft::{AsyncPerftRunner, AsyncPerftMessage};
+use rust_chess::async_perft::{AsyncPerftRunner};
 use wasm_bindgen::prelude::wasm_bindgen;
 
 pub fn set_panic_hook() {
