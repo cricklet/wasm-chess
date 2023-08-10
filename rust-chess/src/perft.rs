@@ -207,6 +207,42 @@ fn assert_perft_matches_for_depth(fen: &str, max_depth: usize, expected_count: u
     assert_eq!(expected_count, perft_overall);
 }
 
+fn assert_perft_matches(fen: &str, expected_counts: &[usize]) {
+    for (max_depth, &expected_count) in expected_counts.iter().enumerate() {
+        assert_perft_matches_for_depth(fen, max_depth, expected_count);
+    }
+}
+
+// #[test]
+// fn test_perft_start_board_depth_5() {
+//     let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+//     let max_depth = 5;
+//     let expected_count = 4865609;
+//     let expected_branches = HashMap::from([
+//         ("a2a3", 181046),
+//         ("b2b3", 215255),
+//         ("c2c3", 222861),
+//         ("d2d3", 328511),
+//         ("e2e3", 402988),
+//         ("f2f3", 178889),
+//         ("g2g3", 217210),
+//         ("h2h3", 181044),
+//         ("a2a4", 217832),
+//         ("b2b4", 216145),
+//         ("c2c4", 240082),
+//         ("d2d4", 361790),
+//         ("e2e4", 405385),
+//         ("f2f4", 198473),
+//         ("g2g4", 214048),
+//         ("h2h4", 218829),
+//         ("b1a3", 198572),
+//         ("b1c3", 234656),
+//         ("g1f3", 233491),
+//         ("g1h3", 198502),
+//     ]);
+//     assert_perft_matches_for_depth(fen, max_depth, expected_count, Some(&expected_branches));
+// }
+
 #[test]
 fn test_perft_position_2() {
     let fen = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1";
