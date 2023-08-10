@@ -1,16 +1,13 @@
-
-
-
 use strum::IntoEnumIterator;
 
 use super::bitboard::{self, castling_allowed_after_move, Bitboards, BoardIndex};
 use super::bitboard::{index_from_file_rank_str, ForPlayer};
 use super::danger::Danger;
+use super::helpers::*;
 use super::moves::{
     all_moves, index_in_danger, Capture, Move, MoveBuffer, MoveOptions, MoveType, Quiet,
 };
 use super::types::{self, CastlingSide, Piece, Player, PlayerPiece, CASTLING_SIDES};
-use super::{helpers::*};
 
 #[derive(Debug, Default, Copy, Clone)]
 pub struct CanCastleOnSide {

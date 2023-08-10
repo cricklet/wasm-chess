@@ -1,9 +1,4 @@
-use std::{
-    collections::HashMap,
-    fmt::{Debug, Formatter},
-};
-
-use strum::IntoEnumIterator;
+use std::fmt::{Debug, Formatter};
 
 use super::{bitboard::*, game::Game, helpers::*, types::*};
 
@@ -198,18 +193,6 @@ impl std::fmt::Debug for Move {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} {} {:?}", self.piece, self.to_uci(), self.move_type,)
     }
-}
-
-#[test]
-fn test_move_to_uci() {
-    let m = Move {
-        piece: PlayerPiece::new(Player::White, Piece::Pawn),
-        start_index: BoardIndex::from(8),
-        end_index: BoardIndex::from(16),
-        move_type: MoveType::Quiet(Quiet::Move),
-        promotion: None,
-    };
-    assert_eq!(m.to_uci(), "a2a3");
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -662,55 +645,73 @@ pub fn index_in_danger(
     }
 }
 
-#[test]
-fn test_castling_repeat_moves() {
-    let position = "position fen r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1 moves e1c1";
-    let game = Game::from_position_uci(position).unwrap();
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::collections::HashMap;
 
-    let mut count_moves = HashMap::<String, usize>::new();
-
-    let mut moves_buffer = MoveBuffer::default();
-    all_moves(
-        &mut moves_buffer,
-        game.player,
-        &game,
-        MoveOptions::default(),
-    )
-    .unwrap();
-
-    for m in moves_buffer.iter() {
-        let count = count_moves.entry(m.to_uci().to_string()).or_insert(0);
-        *count += 1;
+    #[test]
+    fn test_move_to_uci() {
+        let m = Move {
+            piece: PlayerPiece::new(Player::White, Piece::Pawn),
+            start_index: BoardIndex::from(8),
+            end_index: BoardIndex::from(16),
+            move_type: MoveType::Quiet(Quiet::Move),
+            promotion: None,
+        };
+        assert_eq!(m.to_uci(), "a2a3");
     }
 
-    for (m, count) in count_moves.iter() {
-        assert_eq!(*count, 1, "incorrect count for: {}", m);
+    #[test]
+    fn test_castling_repeat_moves() {
+        let position = "position fen r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1 moves e1c1";
+        let game = Game::from_position_uci(position).unwrap();
+
+        let mut count_moves = HashMap::<String, usize>::new();
+
+        let mut moves_buffer = MoveBuffer::default();
+        all_moves(
+            &mut moves_buffer,
+            game.player,
+            &game,
+            MoveOptions::default(),
+        )
+        .unwrap();
+
+        for m in moves_buffer.iter() {
+            let count = count_moves.entry(m.to_uci().to_string()).or_insert(0);
+            *count += 1;
+        }
+
+        for (m, count) in count_moves.iter() {
+            assert_eq!(*count, 1, "incorrect count for: {}", m);
+        }
     }
-}
 
-#[test]
-fn test_promotion_moves() {
-    let position =
-        "position fen r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1 moves b4c5";
-    let game = Game::from_position_uci(position).unwrap();
+    #[test]
+    fn test_promotion_moves() {
+        let position =
+            "position fen r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1 moves b4c5";
+        let game = Game::from_position_uci(position).unwrap();
 
-    let mut count_moves = HashMap::<String, usize>::new();
-    let mut moves_buffer = MoveBuffer::default();
-    all_moves(
-        &mut moves_buffer,
-        game.player,
-        &game,
-        MoveOptions::default(),
-    )
-    .unwrap();
+        let mut count_moves = HashMap::<String, usize>::new();
+        let mut moves_buffer = MoveBuffer::default();
+        all_moves(
+            &mut moves_buffer,
+            game.player,
+            &game,
+            MoveOptions::default(),
+        )
+        .unwrap();
 
-    for m in moves_buffer.iter() {
-        let count = count_moves.entry(m.to_uci().to_string()).or_insert(0);
-        *count += 1;
+        for m in moves_buffer.iter() {
+            let count = count_moves.entry(m.to_uci().to_string()).or_insert(0);
+            *count += 1;
+        }
+
+        assert_eq!(*count_moves.get("b2b1b").unwrap(), 1);
+        assert_eq!(*count_moves.get("b2b1r").unwrap(), 1);
+        assert_eq!(*count_moves.get("b2b1q").unwrap(), 1);
+        assert_eq!(*count_moves.get("b2b1n").unwrap(), 1);
     }
-
-    assert_eq!(*count_moves.get("b2b1b").unwrap(), 1);
-    assert_eq!(*count_moves.get("b2b1r").unwrap(), 1);
-    assert_eq!(*count_moves.get("b2b1q").unwrap(), 1);
-    assert_eq!(*count_moves.get("b2b1n").unwrap(), 1);
 }
