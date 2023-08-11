@@ -1230,6 +1230,7 @@ dependencies = [
  "num-format",
  "pprof",
  "rand",
+ "rust-chess",
  "scopeguard",
  "strum",
  "tokio",

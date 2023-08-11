@@ -69,7 +69,6 @@ impl AsyncPerftData {
     }
 
     pub fn iterate_loop(&mut self) -> AsyncPerftIterationResult {
-        println!("iterating loop");
         for _ in 0..self.loop_count {
             let result = self.iterate();
             if result != AsyncPerftIterationResult::Continue {

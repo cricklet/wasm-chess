@@ -54,6 +54,10 @@ fn yield_fn() -> Pin<Box<dyn Future<Output = ()> + Send>> {
     Box::pin(tokio::time::sleep(Duration::from_millis(1)))
 }
 
+fn done_fn(count: usize) {
+    println!("done: {}", count);
+}
+
 #[tokio::main]
 async fn main() {
     let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -65,17 +69,17 @@ async fn main() {
 
     run_perft_recursively(Game::from_fen(fen).unwrap(), 2).unwrap();
 
-    println!("async");
+    println!("\nasync");
     {
         let p = Profiler::new("async_perft_long".to_string());
-        let perft = Arc::new(AsyncPerftRunner::from(yield_fn, log_fn));
+        let perft = Arc::new(AsyncPerftRunner::from(yield_fn, log_fn, done_fn));
 
         let spawn_perft = perft.clone();
         tokio::spawn(async move {
             spawn_perft.start("startpos".to_string(), 7).await;
         });
 
-        tokio::time::sleep(Duration::from_millis(5000)).await;
+        tokio::time::sleep(Duration::from_millis(1000)).await;
         perft.stop().await;
 
         println!("count: {}", perft.count().to_formatted_string(&Locale::en));
@@ -83,10 +87,10 @@ async fn main() {
         p.flush();
     }
 
-    println!("recursive");
+    println!("\nrecursive");
 
     {
-        let p = Profiler::new("recursive_perft".to_string());
+        // let p = Profiler::new("recursive_perft".to_string());
         for (i, expected_count) in expected_count.into_iter().enumerate() {
             let start_time = std::time::Instant::now();
 
@@ -111,14 +115,14 @@ async fn main() {
                 (end_time - start_time).as_millis()
             );
         }
-        p.flush();
+        // p.flush();
     }
 
     println!("\niterative");
 
     run_perft_iteratively_to_depth(Game::from_fen(fen).unwrap(), 2).unwrap();
     {
-        let p = Profiler::new("iterative_perft".to_string());
+        // let p = Profiler::new("iterative_perft".to_string());
         for (i, expected_count) in expected_count.into_iter().enumerate() {
             let start_time = std::time::Instant::now();
 
@@ -144,6 +148,6 @@ async fn main() {
                 (end_time - start_time).as_millis()
             );
         }
-        p.flush();
+        // p.flush();
     }
 }
