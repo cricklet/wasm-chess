@@ -1,51 +1,76 @@
 
-export type WebToWorker = {
-    kind: 'counter-go',
+export type SendToWorker = {
+    name: 'counter-go',
 } | {
-    kind: 'counter-stop',
-} | {
-    kind: 'counter-count',
-} | {
-    kind: 'perft-setup',
+    name: 'perft-setup',
     fen: string,
     depth: number,
 } | {
-    kind: 'perft-count',
+    name: 'perft-count',
 } | {
-    kind: 'perft-think',
-};
+    name: 'perft-think',
+} | SendToWorkerWithResponse;
 
-export function encodeWebToWorker(msg: WebToWorker): string {
+export type SendToWorkerWithResponse = ({
+    name: 'counter-stop',
+} | {
+    name: 'perft-count',
+} | {
+    name: 'perft-think',
+}) & { id: number };
+
+export function encodeSendToWorker(msg: SendToWorker): string {
     return JSON.stringify(msg);
 }
 
-export function decodeWebToWorker(msg: string): WebToWorker {
+export function decodeSendToWorker(msg: string): SendToWorker {
     return JSON.parse(msg);
 }
 
-export type WorkerToWeb = {
-    kind: 'ready',
+export type ReceiveFromWorkerMessage = ({
+    name: 'ready',
 } | {
-    kind: 'log',
+    name: 'log',
     msg: Array<any>,
 } | {
-    kind: 'counter-count',
-    count: number,
-} | {
-    kind: 'perft-count',
-    count: number,
-} | {
-    kind: 'perft-done',
-    count: number,
-} | {
-    kind: 'error',
+    name: 'error',
     msg: string,
+}) & {
+    kind: 'message',
 };
 
-export function encodeWorkerToWeb(msg: WorkerToWeb): string {
+export type ReceiveFromWorker = ReceiveFromWorkerMessage | ReceiveFromWorkerResponse;
+
+export type ReceiveFromWorkerResponse = ({
+    name: 'counter-stop',
+    counterResult: number,
+} | {
+    name: 'perft-count',
+    perftResult: number,
+} | {
+    name: 'perft-think',
+    id: number,
+    done: boolean,
+}) & {
+    kind: 'response',
+    id: number,
+};
+
+export function isResponse(msg: ReceiveFromWorker): msg is ReceiveFromWorkerResponse {
+    return msg.kind === 'response' && msg.id !== undefined;
+}
+
+export function responseMatchesRequest<
+    S extends SendToWorkerWithResponse,
+    R extends ReceiveFromWorkerResponse & Pick<S, "name">
+>(msg: SendToWorkerWithResponse, response: ReceiveFromWorker): response is R {
+    return isResponse(response) && response.id === msg.id && response.name === msg.name;
+}
+
+export function encodeReceiveFromWorker(msg: ReceiveFromWorker): string {
     return JSON.stringify(msg);
 }
 
-export function decodeWorkerToWeb(msg: string): WorkerToWeb {
+export function decodeReceiveFromWorker(msg: string): ReceiveFromWorker {
     return JSON.parse(msg);
 }

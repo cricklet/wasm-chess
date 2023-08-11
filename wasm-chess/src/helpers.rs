@@ -70,10 +70,6 @@ impl AsyncCounterForJs {
             }),
         }
     }
-    pub fn count(&self) -> i32 {
-        let data = self.data.lock().unwrap();
-        data.counter
-    }
 
     pub async fn start(&self) {
         log_to_js("start");
@@ -96,9 +92,10 @@ impl AsyncCounterForJs {
         }
     }
 
-    pub async fn stop(&self) {
+    pub fn stop(&self) -> i32 {
         log_to_js("stop");
         self.data.lock().unwrap().stop = true;
+        self.data.lock().unwrap().counter
     }
 }
 

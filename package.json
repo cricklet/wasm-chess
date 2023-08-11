@@ -5,7 +5,7 @@
 
         "test": "cargo test --release --bin main",
 
-        "build-wasm": "wasm-pack build --debug --target=no-modules wasm-chess/",
+        "build-wasm": "wasm-pack build --release --target=no-modules wasm-chess/",
         "build-perft": "cargo build --release --bin perft --features \"profiling async_feat\"",
         "build-uci": "cargo build --release --bin main",
 

@@ -37,7 +37,7 @@ globalThis.BindingsJs = {
 // for modules isn't very mature, the wasm bindings are instead imported via a
 // <script> tag which sets a global variable called `wasm_bindgen`.
 import '../public/lib/wasm-pack/wasm_chess'
-import { createWorker } from './worker/worker_wrapper'
+import { createWorker } from './worker/worker-wrapper'
 
 
 export function jsWorkerForTesting() {
@@ -68,33 +68,16 @@ export async function wasmWorkerForTesting() {
     return {
         counter: {
             go: function () {
-                worker.send({ kind: 'counter-go' })
+                worker.send({ name: 'counter-go' })
             },
 
-            stop: function () {
-                worker.send({ kind: 'counter-stop' })
-            },
-
-            count: async function () {
-                let result = worker.wait(
-                    e => e.kind === 'counter-count' ? e.count : undefined)
-                worker.send({ kind: 'counter-count' })
-                return await result
+            stop: async function (): Promise<number> {
+                let response = await worker.sendWithResponse({ name: 'counter-stop' })
+                return response.counterResult
             },
         },
 
         perft: {
-            setup: function (fen: string, depth: number) {
-                worker.send({ kind: 'perft-setup', fen, depth })
-            },
-            count: async function (): Promise<number> {
-                worker.send({ kind: 'perft-count' })
-                return await worker.wait(
-                    e => e.kind === 'perft-count' ? e.count : undefined)
-            },
-            think_and_return_done: function (): boolean {
-                return true
-            },
         },
 
         terminate: () => worker.terminate

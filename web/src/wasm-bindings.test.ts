@@ -68,9 +68,8 @@ describe('wasm-bindings.test.ts', function () {
 
         worker.counter.go()
         await new Promise(resolve => setTimeout(resolve, 400))
-        worker.counter.stop()
-
-        const result = await worker.counter.count()
+        const result = await worker.counter.stop()
+    
         expect(result).toBeGreaterThan(2)
         worker.terminate()
     })
