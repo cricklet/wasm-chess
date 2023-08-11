@@ -293,8 +293,7 @@ pub fn run_perft_recursively(game: Game, max_depth: usize) -> ErrorResult<usize>
 }
 
 pub fn run_perft_iteratively<const N: usize>(game: Game) -> ErrorResult<usize> {
-    let mut data = TraversalStack::<N>::new(game)?;
-
+    let mut data = TraversalStack::<(), N>::new(game)?;
     let mut overall_count = 0;
 
     if N <= 1 {
@@ -309,7 +308,7 @@ pub fn run_perft_iteratively<const N: usize>(game: Game) -> ErrorResult<usize> {
         }
 
         // We have moves to traverse, dig deeper
-        let next_move = data.next_move()?;
+        let next_move = data.get_and_increment_move()?;
         if let Some(next_move) = next_move {
             let (current, next) = data.current_and_next_mut()?;
 
@@ -424,7 +423,7 @@ pub enum PerftLoopResult {
 
 #[derive(Debug)]
 pub struct PerftLoop {
-    pub stack: TraversalStack<MAX_PERFT_DEPTH>,
+    pub stack: TraversalStack<(), MAX_PERFT_DEPTH>,
 
     pub count: usize,
     pub max_depth: usize,
@@ -441,7 +440,7 @@ impl PerftLoop {
         }
 
         let game = Game::from_fen(fen).unwrap();
-        let stack = TraversalStack::<MAX_PERFT_DEPTH>::new(game).unwrap();
+        let stack = TraversalStack::<(), MAX_PERFT_DEPTH>::new(game).unwrap();
 
         Self {
             stack,
@@ -464,7 +463,7 @@ impl PerftLoop {
         }
 
         // We have moves to traverse, dig deeper
-        let next_move = traversal.next_move().unwrap();
+        let next_move = traversal.get_and_increment_move().unwrap();
         if let Some(next_move) = next_move {
             let (current, next) = traversal.current_and_next_mut().unwrap();
 

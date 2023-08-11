@@ -43,18 +43,20 @@ impl Debug for IndexedMoveBuffer {
 }
 
 #[derive(Default, Debug, Copy, Clone)]
-pub struct TraversalStackFrame {
-    game: Game,
-    last_move: Option<Move>,
+pub struct TraversalStackFrame<D> {
+    pub game: Game,
+    pub last_move: Option<Move>,
 
-    danger: Option<Danger>,
-    moves: Option<IndexedMoveBuffer>,
+    pub danger: Option<Danger>,
+    pub moves: Option<IndexedMoveBuffer>,
+
+    pub data: D,
 }
 
-impl TraversalStackFrame {
+impl<D> TraversalStackFrame<D> {
     pub fn setup_from_move(
         &mut self,
-        previous: &mut TraversalStackFrame,
+        previous: &mut TraversalStackFrame<D>,
         next_move: &Move,
     ) -> ErrorResult<Legal> {
         self.game = previous.game;
@@ -124,12 +126,12 @@ impl TraversalStackFrame {
     }
 }
 
-pub struct TraversalStack<const N: usize> {
-    stack: [TraversalStackFrame; N],
+pub struct TraversalStack<D, const N: usize> {
+    stack: [TraversalStackFrame<D>; N],
     pub depth: usize,
 }
 
-impl<const N: usize> Debug for TraversalStack<N> {
+impl<D: Debug + Clone + Default + Copy, const N: usize> Debug for TraversalStack<D, N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TraversalStack")
             .field("depth", &self.depth)
@@ -139,7 +141,7 @@ impl<const N: usize> Debug for TraversalStack<N> {
     }
 }
 
-impl<const N: usize> TraversalStack<N> {
+impl<D: Default + Copy, const N: usize> TraversalStack<D, N> {
     pub fn new(game: Game) -> ErrorResult<Self> {
         let mut data = Self {
             stack: [TraversalStackFrame::default(); N],
@@ -151,15 +153,15 @@ impl<const N: usize> TraversalStack<N> {
         Ok(data)
     }
 
-    pub fn current(&self) -> ErrorResult<&TraversalStackFrame> {
+    pub fn current(&self) -> ErrorResult<&TraversalStackFrame<D>> {
         self.stack.get(self.depth).as_result()
     }
 
-    fn current_mut(&mut self) -> ErrorResult<&mut TraversalStackFrame> {
+    fn current_mut(&mut self) -> ErrorResult<&mut TraversalStackFrame<D>> {
         self.stack.get_mut(self.depth).as_result()
     }
 
-    fn previous(&self) -> Option<&TraversalStackFrame> {
+    fn previous(&self) -> Option<&TraversalStackFrame<D>> {
         if self.depth == 0 {
             return None;
         }
@@ -168,7 +170,7 @@ impl<const N: usize> TraversalStack<N> {
 
     pub fn current_and_next_mut(
         &mut self,
-    ) -> ErrorResult<(&mut TraversalStackFrame, &mut TraversalStackFrame)> {
+    ) -> ErrorResult<(&mut TraversalStackFrame<D>, &mut TraversalStackFrame<D>)> {
         if let Some((current, remainder)) = self.stack[self.depth..].split_first_mut() {
             Ok((current, remainder.first_mut().unwrap()))
         } else {
@@ -176,7 +178,7 @@ impl<const N: usize> TraversalStack<N> {
         }
     }
 
-    pub fn next_move(&mut self) -> ErrorResult<Option<Move>> {
+    pub fn get_and_increment_move(&mut self) -> ErrorResult<Option<Move>> {
         let current = self.current_mut()?;
         current.lazily_generate_moves()?;
 
