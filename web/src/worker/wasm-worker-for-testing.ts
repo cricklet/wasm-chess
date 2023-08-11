@@ -1,9 +1,14 @@
+import { WorkerToWeb, decodeWebToWorker, encodeWorkerToWeb } from "./worker-types";
 
 importScripts('/lib/wasm-pack/wasm_chess.js');
 
+function send(msg: WorkerToWeb) {
+    self.postMessage(encodeWorkerToWeb(msg));
+}
+
 globalThis.BindingsJs = {
     log_to_js: function (msg) {
-        self.postMessage(`${msg}`);
+        send({ kind: 'log', msg: [msg] });
     }
 };
 
@@ -15,21 +20,21 @@ async function init_wasm_in_worker() {
     let asyncPerft = await wasm_bindgen.PerftForJs.new();
 
     // handle messages passed to the worker
-    self.onmessage = async event => {
-        self.postMessage(`worker recv: ${event.data}`)
-        if (event.data === 'counter-go') {
+    self.onmessage = async e => {
+        let data = decodeWebToWorker(e.data);
+
+        if (data.kind === 'counter-go') {
             await asyncCounter.start()
-        } else if (event.data === 'counter-stop') {
+        } else if (data.kind === 'counter-stop') {
             asyncCounter.stop()
-        } else if (event.data === 'counter-count') {
-            self.postMessage(asyncCounter.count())
+        } else if (data.kind === 'counter-count') {
+            send({ kind: 'counter-count', count: await asyncCounter.count() });
         } else {
-            self.postMessage(`error: unknown message ${event.data}`)
+            send({ kind: 'error', msg: `unknown message: ${data}` });
         }
     };
 
-    self.postMessage(`ready`);
+    send({ kind: 'ready' });
 };
 
 init_wasm_in_worker();
-self.postMessage("wasm-worker-for-testing.js loading")

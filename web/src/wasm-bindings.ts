@@ -26,7 +26,7 @@ export function listen(listener: WasmListener): () => void {
 
 globalThis.BindingsJs = {
     log_to_js: (message: string): void => {
-        console.log(message)
+        console.log('> (not worker)', message)
         message.split('\n').forEach((line) => {
             listeners.forEach((listener) => listener(line))
         })
@@ -37,6 +37,7 @@ globalThis.BindingsJs = {
 // for modules isn't very mature, the wasm bindings are instead imported via a
 // <script> tag which sets a global variable called `wasm_bindgen`.
 import '../public/lib/wasm-pack/wasm_chess'
+import { createWorker } from './worker/worker_wrapper'
 
 
 export function jsWorkerForTesting() {
@@ -62,68 +63,41 @@ export function jsWorkerForTesting() {
 
 
 export async function wasmWorkerForTesting() {
-    let worker = new Worker('build/worker/wasm-worker-for-testing.js')
-
-    let listeners: Array<(e: MessageEvent) => void> = [
-        (e: MessageEvent) => console.log('>', e.data),
-    ]
-
-    worker.onmessage = (e) => {
-        listeners.forEach((l) => l(e))
-    }
-
-    async function waitFor<T>(f: (e: MessageEvent) => T | undefined): Promise<T | undefined> {
-        return new Promise((resolve) => {
-            let callback = (e: MessageEvent) => {
-                let t = f(e)
-                if (t != null && t !== false) {
-                    listeners = listeners.filter((l) => l !== callback)
-                    resolve(t)
-                }
-            }
-
-            listeners.push(callback)
-        })
-    }
-
-    async function waitForSubstr(str: string): Promise<void> {
-        await waitFor(e => {
-            return typeof e.data === 'string' && e.data.indexOf(str) !== -1
-        })
-    }
-
-    await waitForSubstr('ready')
+    let worker = await createWorker('build/worker/wasm-worker-for-testing.js')
 
     return {
         counter: {
             go: function () {
-                worker.postMessage('counter-go')
+                worker.send({ kind: 'counter-go' })
             },
 
             stop: function () {
-                worker.postMessage('counter-stop')
+                worker.send({ kind: 'counter-stop' })
             },
 
             count: async function () {
-                worker.postMessage('counter-count')
-                return await waitFor(e => typeof e.data === 'number' ? e.data : undefined)
+                let result = worker.wait(
+                    e => e.kind === 'counter-count' ? e.count : undefined)
+                worker.send({ kind: 'counter-count' })
+                return await result
             },
         },
 
         perft: {
-            setup: function (fen, depth) {
+            setup: function (fen: string, depth: number) {
+                worker.send({ kind: 'perft-setup', fen, depth })
             },
-            count: function (): number {
-                return 1
+            count: async function (): Promise<number> {
+                worker.send({ kind: 'perft-count' })
+                return await worker.wait(
+                    e => e.kind === 'perft-count' ? e.count : undefined)
             },
             think_and_return_done: function (): boolean {
                 return true
             },
         },
 
-        terminate: function () {
-            worker.terminate()
-        }
+        terminate: () => worker.terminate
     }
 }
 
