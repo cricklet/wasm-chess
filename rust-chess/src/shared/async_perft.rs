@@ -1,86 +1,8 @@
 use std::{future::Future, sync::Mutex, pin::Pin};
 
-use crate::game::{Game, Legal};
+use crate::{game::{Game, Legal}, perft::{PerftLoop, PerftLoopResult}};
 
 use super::iterative_traversal::TraversalStack;
-
-#[derive(Debug)]
-struct AsyncPerftData {
-    stack: TraversalStack<MAX_PERFT_DEPTH>,
-    count: usize,
-
-    max_depth: usize,
-    start_fen: String,
-
-    loop_count: usize,
-}
-const LOOP_COUNT: usize = 1_000_000;
-
-impl AsyncPerftData {
-    pub fn new(fen: &str, max_depth: usize) -> Self {
-        if max_depth > MAX_PERFT_DEPTH {
-            panic!("max_depth must be <= {}", MAX_PERFT_DEPTH);
-        }
-
-        let game = Game::from_fen(fen).unwrap();
-        let stack = TraversalStack::<MAX_PERFT_DEPTH>::new(game).unwrap();
-
-        Self {
-            stack,
-            count: 0,
-            max_depth,
-            loop_count: LOOP_COUNT,
-            start_fen: fen.to_string(),
-        }
-    }
-
-    fn iterate(&mut self) -> AsyncPerftIterationResult {
-        let ref mut traversal = self.stack;
-
-        // Leaf node case:
-        if traversal.depth + 1 >= self.max_depth {
-            self.count += 1;
-            traversal.depth -= 1;
-
-            return AsyncPerftIterationResult::Continue;
-        }
-
-        // We have moves to traverse, dig deeper
-        let next_move = traversal.next_move().unwrap();
-        if let Some(next_move) = next_move {
-            let (current, next) = traversal.current_and_next_mut().unwrap();
-
-            let result = next.setup_from_move(current, &next_move).unwrap();
-            if result == Legal::No {
-                return AsyncPerftIterationResult::Continue;
-            } else {
-                traversal.depth += 1;
-                return AsyncPerftIterationResult::Continue;
-            }
-        }
-
-        // We're out of moves to traverse, pop back up.
-        if traversal.depth == 0 {
-            return AsyncPerftIterationResult::Done;
-        } else {
-            traversal.depth -= 1;
-            return AsyncPerftIterationResult::Continue;
-        }
-    }
-
-    pub fn iterate_loop(&mut self) -> AsyncPerftIterationResult {
-        for _ in 0..self.loop_count {
-            let result = self.iterate();
-            if result != AsyncPerftIterationResult::Continue {
-                return result;
-            }
-        }
-
-        AsyncPerftIterationResult::Continue
-    }
-
-
-}
 
 type YieldFn = fn() -> Pin<Box<dyn Future<Output = ()> + Send>>;
 type LogFn = fn(&str);
@@ -89,7 +11,7 @@ type DoneFn = fn(usize);
 #[derive(Debug)]
 pub struct AsyncPerftRunner
 {
-    data: Mutex<Option<AsyncPerftData>>,
+    data: Mutex<Option<PerftLoop>>,
 
     stop: Mutex<bool>,
 
@@ -98,15 +20,6 @@ pub struct AsyncPerftRunner
     done_fn: DoneFn,
 }
 
-const MAX_PERFT_DEPTH: usize = 10;
-
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum AsyncPerftIterationResult {
-    Continue,
-    Done,
-    Interrupted,
-}
 
 impl AsyncPerftRunner{
     pub fn from(yield_fn: YieldFn, log_fn: LogFn, done_fn: DoneFn) -> Self {
@@ -134,7 +47,7 @@ impl AsyncPerftRunner{
 
         {
             let mut data = self.data.lock().unwrap();
-            *data = Some(AsyncPerftData::new(&fen, max_depth));
+            *data = Some(PerftLoop::new(&fen, max_depth));
         }
 
         loop {
@@ -149,20 +62,20 @@ impl AsyncPerftRunner{
                 let data = data.as_mut().unwrap();
 
                 if (data.start_fen != fen) || (data.max_depth != max_depth) {
-                    AsyncPerftIterationResult::Interrupted
+                    PerftLoopResult::Interrupted
                 } else {
                     data.iterate_loop()
                 }
             };
 
             match result {
-                AsyncPerftIterationResult::Continue => {
+                PerftLoopResult::Continue => {
                     (self.yield_fn)().await;
                 }
-                AsyncPerftIterationResult::Done => {
+                PerftLoopResult::Done => {
                     break;
                 }
-                AsyncPerftIterationResult::Interrupted => {
+                PerftLoopResult::Interrupted => {
                     panic!("interrupted: please only one perft running at a time");
                 }
             }

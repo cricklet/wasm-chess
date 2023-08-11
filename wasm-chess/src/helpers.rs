@@ -1,5 +1,6 @@
 use std::{sync::Mutex, time::Duration};
 
+use rust_chess::perft::{PerftLoop, PerftLoopResult};
 use wasm_bindgen::prelude::wasm_bindgen;
 
 pub fn set_panic_hook() {
@@ -27,7 +28,7 @@ struct AsyncCounterData {
 }
 
 #[wasm_bindgen]
-pub struct AsyncCounter {
+pub struct AsyncCounterForJs {
     data: Mutex<AsyncCounterData>,
 }
 
@@ -59,7 +60,7 @@ fn pretend_to_work(ms: i64) {
 }
 
 #[wasm_bindgen]
-impl AsyncCounter {
+impl AsyncCounterForJs {
     pub fn new() -> Self {
         set_panic_hook();
         Self {
@@ -101,36 +102,39 @@ impl AsyncCounter {
     }
 }
 
-// async fn js_callback(message: AsyncPerftMessage) {
-//     match message {
-//         AsyncPerftMessage::Log(s) => {
-//             log_to_js(&s);
-//         }
-//         AsyncPerftMessage::Continue => {
-//             yield_to_js().await;
-//         }
-//     }
-// }
+#[wasm_bindgen]
+pub struct PerftForJs {
+    data: Option<PerftLoop>,
+}
 
-// #[wasm_bindgen]
-// pub struct AsyncPerft {
-//     runner: AsyncPerftRunner,
-// }
+#[wasm_bindgen]
+impl PerftForJs {
+    pub fn new() -> Self {
+        set_panic_hook();
+        Self { data: None }
+    }
 
-// impl AsyncPerft {
-//     pub fn new() -> Self {
-//         Self {
-//             runner: AsyncPerftRunner::from(|message| async {
-//                 match message {
-//                     AsyncPerftMessage::Log(s) => {
-//                         log_to_js(&s);
-//                     }
-//                     AsyncPerftMessage::Continue => {
-//                         yield_to_js().await;
-//                     }
-//                 }
-//             }),
-//         }
-//     }
-// }
+    pub fn count(&self) -> i32 {
+        match &self.data {
+            Some(data) => data.count as i32,
+            None => -1,
+        }
+    }
+
+    pub fn setup(&mut self, fen: String, max_depth: usize){
+        self.data = Some(PerftLoop::new(&fen, max_depth));
+    }
+
+    pub fn think_and_return_done(&mut self) -> bool{
+        match self.data.as_mut().unwrap().iterate_loop() {
+            PerftLoopResult::Continue => false,
+            PerftLoopResult::Interrupted => true,
+            PerftLoopResult::Done => true,
+        }
+    }
+
+    pub fn clear(&mut self) {
+        self.data = None;
+    }
+}
 

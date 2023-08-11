@@ -40,7 +40,7 @@ import '../public/lib/wasm-pack/wasm_chess'
 
 
 export function jsWorkerForTesting() {
-    const worker = new Worker('js-worker-for-testing.js')
+    const worker = new Worker('build/worker/js-worker-for-testing.js')
 
     return {
         echo: (message: string) => {
@@ -62,7 +62,7 @@ export function jsWorkerForTesting() {
 
 
 export async function wasmWorkerForTesting() {
-    let worker = new Worker('wasm-worker-for-testing.js')
+    let worker = new Worker('build/worker/wasm-worker-for-testing.js')
 
     let listeners: Array<(e: MessageEvent) => void> = [
         (e: MessageEvent) => console.log('>', e.data),
@@ -76,7 +76,7 @@ export async function wasmWorkerForTesting() {
         return new Promise((resolve) => {
             let callback = (e: MessageEvent) => {
                 let t = f(e)
-                if (t != null) {
+                if (t != null && t !== false) {
                     listeners = listeners.filter((l) => l !== callback)
                     resolve(t)
                 }
@@ -86,8 +86,13 @@ export async function wasmWorkerForTesting() {
         })
     }
 
-    await waitFor(e =>
-        typeof e.data === 'string' && e.data.indexOf('ready') !== -1)
+    async function waitForSubstr(str: string): Promise<void> {
+        await waitFor(e => {
+            return typeof e.data === 'string' && e.data.indexOf(str) !== -1
+        })
+    }
+
+    await waitForSubstr('ready')
 
     return {
         counter: {
@@ -106,15 +111,13 @@ export async function wasmWorkerForTesting() {
         },
 
         perft: {
-            go: function () {
-                worker.postMessage(`perft-go`)
+            setup: function (fen, depth) {
             },
-            stop: function () {
-                worker.postMessage(`perft-stop`)
+            count: function (): number {
+                return 1
             },
-            count: async function () {
-                worker.postMessage('perft-count')
-                return await waitFor(e => typeof e.data === 'number' ? e.data : undefined)
+            think_and_return_done: function (): boolean {
+                return true
             },
         },
 

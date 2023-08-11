@@ -65,7 +65,12 @@ async function main() {
     }
 
     let ctx = await esbuild.context({
-      entryPoints: ['src/entry.tsx', 'src/entry.test.ts'],
+      entryPoints: [
+        'src/entry.tsx',
+        'src/entry.test.ts',
+        'src/worker/js-worker-for-testing.ts',
+        'src/worker/wasm-worker-for-testing.ts',
+      ],
       bundle: true,
       sourcemap: true,
       platform: 'browser',

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+
 use super::{
     danger::Danger,
     game::{Game, Legal},
@@ -409,4 +410,92 @@ fn test_perft_start_board_iteratively() {
             (end_time - start_time).as_millis()
         );
     }
+}
+
+const MAX_PERFT_DEPTH: usize = 10;
+
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum PerftLoopResult {
+    Continue,
+    Done,
+    Interrupted,
+}
+
+#[derive(Debug)]
+pub struct PerftLoop {
+    stack: TraversalStack<MAX_PERFT_DEPTH>,
+
+    pub count: usize,
+    pub max_depth: usize,
+    pub start_fen: String,
+
+    loop_count: usize,
+}
+const LOOP_COUNT: usize = 1_000_000;
+
+impl PerftLoop {
+    pub fn new(fen: &str, max_depth: usize) -> Self {
+        if max_depth > MAX_PERFT_DEPTH {
+            panic!("max_depth must be <= {}", MAX_PERFT_DEPTH);
+        }
+
+        let game = Game::from_fen(fen).unwrap();
+        let stack = TraversalStack::<MAX_PERFT_DEPTH>::new(game).unwrap();
+
+        Self {
+            stack,
+            count: 0,
+            max_depth,
+            loop_count: LOOP_COUNT,
+            start_fen: fen.to_string(),
+        }
+    }
+
+    fn iterate(&mut self) -> PerftLoopResult {
+        let ref mut traversal = self.stack;
+
+        // Leaf node case:
+        if traversal.depth + 1 >= self.max_depth {
+            self.count += 1;
+            traversal.depth -= 1;
+
+            return PerftLoopResult::Continue;
+        }
+
+        // We have moves to traverse, dig deeper
+        let next_move = traversal.next_move().unwrap();
+        if let Some(next_move) = next_move {
+            let (current, next) = traversal.current_and_next_mut().unwrap();
+
+            let result = next.setup_from_move(current, &next_move).unwrap();
+            if result == Legal::No {
+                return PerftLoopResult::Continue;
+            } else {
+                traversal.depth += 1;
+                return PerftLoopResult::Continue;
+            }
+        }
+
+        // We're out of moves to traverse, pop back up.
+        if traversal.depth == 0 {
+            return PerftLoopResult::Done;
+        } else {
+            traversal.depth -= 1;
+            return PerftLoopResult::Continue;
+        }
+    }
+
+    pub fn iterate_loop(&mut self) -> PerftLoopResult {
+        for _ in 0..self.loop_count {
+            let result = self.iterate();
+            if result != PerftLoopResult::Continue {
+                return result;
+            }
+        }
+
+        PerftLoopResult::Continue
+    }
+
+
 }
