@@ -14,7 +14,7 @@ struct AsyncPerftData {
 
     loop_count: usize,
 }
-const LOOP_COUNT: usize = 500_000;
+const LOOP_COUNT: usize = 1_000_000;
 
 impl AsyncPerftData {
     pub fn new(fen: &str, max_depth: usize) -> Self {
@@ -69,6 +69,7 @@ impl AsyncPerftData {
     }
 
     pub fn iterate_loop(&mut self) -> AsyncPerftIterationResult {
+        println!("iterating loop");
         for _ in 0..self.loop_count {
             let result = self.iterate();
             if result != AsyncPerftIterationResult::Continue {
@@ -84,6 +85,7 @@ impl AsyncPerftData {
 
 type YieldFn = fn() -> Pin<Box<dyn Future<Output = ()> + Send>>;
 type LogFn = fn(&str);
+type DoneFn = fn(usize);
 
 #[derive(Debug)]
 pub struct AsyncPerftRunner
@@ -91,8 +93,10 @@ pub struct AsyncPerftRunner
     data: Mutex<Option<AsyncPerftData>>,
 
     stop: Mutex<bool>,
+
     yield_fn: YieldFn,
     log_fn: LogFn,
+    done_fn: DoneFn,
 }
 
 const MAX_PERFT_DEPTH: usize = 10;
@@ -106,12 +110,13 @@ pub enum AsyncPerftIterationResult {
 }
 
 impl AsyncPerftRunner{
-    pub fn from(yield_fn: YieldFn, log_fn: LogFn) -> Self {
+    pub fn from(yield_fn: YieldFn, log_fn: LogFn, done_fn: DoneFn) -> Self {
         Self {
             data: Mutex::new(None),
             stop: Mutex::new(false),
             yield_fn,
-            log_fn
+            log_fn,
+            done_fn,
         }
     }
 
@@ -124,6 +129,7 @@ impl AsyncPerftRunner{
             None => -1,
         }
     }
+
     pub async fn start(&self, fen: String, max_depth: usize) {
         println!("starting");
 
@@ -133,6 +139,12 @@ impl AsyncPerftRunner{
         }
 
         loop {
+            {
+                let stop = self.stop.lock().unwrap();
+                if *stop {
+                    break;
+                }
+            }
             let result = {
                 let mut data = self.data.lock().unwrap();
                 let data = data.as_mut().unwrap();
@@ -158,6 +170,7 @@ impl AsyncPerftRunner{
         }
 
         println!("start done");
+        (self.done_fn)(self.count() as usize);
     }
 
     pub async fn stop(&self) {
@@ -172,6 +185,7 @@ mod test {
 
     use num_format::{ToFormattedString, Locale};
 
+    use crate::game::Game;
     use super::*;
     use std::{sync::Arc, time::Duration};
 
@@ -183,13 +197,16 @@ mod test {
         Box::pin(tokio::time::sleep(Duration::from_millis(1)))
     }
 
+    fn done_fn(count: usize) {
+        println!("finished! {}", count);
+    }
+
     #[tokio::test()]
     async fn test_async_perft_short() {
-        use crate::game::Game;
-
         let perft = AsyncPerftRunner::from(
             yield_fn,
             log_fn,
+            done_fn,
         );
         perft.start("startpos".to_string(), 2).await;
         perft.stop().await;
@@ -198,11 +215,10 @@ mod test {
 
     #[tokio::test()]
     async fn test_async_perft_short_spawn() {
-        use crate::game::Game;
-
         let perft = Arc::new(AsyncPerftRunner::from(
             yield_fn,
             log_fn,
+            done_fn,
         ));
 
         let spawn_perft = perft.clone();
@@ -217,18 +233,19 @@ mod test {
 
     #[tokio::test()]
     async fn test_async_perft_long() {
-        use crate::game::Game;
-
         let perft = Arc::new(AsyncPerftRunner::from(
             yield_fn,
             log_fn,
+            done_fn,
         ));
 
         let spawn_perft = perft.clone();
-        tokio::spawn(async move { spawn_perft.start("startpos".to_string(), 7).await });
+        let spawn_handle = tokio::spawn(async move { spawn_perft.start("startpos".to_string(), 7).await });
 
         tokio::time::sleep(Duration::from_millis(1000)).await;
         perft.stop().await;
+
+        spawn_handle.await.unwrap();
 
         println!("count: {}", perft.count().to_formatted_string(&Locale::en));
         assert!(perft.count() > 50_000);

@@ -8,9 +8,7 @@
         "tsx": "cd web; yarn tsx",
 
         "wasm": "wasm-pack build --debug --target=no-modules wasm-chess/",
-        "perft": "cargo build --release --bin perft --features profiling",
-        "uci": "cargo build --release --bin main",
-
-        "all": "yarn tsx && yarn wasm && yarn perft && yarn uci"
+        "perft": "cargo run --release --bin perft --features profiling",
+        "uci": "cargo run --release --bin main"
     }
 }

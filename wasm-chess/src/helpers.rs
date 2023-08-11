@@ -1,6 +1,5 @@
 use std::{sync::Mutex, time::Duration};
 
-use rust_chess::async_perft::{AsyncPerftRunner};
 use wasm_bindgen::prelude::wasm_bindgen;
 
 pub fn set_panic_hook() {
@@ -102,16 +101,16 @@ impl AsyncCounter {
     }
 }
 
-async fn js_callback(message: AsyncPerftMessage) {
-    match message {
-        AsyncPerftMessage::Log(s) => {
-            log_to_js(&s);
-        }
-        AsyncPerftMessage::Continue => {
-            yield_to_js().await;
-        }
-    }
-}
+// async fn js_callback(message: AsyncPerftMessage) {
+//     match message {
+//         AsyncPerftMessage::Log(s) => {
+//             log_to_js(&s);
+//         }
+//         AsyncPerftMessage::Continue => {
+//             yield_to_js().await;
+//         }
+//     }
+// }
 
 // #[wasm_bindgen]
 // pub struct AsyncPerft {
