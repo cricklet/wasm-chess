@@ -63,7 +63,7 @@ describe('wasm-bindings.test.ts', function () {
         worker.terminate()
     })
 
-    it('wasmWorkerForTesting()', async function () {
+    it('wasmWorkerForTesting() counter', async function () {
         const worker = await bindings.wasmWorkerForTesting()
 
         worker.counter.go()
@@ -71,6 +71,39 @@ describe('wasm-bindings.test.ts', function () {
         const result = await worker.counter.stop()
     
         expect(result).toBeGreaterThan(2)
+        worker.terminate()
+    })
+
+    it('wasmWorkerForTesting() perft very short', async function () {
+        const worker = await bindings.wasmWorkerForTesting()
+
+        worker.perft.start('startpos', 2)
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        const result = await worker.perft.stop()
+    
+        expect(result).toBe(20)
+        worker.terminate()
+    })
+
+    it('wasmWorkerForTesting() perft short', async function () {
+        const worker = await bindings.wasmWorkerForTesting()
+
+        worker.perft.start('startpos', 5)
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        const result = await worker.perft.stop()
+    
+        expect(result).toBe(197281)
+        worker.terminate()
+    })
+
+    it('wasmWorkerForTesting() perft', async function () {
+        const worker = await bindings.wasmWorkerForTesting()
+
+        worker.perft.start('startpos', 7)
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        const result = await worker.perft.stop()
+    
+        expect(result).toBeGreaterThan(197281)
         worker.terminate()
     })
 })

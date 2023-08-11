@@ -56,10 +56,11 @@ async function setupPerftForJs(): Promise<{handleEvent: (MessageEvent: any) => b
                 case 'perft-setup':
                     perftForJs.setup(data.fen, data.depth);
                     perftThinkLoop = setInterval(() => {
+                        send({ kind: 'message', name: 'log', msg: ['perft thinking'] });
                         let done = perftForJs.think_and_return_done();
                         if (done) {
+                            send({ kind: 'message', name: 'log', msg: ['perft finished naturally'] });
                             clearInterval(perftThinkLoop);
-                            send({ kind: 'message', name: 'log', msg: ['perft done'] });
                         }
                     }); 
                     return true;

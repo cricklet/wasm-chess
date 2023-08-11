@@ -78,6 +78,14 @@ export async function wasmWorkerForTesting() {
         },
 
         perft: {
+            start: function (fen: string, depth: number) {
+                worker.send({ name: 'perft-setup', fen, depth })
+            },
+
+            stop: async function (): Promise<number> {
+                let response = await worker.sendWithResponse({ name: 'perft-count' })
+                return response.perftResult
+            }
         },
 
         terminate: () => worker.terminate

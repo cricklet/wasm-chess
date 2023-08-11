@@ -424,7 +424,7 @@ pub enum PerftLoopResult {
 
 #[derive(Debug)]
 pub struct PerftLoop {
-    stack: TraversalStack<MAX_PERFT_DEPTH>,
+    pub stack: TraversalStack<MAX_PERFT_DEPTH>,
 
     pub count: usize,
     pub max_depth: usize,

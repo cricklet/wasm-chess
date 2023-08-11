@@ -41,6 +41,8 @@ function getArgs(): Set<string> {
   return argsSet
 }
 
+let i = 0;
+
 async function main() {
   let argsSet = getArgs()
   
@@ -58,7 +60,7 @@ async function main() {
         })
         build.onEnd(() => {
           if (endMessage) {
-            console.log(endMessage)
+            console.log(endMessage, '(' + i++ + ')')
           }
         })
       },

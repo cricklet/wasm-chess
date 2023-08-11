@@ -5,12 +5,16 @@ export async function createWorker(url: string) {
 
     let listeners: Array<(e: ReceiveFromWorker) => void> = [
         (e: ReceiveFromWorker) => {
-            if (e.name === 'log') {
-                console.log('> log:', ...e.msg)
-            } else if (e.name === 'error') {
-                console.error('> err:', e.msg)
+            let {name, kind, ...rest} = e
+            if (name === 'log') {
+                if ('msg' in rest) {
+                    console.log('> log:', ...rest.msg)
+                }
+            } else if (name === 'error') {
+                console.error('> err:', JSON.stringify(rest))
+            } else if (name === 'ready') {
+                console.log('> ready')  
             } else {
-                let {name: kind, ...rest} = e
                 console.log('> ' + kind + ': ' + JSON.stringify(rest))
             }
         },
