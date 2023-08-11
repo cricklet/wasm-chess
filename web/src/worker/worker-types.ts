@@ -8,7 +8,7 @@ export type SendToWorker = {
 } | SendToWorkerWithResponse;
 
 export type SendToWorkerWithResponse = ({
-    name: 'counter-stop',
+    name: 'counter-count',
 } | {
     name: 'perft-count',
 }) & { id: number };
@@ -36,15 +36,11 @@ export type ReceiveFromWorkerMessage = ({
 export type ReceiveFromWorker = ReceiveFromWorkerMessage | ReceiveFromWorkerResponse;
 
 export type ReceiveFromWorkerResponse = ({
-    name: 'counter-stop',
+    name: 'counter-count',
     counterResult: number,
 } | {
     name: 'perft-count',
     perftResult: number,
-} | {
-    name: 'perft-think',
-    id: number,
-    done: boolean,
 }) & {
     kind: 'response',
     id: number,

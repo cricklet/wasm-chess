@@ -1,4 +1,3 @@
-use std::{sync::Mutex, time::Duration};
 
 use rust_chess::perft::{PerftLoop, PerftLoopResult};
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -22,19 +21,14 @@ extern "C" {
     pub fn log_to_js(s: &str);
 }
 
-struct AsyncCounterData {
-    counter: i32,
-    stop: bool,
-}
-
 #[wasm_bindgen]
-pub struct AsyncCounterForJs {
-    data: Mutex<AsyncCounterData>,
+pub struct CounterForJs {
+    counter: i32,
 }
 
-pub async fn yield_to_js() {
-    async_std::task::sleep(Duration::from_millis(0)).await;
-}
+// pub async fn yield_to_js() {
+//     async_std::task::sleep(Duration::from_millis(0)).await;
+// }
 
 fn pretend_to_work(ms: i64) {
     let start = chrono::Utc::now();
@@ -60,42 +54,21 @@ fn pretend_to_work(ms: i64) {
 }
 
 #[wasm_bindgen]
-impl AsyncCounterForJs {
+impl CounterForJs {
     pub fn new() -> Self {
         set_panic_hook();
         Self {
-            data: Mutex::new(AsyncCounterData {
-                counter: 0,
-                stop: false,
-            }),
+            counter: 0,
         }
     }
 
-    pub async fn start(&self) {
-        log_to_js("start");
-
-        loop {
-            {
-                let mut data = self.data.lock().unwrap();
-
-                if data.stop {
-                    return;
-                }
-                data.counter += 1;
-            }
-
-            // Pretend to work
-            pretend_to_work(100);
-
-            // Give control back to the JS event loop
-            yield_to_js().await;
-        }
+    pub fn think(&mut self) {
+        self.counter += 1;
+        pretend_to_work(100);
     }
 
-    pub fn stop(&self) -> i32 {
-        log_to_js("stop");
-        self.data.lock().unwrap().stop = true;
-        self.data.lock().unwrap().counter
+    pub fn count(&self) -> i32 {
+        self.counter
     }
 }
 

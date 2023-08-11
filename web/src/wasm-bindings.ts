@@ -72,7 +72,7 @@ export async function wasmWorkerForTesting() {
             },
 
             stop: async function (): Promise<number> {
-                let response = await worker.sendWithResponse({ name: 'counter-stop' })
+                let response = await worker.sendWithResponse({ name: 'counter-count' })
                 return response.counterResult
             },
         },
