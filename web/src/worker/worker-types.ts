@@ -5,18 +5,12 @@ export type SendToWorker = {
     name: 'perft-setup',
     fen: string,
     depth: number,
-} | {
-    name: 'perft-count',
-} | {
-    name: 'perft-think',
 } | SendToWorkerWithResponse;
 
 export type SendToWorkerWithResponse = ({
     name: 'counter-stop',
 } | {
     name: 'perft-count',
-} | {
-    name: 'perft-think',
 }) & { id: number };
 
 export function encodeSendToWorker(msg: SendToWorker): string {

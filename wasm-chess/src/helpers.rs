@@ -118,15 +118,18 @@ impl PerftForJs {
         }
     }
 
-    pub fn setup(&mut self, fen: String, max_depth: usize){
+    pub fn setup(&mut self, fen: String, max_depth: usize) {
         self.data = Some(PerftLoop::new(&fen, max_depth));
     }
 
-    pub fn think_and_return_done(&mut self) -> bool{
-        match self.data.as_mut().unwrap().iterate_loop() {
-            PerftLoopResult::Continue => false,
-            PerftLoopResult::Interrupted => true,
-            PerftLoopResult::Done => true,
+    pub fn think_and_return_done(&mut self) -> bool {
+        match self.data {
+            Some(ref mut data) => match data.iterate_loop() {
+                PerftLoopResult::Continue => false,
+                PerftLoopResult::Interrupted => true,
+                PerftLoopResult::Done => true,
+            },
+            None => true,
         }
     }
 
@@ -134,4 +137,3 @@ impl PerftForJs {
         self.data = None;
     }
 }
-
