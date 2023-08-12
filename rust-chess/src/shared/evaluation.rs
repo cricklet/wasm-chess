@@ -167,8 +167,8 @@ fn development_evaluation(game: &Game, player: Player) -> isize {
     score
 }
 
-pub fn evaluate(game: &Game, player: Player) -> isize {
-    centipawn_evaluation(game, player) + development_evaluation(game, player)
+pub fn evaluate(game: &Game) -> isize {
+    centipawn_evaluation(game, game.player) + development_evaluation(game, game.player)
 }
 
 #[test]

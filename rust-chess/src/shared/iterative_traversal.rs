@@ -153,19 +153,40 @@ impl<D: Default + Copy, const N: usize> TraversalStack<D, N> {
         Ok(data)
     }
 
-    pub fn current(&self) -> ErrorResult<&TraversalStackFrame<D>> {
-        self.stack.get(self.depth).as_result()
+    pub fn root(&self) -> ErrorResult<&TraversalStackFrame<D>> {
+        self.stack.get(0).as_result()
     }
 
-    fn current_mut(&mut self) -> ErrorResult<&mut TraversalStackFrame<D>> {
-        self.stack.get_mut(self.depth).as_result()
+    pub fn current(&self) -> ErrorResult<(&TraversalStackFrame<D>, usize)> {
+        let current_depth = self.depth;
+        Ok((self.stack.get(current_depth).as_result()?, current_depth))
     }
 
-    fn previous(&self) -> Option<&TraversalStackFrame<D>> {
+    pub fn current_mut(&mut self) -> ErrorResult<(&mut TraversalStackFrame<D>, usize)> {
+        let current_depth = self.depth;
+        Ok((self.stack.get_mut(current_depth).as_result()?, current_depth))
+    }
+
+    pub fn next(&self) -> ErrorResult<(&TraversalStackFrame<D>, usize)> {
+        let next_depth = self.depth+1;
+        Ok((self.stack.get(next_depth).as_result()?, next_depth))
+    }
+
+    pub fn next_mut(&mut self) -> ErrorResult<(&mut TraversalStackFrame<D>, usize)> {
+        let next_depth = self.depth+1;
+        Ok((self.stack.get_mut(next_depth).as_result()?, next_depth))
+    }
+
+    fn previous(&self) -> ErrorResult<Option<(&TraversalStackFrame<D>, usize)>> {
         if self.depth == 0 {
-            return None;
+            return Ok(None);
         }
-        self.stack.get(self.depth - 1)
+        let previous_depth = self.depth-1;
+        if previous_depth == 0 {
+            Ok(Some((self.stack.get(previous_depth).as_result()?, previous_depth)))
+        } else {
+            err_result(&format!("previous depth {} invalid", previous_depth))
+        }
     }
 
     pub fn current_and_next_mut(
@@ -179,7 +200,7 @@ impl<D: Default + Copy, const N: usize> TraversalStack<D, N> {
     }
 
     pub fn get_and_increment_move(&mut self) -> ErrorResult<Option<Move>> {
-        let current = self.current_mut()?;
+        let (current, _) = self.current_mut()?;
         current.lazily_generate_moves()?;
 
         let current_moves = current.moves.as_mut().as_result()?;
