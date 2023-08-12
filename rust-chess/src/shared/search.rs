@@ -297,7 +297,7 @@ impl Search {
                         .is_better()
                     {
                         current.data.result =
-                            SearchResult::BestMove(next_score, next_move.unwrap());
+                            SearchResult::BestMove(next_score, next_move);
 
                         if Evaluation::compare(current.game.player, next_score, current.data.alpha)
                             .is_better()
