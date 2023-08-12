@@ -9,7 +9,10 @@ use pprof::protos::Message;
 pub mod shared;
 pub use shared::*;
 
-use crate::async_perft::AsyncPerftRunner;
+use crate::{
+    async_perft::AsyncPerftRunner,
+    search::{LoopResult, Search},
+};
 
 use {game::Game, perft::run_perft_iteratively_to_depth, perft::run_perft_recursively};
 
@@ -58,8 +61,7 @@ fn done_fn(count: usize) {
     println!("done: {}", count);
 }
 
-#[tokio::main]
-async fn main() {
+fn main() {
     let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
     let expected_count = [
@@ -67,23 +69,28 @@ async fn main() {
         // 3195901860,
     ];
 
+    // setup magics
     run_perft_recursively(Game::from_fen(fen).unwrap(), 2).unwrap();
 
-    println!("\nasync");
+    println!("\nalpha-beta");
     {
-        let p = Profiler::new("async_perft_long".to_string());
-        let perft = Arc::new(AsyncPerftRunner::from(yield_fn, log_fn, done_fn));
+        let p = Profiler::new("alpha_beta".to_string());
 
-        let spawn_perft = perft.clone();
-        tokio::spawn(async move {
-            spawn_perft.start("startpos".to_string(), 7).await;
-        });
+        let start_time = std::time::Instant::now();
+        let mut search = Search::with_max_depth(Game::from_fen("startpos").unwrap(), 5).unwrap();
+        loop {
+            match search.iterate().unwrap() {
+                LoopResult::Continue => {}
+                LoopResult::Done => break,
+            }
+        }
 
-        tokio::time::sleep(Duration::from_millis(1000)).await;
-        perft.stop().await;
+        println!(
+            "search found: {:?} in {} ms",
+            search.bestmove(),
+            (std::time::Instant::now() - start_time).as_millis()
+        );
 
-        println!("count: {}", perft.count().to_formatted_string(&Locale::en));
-        assert!(perft.count() > 100_000);
         p.flush();
     }
 

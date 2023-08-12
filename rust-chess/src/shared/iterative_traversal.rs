@@ -45,7 +45,6 @@ impl Debug for IndexedMoveBuffer {
 #[derive(Default, Debug, Copy, Clone)]
 pub struct TraversalStackFrame<D> {
     pub game: Game,
-    pub last_move: Option<Move>,
 
     pub danger: Option<Danger>,
     pub moves: Option<IndexedMoveBuffer>,
@@ -75,14 +74,11 @@ impl<D> TraversalStackFrame<D> {
             return Ok(Legal::No);
         }
 
-        self.last_move = Some(*next_move);
-
         Ok(Legal::Yes)
     }
 
     pub fn setup_from_scratch(&mut self, game: Game) -> ErrorResult<()> {
         self.game = game;
-        self.last_move = None;
 
         self.danger = None;
         self.moves = None;
@@ -124,6 +120,34 @@ impl<D> TraversalStackFrame<D> {
         self.danger = Some(Danger::from(self.game.player, &self.game.board)?);
         Ok(self.danger.as_ref().unwrap())
     }
+
+    pub fn get_and_increment_move(&mut self) -> ErrorResult<Option<Move>> {
+        self.lazily_generate_moves()?;
+
+        let current_moves = self.moves.as_mut().as_result()?;
+
+        if current_moves.index >= current_moves.buffer.size {
+            return Ok(None);
+        }
+
+        let m = current_moves.buffer.get(current_moves.index);
+        current_moves.index += 1;
+
+        Ok(Some(*m))
+    }
+
+    pub fn previously_applied_move(&self) -> Option<Move> {
+        match self.moves {
+            None => None,
+            Some(moves) => {
+                if moves.index == 0 {
+                    return None;
+                }
+
+                Some(*moves.buffer.get(moves.index - 1))
+            }
+        }
+    }
 }
 
 pub struct TraversalStack<D, const N: usize> {
@@ -153,8 +177,8 @@ impl<D: Default + Copy, const N: usize> TraversalStack<D, N> {
         Ok(data)
     }
 
-    pub fn root(&self) -> ErrorResult<&TraversalStackFrame<D>> {
-        self.stack.get(0).as_result()
+    pub fn root(&self) -> &TraversalStackFrame<D> {
+        self.stack.get(0).unwrap()
     }
 
     pub fn current(&self) -> ErrorResult<(&TraversalStackFrame<D>, usize)> {
@@ -201,17 +225,7 @@ impl<D: Default + Copy, const N: usize> TraversalStack<D, N> {
 
     pub fn get_and_increment_move(&mut self) -> ErrorResult<Option<Move>> {
         let (current, _) = self.current_mut()?;
-        current.lazily_generate_moves()?;
-
-        let current_moves = current.moves.as_mut().as_result()?;
-
-        if current_moves.index >= current_moves.buffer.size {
-            return Ok(None);
-        }
-
-        let m = current_moves.buffer.get(current_moves.index);
-        current_moves.index += 1;
-
-        Ok(Some(*m))
+        current.get_and_increment_move()
     }
+
 }

@@ -9,8 +9,8 @@
         "build-perft": "cargo build --release --bin perft --features \"profiling async_feat\"",
         "build-uci": "cargo build --release --bin main",
 
-        "run-uci": "yarn uci && ./target/release/main",
-        "run-perft": "yarn perft && ./target/release/perft",
+        "run-uci": "yarn build-uci && ./target/release/main",
+        "run-perft": "yarn build-perft && ./target/release/perft",
 
         "watch": "watchexec -e rs",
 

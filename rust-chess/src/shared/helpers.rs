@@ -384,6 +384,8 @@ impl<T> OptionResult<T> for Option<T> {
     }
 
     fn as_result(self) -> ErrorResult<T> {
-        self.ok_or_else(|| err("expected Some, got None"))
+        self.ok_or_else(|| {
+            err("expected Some, got None")
+        })
     }
 }

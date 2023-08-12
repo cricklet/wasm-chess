@@ -1,4 +1,4 @@
-use crate::iterative_traversal::TraversalStack;
+use crate::{helpers::OptionResult, iterative_traversal::TraversalStack};
 
 use super::{
     danger::Danger,
@@ -223,8 +223,8 @@ pub enum LoopResult {
     Continue,
     Done,
 }
-struct Search {
-    pub traversal: TraversalStack<SearchStackData, MAX_ALPHA_BETA_DEPTH>,
+pub struct Search {
+    traversal: TraversalStack<SearchStackData, MAX_ALPHA_BETA_DEPTH>,
     pub max_depth: usize,
 }
 
@@ -240,6 +240,13 @@ impl Search {
             traversal: TraversalStack::<SearchStackData, MAX_ALPHA_BETA_DEPTH>::new(game)?,
             max_depth,
         })
+    }
+
+    pub fn bestmove(&self) -> Option<(Move, Evaluation)> {
+        match self.traversal.root().data.result {
+            SearchResult::BestMove(e, m) => Some((m, e)),
+            _ => None,
+        }
     }
 
     pub fn iterate(&mut self) -> ErrorResult<LoopResult> {
@@ -264,10 +271,12 @@ impl Search {
             let next_evaluation = next.data.result;
             next.data.result = SearchResult::None;
 
-            let next_move = next.last_move;
             let next_score = next_evaluation.score();
-
             if let Some(next_score) = next_score {
+                let next_move = current
+                    .previously_applied_move()
+                    .expect_ok("we should only have a next-evaluation if a move has been applied");
+
                 if Evaluation::compare(current.game.player, next_score, current.data.beta)
                     .is_better_or_equal()
                 {
@@ -309,6 +318,12 @@ impl Search {
                 let (current, next) = self.traversal.current_and_next_mut()?;
                 let result = next.setup_from_move(current, &next_move).unwrap();
                 if result == Legal::Yes {
+                    // Finish setting up the new data
+                    next.data.alpha = current.data.beta;
+                    next.data.beta = current.data.alpha;
+                    next.data.in_quiescence = current.data.in_quiescence;
+                    next.data.result = SearchResult::None;
+
                     // Recurse into our newly applied move
                     self.traversal.depth += 1;
                     return Ok(LoopResult::Continue);
@@ -379,6 +394,4 @@ fn test_start_search() {
             LoopResult::Done => break,
         }
     }
-
-    println!("{:?}", search.traversal.root().unwrap().data.result);
 }
