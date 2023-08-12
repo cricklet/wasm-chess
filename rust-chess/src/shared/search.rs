@@ -275,7 +275,7 @@ impl Search {
             if let Some(next_score) = next_score {
                 let next_move = current
                     .previously_applied_move()
-                    .expect_ok("we should only have a next-evaluation if a move has been applied");
+                    .expect_ok("we should only have a next-evaluation if a move has been applied")?;
 
                 if Evaluation::compare(current.game.player, next_score, current.data.beta)
                     .is_better_or_equal()
