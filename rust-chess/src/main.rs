@@ -15,6 +15,7 @@ fn next_stdin() -> String {
 fn run() -> ErrorResult<()> {
     let mut uci = Uci {
         game: Game::from_position_uci(&"position startpos")?,
+        search: None,
     };
 
     loop {
@@ -25,11 +26,10 @@ fn run() -> ErrorResult<()> {
         }
 
         for line in input.split("\n") {
-            for result in uci.handle_line(line) {
-                match result {
-                    Ok(line) => println!("{}", line),
-                    Err(e) => return Err(e),
-                }
+            let result = uci.handle_line(line);
+            match result {
+                Ok(line) => println!("{}", line),
+                Err(e) => return Err(e),
             }
         }
     }

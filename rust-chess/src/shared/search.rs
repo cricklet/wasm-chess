@@ -246,6 +246,7 @@ pub enum LoopResult {
 pub struct Search {
     traversal: TraversalStack<SearchStackData, MAX_ALPHA_BETA_DEPTH>,
     returned_evaluation: Option<SearchResult>,
+    pub done: bool,
     pub max_depth: usize,
 }
 
@@ -255,6 +256,7 @@ impl Search {
             traversal: TraversalStack::<SearchStackData, MAX_ALPHA_BETA_DEPTH>::new(game)?,
             returned_evaluation: None,
             max_depth: 3,
+            done: false,
         })
     }
     pub fn with_max_depth(game: Game, max_depth: usize) -> ErrorResult<Self> {
@@ -262,6 +264,7 @@ impl Search {
             traversal: TraversalStack::<SearchStackData, MAX_ALPHA_BETA_DEPTH>::new(game)?,
             returned_evaluation: None,
             max_depth,
+            done: false,
         })
     }
 
@@ -388,9 +391,10 @@ impl Search {
 
         if self.traversal.depth == 0 {
             // If there are no more moves at 'current' and we're at the root node, we've exhaustively searched
+            self.done = true;
             Ok(Some(LoopResult::Done))
         } else {
-            self.traversal.depth -= 1;
+            self.traversal.depth -= 1;    
             Ok(Some(LoopResult::Continue))
         }
     }
@@ -401,6 +405,10 @@ impl Search {
 
         if self.max_depth == 0 {
             return err_result("max_depth must be > 0");
+        }
+
+        if self.done {
+            return Ok(LoopResult::Done);
         }
 
         // If we're at a leaf, statically evaluate
@@ -474,6 +482,9 @@ fn test_start_search() {
             LoopResult::Done => break,
         }
     }
+
+    // Calling `iterate()` should be idempotent
+    search.iterate().unwrap();
 
     let potential_first_moves: HashSet<String> = HashSet::from_iter(
         vec!["e2e4", "d2d4"]

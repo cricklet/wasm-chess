@@ -1,5 +1,5 @@
 import { SetStateAction, atom } from "jotai";
-import { Board, boardFromFen,  } from "./helpers";
+import { Board, boardFromFen, } from "./helpers";
 import * as wasm from "./wasm-bindings";
 
 interface GameState {
@@ -7,18 +7,22 @@ interface GameState {
     moves: string[],
 }
 
+function wasmUci(): ReturnType<typeof wasm.syncUci> {
+    return wasm.syncUci()
+}
+
 export const atomGame = atom<GameState>({
     start: 'startpos',
     moves: ['e2e4'],
 })
 
-const atomEngine = atom(null, (get, set) => {
-    const game = get(atomGame)
-    if (game.moves.length % 2 === 0) {
-        // engine's turn
-        wasm.setPosition(game.start, game.moves)
-    }
-})
+// const atomEngine = atom(null, (get, set) => {
+//     const game = get(atomGame)
+//     if (game.moves.length % 2 === 0) {
+//         // engine's turn
+//         wasmUci.setPosition(game.start, game.moves)
+//     }
+// })
 
 export function performMove(move: string, game: GameState): GameState {
     return {
@@ -29,8 +33,8 @@ export function performMove(move: string, game: GameState): GameState {
 
 export const atomBoard = atom<Board>(get => {
     let state = get(atomGame)
-    wasm.setPosition(state.start, state.moves)
-    let currentFen = wasm.currentFen()
+    wasmUci().setPosition(state.start, state.moves)
+    let currentFen = wasmUci().currentFen()
 
     return boardFromFen(currentFen)
 })
@@ -39,7 +43,7 @@ export const atomInput = atom<string>('')
 
 export const atomLegalMoves = atom<string[]>(get => {
     get(atomBoard)
-    return wasm.possibleMoves()
+    return wasmUci().possibleMoves()
 })
 
 export const atomLegalStarts = atom<Set<string>>(get => {

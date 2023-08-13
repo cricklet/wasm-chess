@@ -108,52 +108,55 @@ export async function loadWasmBindgen(): Promise<void> {
 
     await wasm_bindgen()
     wasmLoaded = true
-
-    wasm_bindgen.hello()
 }
 
-export function currentFen(): string {
-    let fenLine: string = ''
-    listenScope((line: string) => {
-        if (line.indexOf('Fen: ') >= 0) {
-            fenLine = line
-        }
-    }, () => {
-        wasm_bindgen.process_sync('d')
-    })
-    return fenLine.split('Fen: ')[1].trim()
-}
+export function syncUci() {
+    let uci = wasm_bindgen.UciForJs.new()
 
-export function possibleMoves(): string[] {
-    let moves: string[] = []
-    listenScope((line: string) => {
-        if (line.indexOf(':') === -1) {
-            return
-        }
-        let split = line.split(':').filter(v => v !== '').map(v => v.trim())
-        if (split.length !== 2) {
-            return
-        }
-        let [move, perft] = split
-        if (perft !== '1') {
-            return
-        }
+    return {
+        currentFen: (): string => {
+            let fen = ''
+            let result = uci.handle_line('d')
+            console.log('> (not worker)', result)
+            for (let line of result.split('\n')) {
+                if (line.indexOf('Fen: ') >= 0) {
+                    fen = line.split('Fen: ')[1].trim()
+                }
+            }
+            return fen
+        },
+        possibleMoves: (): string[] => {
+            let moves: string[] = []
+            let result = uci.handle_line('go perft 1')
+            console.log('> (not worker)', result)
 
-        if (move.length !== 4 && move.length !== 5) {
-            return
+            for (let line of result.split('\n')) {
+                if (line.indexOf(':') === -1) {
+                    continue
+                }
+                let split = line.split(':').filter(v => v !== '').map(v => v.trim())
+                if (split.length !== 2) {
+                    continue
+                }
+                let [move, perft] = split
+                if (perft !== '1') {
+                    continue
+                }
+
+                if (move.length !== 4 && move.length !== 5) {
+                    continue
+                }
+                moves.push(move)
+            }
+
+            return moves
+        },
+        setPosition: (position: string, moves: string[]) => {
+            if (position === 'startpos') {
+                uci.handle_line(`position ${position} moves ${moves.join(' ')}`)
+            } else {
+                uci.handle_line(`position fen ${position} moves ${moves.join(' ')}`)
+            }
         }
-        moves.push(move)
-    }, () => {
-        wasm_bindgen.process_sync('go perft 1')
-    })
-
-    return moves
-}
-
-export function setPosition(position: string, moves: string[]) {
-    if (position === 'startpos') {
-        wasm_bindgen.process_sync(`position ${position} moves ${moves.join(' ')}`)
-    } else {
-        wasm_bindgen.process_sync(`position fen ${position} moves ${moves.join(' ')}`)
     }
 }

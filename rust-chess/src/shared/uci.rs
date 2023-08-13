@@ -1,6 +1,8 @@
 use itertools::Itertools;
 use std::{iter, sync::Mutex};
 
+use crate::search::{Search, LoopResult};
+
 use super::{
     game::Game,
     helpers::{err_result, ErrorResult},
@@ -13,32 +15,38 @@ pub struct UciAsync {
 
 pub struct Uci {
     pub game: Game,
+    pub search: Option<Search>,
 }
 
 impl Uci {
-    pub fn handle_line(&mut self, line: &str) -> Box<dyn Iterator<Item = ErrorResult<String>>> {
+    pub fn new() -> Self {
+        Self {
+            game: Game::from_position_uci(&"position startpos").unwrap(),
+            search: None,
+        }
+    }
+    pub fn handle_line(&mut self, line: &str) -> ErrorResult<String> {
         if line.starts_with("position") {
             let game = Game::from_position_uci(line);
             if let Err(e) = &game {
-                return Box::new(iter::once(Err(e.clone())));
+                return Err(e.clone());
             }
             self.game = game.unwrap();
-            println!("Game: {}", self.game);
-            Box::new(iter::empty())
+            Ok(format!("{:?}", self.game))
         } else if line.starts_with("go perft") {
             let depth = line["go perft".len()..].trim();
             let depth = match depth.parse::<usize>() {
                 Ok(depth) => depth,
                 Err(_) => {
-                    return Box::new(iter::once(err_result(&format!(
+                    return err_result(&format!(
                         "invalid depth for '{}'",
                         line
-                    ))));
+                    ));
                 }
             };
             let perft_result = run_perft_counting_first_move(&self.game, depth);
             if let Err(e) = &perft_result {
-                return Box::new(iter::once(Err(e.clone())));
+                return Err(e.clone());
             }
             let (perft_overall, perft_per_move) = perft_result.unwrap();
             let perft_per_move = perft_per_move
@@ -49,18 +57,45 @@ impl Uci {
                 perft_per_move.into_iter().join("\n"),
                 perft_overall,
             );
-            Box::new(iter::once(perft_output).map(Ok))
+            Ok(perft_output)
         } else if line == "d" {
             let debug_str = format!("{}\nFen: {}", self.game, self.game.to_fen());
-            let debug_iter = iter::once(debug_str);
-            Box::new(debug_iter.map(Ok))
+            Ok(debug_str)
+        } else if line == "go" {
+            let search = Search::new(self.game)?;
+            self.search = Some(search);
+            Ok("".to_string())
         } else if line == "stop" {
-            Box::new(iter::empty())
+            Ok("".to_string())
         } else {
-            Box::new(iter::once(err_result(&format!(
+            err_result(&format!(
                 "Unknown command: '{}'",
                 line
-            ))))
+            ))
         }
     }
+
+    pub fn think(&mut self) -> ErrorResult<String> {
+        if let Some(search) = &mut self.search {
+            let result = search.iterate()?;
+
+            match result {
+                LoopResult::Done => {
+                    let best_move = search.bestmove();
+                    self.search = None;
+
+                    match best_move {
+                        Some((best_move, _)) => {
+                            Ok(format!("bestmove {}", best_move))
+                        }
+                        None => Ok("bestmove (none)".to_string()),
+                    }
+                }
+                _ => Ok("".to_string()),
+            }
+        } else {
+            Ok("".to_string())
+        }
+    }
+
 }

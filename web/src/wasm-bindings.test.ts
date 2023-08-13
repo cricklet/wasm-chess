@@ -7,19 +7,22 @@ describe('wasm-bindings.test.ts', function () {
     })
 
     it('d', function () {
-        bindings.setPosition('startpos', [])
-        expect(bindings.currentFen()).toBe('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1')
+        let uci = bindings.syncUci()
+        uci.setPosition('startpos', [])
+        expect(uci.currentFen()).toBe('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1')
     })
     it('e2e4', function () {
+        let uci = bindings.syncUci()
         let start = 'startpos'
         let moves = ['e2e4']
-        bindings.setPosition(start, moves)
-        expect(bindings.currentFen()).toBe('rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 1 1')
+        uci.setPosition(start, moves)
+        expect(uci.currentFen()).toBe('rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 1 1')
     })
     it('possibleMoves`', function () {
+        let uci = bindings.syncUci()
         let start = 'startpos'
         let moves = ['e2e4']
-        bindings.setPosition(start, moves)
+        uci.setPosition(start, moves)
 
         const expectedMoves = [
             'a7a6',
@@ -45,7 +48,7 @@ describe('wasm-bindings.test.ts', function () {
         ]
         expectedMoves.sort()
 
-        const actualMoves = bindings.possibleMoves()
+        const actualMoves = uci.possibleMoves()
         actualMoves.sort()
 
         expect(expectedMoves).toEqual(actualMoves)
