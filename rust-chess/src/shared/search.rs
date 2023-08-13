@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::{
     helpers::{err_result, OptionResult},
     iterative_traversal::TraversalStack,
@@ -452,5 +454,14 @@ fn test_start_search() {
         }
     }
 
-    println!("{:#?}", search);
+    let potential_first_moves: HashSet<String> = HashSet::from_iter(
+        vec!["e2e4", "d2d4"].iter().map(|s| s.to_string()).into_iter()
+    );
+
+    match search.returned_evaluation.unwrap() {
+        SearchResult::BestMove(best_move) => {
+            assert!(potential_first_moves.contains(&best_move.best_move.to_uci()));
+        }
+        _ => panic!("unexpected {:?}", search.returned_evaluation),
+    }
 }
