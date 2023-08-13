@@ -135,37 +135,29 @@ impl<D> TraversalStackFrame<D> {
 
         Ok(Some(*m))
     }
-
-    pub fn previously_applied_move(&self) -> Option<Move> {
-        match self.moves {
-            None => None,
-            Some(moves) => {
-                if moves.index == 0 {
-                    return None;
-                }
-
-                Some(*moves.buffer.get(moves.index - 1))
-            }
-        }
-    }
 }
 
-pub struct TraversalStack<D, const N: usize> {
+pub struct TraversalStack<D: Debug + Default + Copy, const N: usize> {
     stack: [TraversalStackFrame<D>; N],
     pub depth: usize,
 }
 
-impl<D: Debug + Clone + Default + Copy, const N: usize> Debug for TraversalStack<D, N> {
+impl<D: Debug + Default + Copy, const N: usize> Debug for TraversalStack<D, N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("TraversalStack")
-            .field("depth", &self.depth)
-            .field("previous", &self.previous())
-            .field("current", &self.current().unwrap())
-            .finish()
+        let mut debug = f.debug_struct("TraversalStack");
+        debug.field("depth", &self.depth);
+
+        let current_depth = self.depth;
+        if current_depth >= 1 {
+            let previous_depth = self.depth - 1;
+            debug.field("previous", &self.stack.get(previous_depth).unwrap());
+        }
+        debug.field("current", &self.stack.get(current_depth).unwrap());
+        debug.finish()
     }
 }
 
-impl<D: Default + Copy, const N: usize> TraversalStack<D, N> {
+impl<D: Debug + Default + Copy, const N: usize> TraversalStack<D, N> {
     pub fn new(game: Game) -> ErrorResult<Self> {
         let mut data = Self {
             stack: [TraversalStackFrame::default(); N],
@@ -188,16 +180,23 @@ impl<D: Default + Copy, const N: usize> TraversalStack<D, N> {
 
     pub fn current_mut(&mut self) -> ErrorResult<(&mut TraversalStackFrame<D>, usize)> {
         let current_depth = self.depth;
-        Ok((self.stack.get_mut(current_depth).as_result()?, current_depth))
+        Ok((
+            self.stack.get_mut(current_depth).as_result()?,
+            current_depth,
+        ))
+    }
+
+    pub fn current_depth(&self) -> usize {
+        self.depth
     }
 
     pub fn next(&self) -> ErrorResult<(&TraversalStackFrame<D>, usize)> {
-        let next_depth = self.depth+1;
+        let next_depth = self.depth + 1;
         Ok((self.stack.get(next_depth).as_result()?, next_depth))
     }
 
     pub fn next_mut(&mut self) -> ErrorResult<(&mut TraversalStackFrame<D>, usize)> {
-        let next_depth = self.depth+1;
+        let next_depth = self.depth + 1;
         Ok((self.stack.get_mut(next_depth).as_result()?, next_depth))
     }
 
@@ -205,12 +204,11 @@ impl<D: Default + Copy, const N: usize> TraversalStack<D, N> {
         if self.depth == 0 {
             return Ok(None);
         }
-        let previous_depth = self.depth-1;
-        if previous_depth == 0 {
-            Ok(Some((self.stack.get(previous_depth).as_result()?, previous_depth)))
-        } else {
-            err_result(&format!("previous depth {} invalid", previous_depth))
-        }
+        let previous_depth = self.depth - 1;
+        Ok(Some((
+            self.stack.get(previous_depth).as_result()?,
+            previous_depth,
+        )))
     }
 
     pub fn current_and_next_mut(
@@ -228,4 +226,22 @@ impl<D: Default + Copy, const N: usize> TraversalStack<D, N> {
         current.get_and_increment_move()
     }
 
+    pub fn move_applied_before_depth(&self, depth: usize) -> ErrorResult<Option<Move>> {
+        if depth == 0 {
+            // eg if we're searching from startpos, there's no previous move
+            // to get to that state.
+            return Ok(None);
+        }
+
+        let node = self.stack.get(depth - 1).as_result()?;
+        match node.moves {
+            None => err_result(&format!("no moves at previous depth {} to get to {}, {:#?}", depth - 1, depth, self))?,
+            Some(moves) => {
+                if moves.index == 0 {
+                    return Ok(None);
+                }
+                Ok(Some(*moves.buffer.get(moves.index - 1)))
+            }
+        }
+    }
 }
