@@ -275,31 +275,30 @@ impl Search {
     fn statically_evaluate_leaf(&mut self) -> ErrorResult<Option<LoopResult>> {
         let (current, current_depth) = self.traversal.current()?;
 
-        if current_depth >= self.max_depth {
-            let score = Evaluation::Centipawns(current.game.player, evaluate(&current.game));
-
-            self.returned_evaluation =
-                Some(SearchResult::StaticEvaluation(StaticEvaluationReturn {
-                    current_move: self
-                        .traversal
-                        .move_applied_before_depth(current_depth)?
-                        .expect_ok(&format!(
-                            "invalid move at current_depth {}, {:#?}",
-                            current_depth, self
-                        ))?,
-                    evaluation: score,
-                    depth: current_depth,
-                    previous_move: self
-                        .traversal
-                        .move_applied_before_depth(current_depth - 1)?,
-                }));
-
-            // Return early (pop up the stack)
-            self.traversal.depth -= 1;
-            return Ok(Some(LoopResult::Continue));
+        if current_depth < self.max_depth {
+            return Ok(None);
         }
 
-        Ok(None)
+        let score = Evaluation::Centipawns(current.game.player, evaluate(&current.game));
+
+        self.returned_evaluation = Some(SearchResult::StaticEvaluation(StaticEvaluationReturn {
+            current_move: self
+                .traversal
+                .move_applied_before_depth(current_depth)?
+                .expect_ok(&format!(
+                    "invalid move at current_depth {}, {:#?}",
+                    current_depth, self
+                ))?,
+            evaluation: score,
+            depth: current_depth,
+            previous_move: self
+                .traversal
+                .move_applied_before_depth(current_depth - 1)?,
+        }));
+
+        // Return early (pop up the stack)
+        self.traversal.depth -= 1;
+        Ok(Some(LoopResult::Continue))
     }
 
     fn process_next_move_evaluation(&mut self) -> ErrorResult<Option<LoopResult>> {
@@ -307,93 +306,93 @@ impl Search {
         let current_depth = self.traversal.current_depth();
         let next_depth = current_depth + 1;
 
-        if let Some(next_evaluation) = self.returned_evaluation {
-            self.returned_evaluation = None;
-
-            let next_evaluation = next_evaluation.score();
-            let next_move = self
-                .traversal
-                .move_applied_before_depth(next_depth)?
-                .expect_ok(&format!("{:#?}", self))?;
-
-            let (current, _) = self.traversal.current_mut()?;
-            if Evaluation::compare(current.game.player, next_evaluation, current.data.beta)
-                .is_better_or_equal()
-            {
-                // The enemy can force a better score. Cutoff early.
-                // Beta is the lower bound for the score we can get at this board state.
-                self.returned_evaluation = Some(SearchResult::BetaCutoff(next_evaluation));
-
-                // Return early (pop up the stack)
-                self.traversal.depth -= 1;
-                return Ok(Some(LoopResult::Continue));
-            } else {
-                let current_evaluation = current.data.best_move;
-                if current_evaluation.is_none()
-                    || Evaluation::compare(
-                        current.game.player,
-                        next_evaluation,
-                        current_evaluation.unwrap().evaluation,
-                    )
-                    .is_better()
-                {
-                    current.data.best_move = Some(BestMoveReturn {
-                        best_move: next_move,
-                        evaluation: next_evaluation,
-                    });
-
-                    if Evaluation::compare(current.game.player, next_evaluation, current.data.alpha)
-                        .is_better()
-                    {
-                        // Enemy won't prevent us from making this move. Keep searching
-                        current.data.alpha = next_evaluation;
-                    }
-                }
-            }
+        if self.returned_evaluation.is_none() {
+            return Ok(None);
         }
 
-        Ok(None)
+        let next_evaluation = self.returned_evaluation.unwrap();
+        self.returned_evaluation = None;
+
+        let next_evaluation = next_evaluation.score();
+        let next_move = self
+            .traversal
+            .move_applied_before_depth(next_depth)?
+            .expect_ok(&format!("{:#?}", self))?;
+
+        let (current, _) = self.traversal.current_mut()?;
+        if Evaluation::compare(current.game.player, next_evaluation, current.data.beta)
+            .is_better_or_equal()
+        {
+            // The enemy can force a better score. Cutoff early.
+            // Beta is the lower bound for the score we can get at this board state.
+            self.returned_evaluation = Some(SearchResult::BetaCutoff(next_evaluation));
+
+            // Return early (pop up the stack)
+            self.traversal.depth -= 1;
+            return Ok(Some(LoopResult::Continue));
+        }
+        let current_evaluation = current.data.best_move;
+        if current_evaluation.is_none()
+            || Evaluation::compare(
+                current.game.player,
+                next_evaluation,
+                current_evaluation.unwrap().evaluation,
+            )
+            .is_better()
+        {
+            current.data.best_move = Some(BestMoveReturn {
+                best_move: next_move,
+                evaluation: next_evaluation,
+            });
+
+            if Evaluation::compare(current.game.player, next_evaluation, current.data.alpha)
+                .is_better()
+            {
+                // Enemy won't prevent us from making this move. Keep searching
+                current.data.alpha = next_evaluation;
+            }
+        }
+        Ok(Some(LoopResult::Continue))
     }
 
     fn apply_next_move_or_return(&mut self) -> ErrorResult<Option<LoopResult>> {
         let next_move = self.traversal.get_and_increment_move()?;
-        {
-            if let Some(next_move) = next_move {
-                // If there are moves left at 'current', apply the move
-                let (current, next) = self.traversal.current_and_next_mut()?;
-                let result = next.setup_from_move(current, &next_move).unwrap();
-                if result == Legal::Yes {
-                    // Finish setting up the new data
-                    next.data.alpha = current.data.beta;
-                    next.data.beta = current.data.alpha;
-                    next.data.in_quiescence = current.data.in_quiescence;
-                    next.data.best_move = None;
+        if let Some(next_move) = next_move {
+            // If there are moves left at 'current', apply the move
+            let (current, next) = self.traversal.current_and_next_mut()?;
+            let result = next.setup_from_move(current, &next_move).unwrap();
 
-                    // Recurse into our newly applied move
-                    self.traversal.depth += 1;
-                    return Ok(Some(LoopResult::Continue));
-                }
-            } else {
-                // We're out of moves to traverse, return the best move and pop up the stack.
-                let (current, _) = self.traversal.current_mut()?;
-
-                if let Some(best_move) = current.data.best_move {
-                    self.returned_evaluation = Some(SearchResult::BestMove(best_move));
-                } else {
-                    todo!("checkmate or draw");
-                }
-
-                if self.traversal.depth == 0 {
-                    // If there are no more moves at 'current' and we're at the root node, we've exhaustively searched
-                    return Ok(Some(LoopResult::Done));
-                } else {
-                    self.traversal.depth -= 1;
-                    return Ok(Some(LoopResult::Continue));
-                }
+            if result == Legal::No {
+                return Ok(Some(LoopResult::Continue));
             }
+
+            // Finish setting up the new data
+            next.data.alpha = current.data.beta;
+            next.data.beta = current.data.alpha;
+            next.data.in_quiescence = current.data.in_quiescence;
+            next.data.best_move = None;
+
+            // Recurse into our newly applied move
+            self.traversal.depth += 1;
+            return Ok(Some(LoopResult::Continue));
         }
 
-        Ok(None)
+        // We're out of moves to traverse, return the best move and pop up the stack.
+        let (current, _) = self.traversal.current_mut()?;
+
+        if let Some(best_move) = current.data.best_move {
+            self.returned_evaluation = Some(SearchResult::BestMove(best_move));
+        } else {
+            todo!("checkmate or draw");
+        }
+
+        if self.traversal.depth == 0 {
+            // If there are no more moves at 'current' and we're at the root node, we've exhaustively searched
+            Ok(Some(LoopResult::Done))
+        } else {
+            self.traversal.depth -= 1;
+            Ok(Some(LoopResult::Continue))
+        }
     }
 
     pub fn iterate(&mut self) -> ErrorResult<LoopResult> {
