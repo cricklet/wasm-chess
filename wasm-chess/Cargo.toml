@@ -37,5 +37,3 @@ web-sys = { version = "0.3.4", features = [
     'Worker',
 ] }
 
-[profile.release]
-opt-level = 's'

@@ -7,8 +7,13 @@ interface GameState {
     moves: string[],
 }
 
-function wasmUci(): ReturnType<typeof wasm.syncUci> {
-    return wasm.syncUci()
+const _wasmUci = undefined
+function wasmUci(): ReturnType<typeof wasm.newUciForJs> {
+    if (_wasmUci) {
+        return _wasmUci
+    } else {
+        return wasm.newUciForJs()
+    }
 }
 
 export const atomGame = atom<GameState>({

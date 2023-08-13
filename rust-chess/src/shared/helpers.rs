@@ -28,6 +28,10 @@ pub type ErrorResult<T> = Result<T, Error>;
 pub type VoidResult = Result<(), Error>;
 
 pub fn err(msg: &str) -> Error {
+    #[cfg(target_arch = "wasm32")]
+    {
+        panic!("{}", msg);
+    }
     let backtrace = Backtrace::force_capture();
     let backtrace_str = backtrace.to_string();
     let mut backtrace_lines = backtrace_str.lines().collect::<Vec<_>>();

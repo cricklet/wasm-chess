@@ -64,11 +64,11 @@ impl UciForJs {
         }
     }
     pub fn handle_line(&mut self, line: &str) -> Result<String, JsError> {
+        log_to_js(&format!("handle_line received: {}", line));
+
         if line.contains("\n") {
             return Err(JsError::from(err(&format!("{} contains newline", line))));
         }
-
-        console::log_1(&format!("> {}", line).into());
 
         let output = self.uci.handle_line(line);
         match output {

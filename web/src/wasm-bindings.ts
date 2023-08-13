@@ -26,7 +26,7 @@ export function listen(listener: WasmListener): () => void {
 
 globalThis.BindingsJs = {
     log_to_js: (message: string): void => {
-        console.log('> (not worker)', message)
+        console.log('> (wasm) log:', message)
         message.split('\n').forEach((line) => {
             listeners.forEach((listener) => listener(line))
         })
@@ -110,25 +110,32 @@ export async function loadWasmBindgen(): Promise<void> {
     wasmLoaded = true
 }
 
-export function syncUci() {
+export function newUciForJs() {
     let uci = wasm_bindgen.UciForJs.new()
+
+    function handleLineAndLog(line: string) {
+        let result = uci.handle_line(line)
+        console.log('> (wasm) returned:', result)
+        return result
+    }
 
     return {
         currentFen: (): string => {
             let fen = ''
-            let result = uci.handle_line('d')
-            console.log('> (not worker)', result)
+            let result = handleLineAndLog('d')
+
             for (let line of result.split('\n')) {
                 if (line.indexOf('Fen: ') >= 0) {
                     fen = line.split('Fen: ')[1].trim()
                 }
             }
+
+            console.log('> (wasm) returned currentFen:', fen)
             return fen
         },
         possibleMoves: (): string[] => {
             let moves: string[] = []
-            let result = uci.handle_line('go perft 1')
-            console.log('> (not worker)', result)
+            let result = handleLineAndLog('go perft 1')
 
             for (let line of result.split('\n')) {
                 if (line.indexOf(':') === -1) {
@@ -148,14 +155,14 @@ export function syncUci() {
                 }
                 moves.push(move)
             }
-
+            console.log('> (wasm) returned moves:', moves)
             return moves
         },
         setPosition: (position: string, moves: string[]) => {
             if (position === 'startpos') {
-                uci.handle_line(`position ${position} moves ${moves.join(' ')}`)
+                handleLineAndLog(`position ${position} moves ${moves.join(' ')}`)
             } else {
-                uci.handle_line(`position fen ${position} moves ${moves.join(' ')}`)
+                handleLineAndLog(`position fen ${position} moves ${moves.join(' ')}`)
             }
         }
     }
