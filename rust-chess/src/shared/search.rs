@@ -375,23 +375,27 @@ impl Search {
                     self.traversal.depth += 1;
                     return Ok(LoopResult::Continue);
                 }
-            } else if self.traversal.depth == 0 {
-                // If there are no more moves at 'current' and we're at the root node, we've exhaustively searched
-                return Ok(LoopResult::Done);
             } else {
                 // We're out of moves to traverse, return the best move and pop up the stack.
                 let (current, _) = self.traversal.current_mut()?;
 
                 if let Some(best_move) = current.data.best_move {
                     self.returned_evaluation = Some(SearchResult::BestMove(best_move));
-                    self.traversal.depth -= 1;
                 } else {
                     todo!("checkmate or draw");
                 }
-            }
 
-            return Ok(LoopResult::Continue);
+                if self.traversal.depth == 0 {
+                    // If there are no more moves at 'current' and we're at the root node, we've exhaustively searched
+                    return Ok(LoopResult::Done);
+                } else {
+                    self.traversal.depth -= 1;
+                    return Ok(LoopResult::Continue);
+                }
+            }
         }
+
+        return Ok(LoopResult::Continue);
     }
 
     fn is_quiet_position(&self, danger: &Danger, last_move: Option<&Move>) -> bool {
