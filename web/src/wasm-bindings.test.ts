@@ -118,9 +118,12 @@ describe('wasm-bindings.test.ts', function () {
         })
 
         it('search via uci commands', async function () {
-            let result = await uciWorker.search('startpos', ['e2e4'])
-            console.log(result)
-            expect(result.length).toBe(4)
+            let result1 = uciWorker.search('startpos', ['e2e4'])
+            let result2 = uciWorker.search('startpos', ['e2e4'])
+            let result3 = uciWorker.search('startpos', ['e2e4'])
+            expect((await result1).length).toBe(4)
+            expect(await result2).toEqual(await result1)
+            expect(await result3).toEqual(await result1)
         })
     })
 })

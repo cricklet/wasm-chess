@@ -26,7 +26,7 @@ export function listen(listener: WasmListener): () => void {
 
 globalThis.BindingsJs = {
     log_to_js: (message: string): void => {
-        console.log('wasm-bindings.ts, log_to_js:', message)
+        console.log('wasm-bindings.ts, syncWasmUci, log_to_js:', message)
         message.split('\n').forEach((line) => {
             listeners.forEach((listener) => listener(line))
         })
