@@ -1,5 +1,5 @@
 
-import { omit, prettyJson } from "../helpers"
+import { indent_string, omit, prettyJson } from "../helpers"
 import { SendToWorker, ReceiveFromWorkerResponse, ReceiveFromWorkerMessage, decodeReceiveFromWorker, ReceiveFromWorker, responseMatchesRequest, SendToWorkerWithResponse, isEmpty } from "./worker-types"
 
 export async function createWorker(url: string) {
@@ -11,22 +11,22 @@ export async function createWorker(url: string) {
                 return
             }
 
-            let { name, kind, ...rest } = e
-            if ('id' in rest) {
-                rest = omit(rest, 'id')
-            }
-            if (name === 'log') {
-                if ('msg' in rest) {
-                    console.log('log (worker-wrapper.ts) =>', prettyJson(rest.msg))
-                } else {
-                    throw new Error('log message missing')
+            if (e.name === 'log') {
+                console.log('log (wasm worker) =>', prettyJson(e.msg))
+            } else if (e.name === 'error') {
+                console.error('error (wasm worker) =>', prettyJson(e.msg))
+            } else if (e.name === 'ready') {
+                console.log('ready (wasm worker)')
+            } else if (e.name === 'uci') {
+                if (e.output.length > 0) {
+                    console.log('uci sync response (wasm worker)', indent_string('\n' + e.output, 2))
                 }
-            } else if (name === 'error') {
-                console.error('error (worker-wrapper.ts) =>', prettyJson(rest))
-            } else if (name === 'ready') {
-                console.log('ready (worker-wrapper.ts, worker)')
+            } else if (e.name === 'uci-flush-output') {
+                if (e.output.length > 0) {
+                    console.log('uci async response (wasm worker)', e.output)
+                }
             } else {
-                console.log(kind, '(worker-wrapper.ts) =>', prettyJson(rest))
+                console.log(e.kind, '(wasm worker) =>', prettyJson(omit(e, 'name', 'kind', 'id')))
             }
         },
     ]

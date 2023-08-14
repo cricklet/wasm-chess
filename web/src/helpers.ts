@@ -63,7 +63,7 @@ export function resolveable<T>(): [promise: Promise<T>, resolve: (t: T) => void]
     return [promise, resolve!];
 }
 
-function indent_string(lines: string, indent: number): string {
+export function indent_string(lines: string, indent: number): string {
     let s = ' '.repeat(indent);
     return lines.split('\n').map(line => s + line).join('\n');
 }
