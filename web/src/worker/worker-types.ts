@@ -14,6 +14,8 @@ export type SendToWorkerWithResponse = ({
 } | {
     name: 'uci',
     line: string,
+} | {
+    name: 'uci-flush-output',
 }) & { id: number };
 
 export function encodeSendToWorker(msg: SendToWorker): string {
@@ -46,6 +48,9 @@ export type ReceiveFromWorkerResponse = ({
     perftResult: number,
 } | {
     name: 'uci',
+    output: string,
+} | {
+    name: 'uci-flush-output',
     output: string,
 }) & {
     kind: 'response',

@@ -72,6 +72,7 @@ async function main() {
         'src/entry.test.ts',
         'src/worker/js-worker-for-testing.ts',
         'src/worker/wasm-worker-for-testing.ts',
+        'src/worker/uci-wasm-worker.ts',
       ],
       bundle: true,
       sourcemap: true,

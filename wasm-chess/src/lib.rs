@@ -4,8 +4,9 @@ mod perft_for_js;
 use wasm_bindgen::prelude::*;
 
 use rust_chess::{
-    helpers::{Error, err},
-    *, game::Game,
+    game::Game,
+    helpers::{err, Error},
+    *, bitboard::warm_magic_cache,
 };
 
 pub fn set_panic_hook() {
@@ -39,7 +40,9 @@ pub struct JsError {
 impl JsError {
     pub fn from(err: Error) -> Self {
         log_to_js(&format!("error in rust-wasm: {:?}", err));
-        JsError { msg: format!("{}", err) }
+        JsError {
+            msg: format!("{}", err),
+        }
     }
 }
 
@@ -53,6 +56,10 @@ impl Into<JsValue> for JsError {
 impl UciForJs {
     pub fn new() -> Self {
         set_panic_hook();
+
+        log_to_js("warming magic cache");
+        warm_magic_cache();
+        log_to_js("... done");
 
         UciForJs {
             uci: uci::Uci {
@@ -76,6 +83,15 @@ impl UciForJs {
     }
 
     pub fn think(&mut self) -> Result<String, JsError> {
-        self.uci.think().map_err(|e| JsError::from(e))
+        let start = chrono::Utc::now();
+
+        let result = self.uci.think().map_err(|e| JsError::from(e));
+
+        let elapsed = chrono::Utc::now() - start;
+        if elapsed > chrono::Duration::milliseconds(1) {
+            log_to_js(&format!("thinking for {} ms", elapsed.num_milliseconds()));
+        }
+
+        result
     }
 }

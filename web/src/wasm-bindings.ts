@@ -92,6 +92,21 @@ export async function wasmWorkerForTesting() {
     }
 }
 
+export async function uciWasmWorker() {
+    let worker = await createWorker('build/worker/uci-wasm-worker.js')
+
+    return {
+        handle_line: async function (line: string): Promise<string> {
+            let response = await worker.sendWithResponse({
+                name: 'uci',
+                line
+            })
+            return response.output
+        },
+        terminate: () => worker.terminate
+    }
+}
+
 let wasmLoaded = false
 export async function loadWasmBindgen(): Promise<void> {
     if (wasmLoaded) {

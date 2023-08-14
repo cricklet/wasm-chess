@@ -2,8 +2,11 @@
 import * as bindings from './wasm-bindings'
 
 describe('wasm-bindings.test.ts', function () {
+    let uciWorker: { handle_line: any; terminate: any }
+
     beforeAll(async function () {
         await bindings.loadWasmBindgen()
+        uciWorker = await bindings.uciWasmWorker()
     })
 
     it('d', function () {
@@ -108,5 +111,16 @@ describe('wasm-bindings.test.ts', function () {
     
         expect(result).toBeGreaterThan(197281)
         worker.terminate()
+    })
+
+    it('wasmWorkerForTesting() search', async function () {
+        let result = ''
+        result += await uciWorker.handle_line('go')
+        await new Promise(resolve => setTimeout(resolve, 3000))
+        result += await uciWorker.handle_line('stop')
+
+        console.log(result)
+        expect(result).toContain('bestmove')
+        uciWorker.terminate()
     })
 })

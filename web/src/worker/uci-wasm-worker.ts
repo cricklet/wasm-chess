@@ -1,4 +1,4 @@
-import { ReceiveFromWorker, decodeSendToWorker, encodeReceiveFromWorker } from "./worker-types";
+import { ReceiveFromWorker, SendToWorkerWithResponse, decodeSendToWorker, encodeReceiveFromWorker } from "./worker-types";
 
 importScripts('/lib/wasm-pack/wasm_chess.js');
 
@@ -17,9 +17,24 @@ async function setupUciForJs(): Promise<{ handleEvent: (MessageEvent: any) => bo
     let uciForJs = await wasm_bindgen.UciForJs.new();
     let uciThinkLoop: ReturnType<typeof setInterval> | undefined = undefined;
 
+    let output: string[] = [];
     uciThinkLoop = setInterval(() => {
-        uciForJs.think();
+        let out = uciForJs.think().trim();
+        if (out.length > 0) {
+            output.push(out);
+        }
     }, 1);
+
+    function flush(request: SendToWorkerWithResponse & { name: 'uci-flush-output' | 'uci' }) {
+        send({
+            kind: 'response',
+            name: request.name,
+            id: request.id,
+            output:
+                output.map(v => v.trim()).filter(line => line.length > 0).join('\n')
+        });
+        output = [];
+    }
 
     // handle messages passed to the worker
     return {
@@ -28,8 +43,15 @@ async function setupUciForJs(): Promise<{ handleEvent: (MessageEvent: any) => bo
 
             switch (data.name) {
                 case 'uci': {
-                    let output = uciForJs.handle_line(data.line);
-                    send({ kind: 'response', name: 'uci', id: data.id, output });
+                    let out = uciForJs.handle_line(data.line).trim();
+                    if (out.length > 0) {
+                        output.push(out);
+                    }
+                    flush(data);
+                    return true;
+                }
+                case 'uci-flush-output': {
+                    flush(data);
                     return true;
                 }
                 default:

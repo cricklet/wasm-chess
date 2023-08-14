@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
 
+use crate::bitboard::warm_magic_cache;
+
 use super::{
     danger::Danger,
     game::{Game, Legal},

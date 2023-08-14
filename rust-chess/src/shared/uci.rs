@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use std::{iter, sync::Mutex};
 
-use crate::search::{LoopResult, Search};
+use crate::{search::{LoopResult, Search}, bitboard::warm_magic_cache};
 
 use super::{
     game::Game,
@@ -84,15 +84,22 @@ impl Uci {
     }
 
     pub fn think(&mut self) -> ErrorResult<String> {
-        if let Some(search) = &mut self.search {
-            let result = search.iterate()?;
+        let mut output: Vec<String> = vec![];
+        for _ in 0..10_000 {
+            if let Some(search) = &mut self.search {
+                let result = search.iterate()?;
 
-            match result {
-                LoopResult::Done => self.finish_search(),
-                _ => Ok("".to_string()),
+                match result {
+                    LoopResult::Done => {
+                        let bestmove = self.finish_search()?;
+                        output.push(bestmove);
+                        break;
+                    },
+                    _ => {},
+                }
             }
-        } else {
-            Ok("".to_string())
         }
+
+        Ok(output.join("\n"))
     }
 }

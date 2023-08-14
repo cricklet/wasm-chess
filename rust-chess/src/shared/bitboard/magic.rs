@@ -420,6 +420,13 @@ pub fn bits_required(piece_index: BoardIndex, piece: WalkType) -> usize {
     }
 }
 
+pub fn warm_magic_cache() {
+    let piece_index = BoardIndex::from(0);
+    for piece in WalkType::iter() {
+        find_magic_value(piece_index, piece);
+    }
+}
+
 pub fn find_magic_value(piece_index: BoardIndex, piece: WalkType) -> Option<MagicValue> {
     let bits_required = bits_required(piece_index, piece);
 
