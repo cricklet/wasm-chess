@@ -299,18 +299,9 @@ impl Game {
         buffer: &mut MoveBuffer,
         options: MoveOptions,
     ) -> ErrorResult<()> {
-        let player: Player = self.player;
+        buffer.clear();
+        all_moves(buffer, self.player, &self, options)?;
 
-        let mut moves_buffer = Box::new(MoveBuffer::default());
-        all_moves(&mut moves_buffer, player, &self, options).unwrap();
-
-        let mut num = 0;
-        for &m in moves_buffer.iter() {
-            *buffer.get_mut(num) = m;
-            num += 1;
-        }
-
-        buffer.set_size(num);
         Ok(())
     }
 
