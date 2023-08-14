@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use std::{iter, sync::Mutex};
 
-use crate::search::{Search, LoopResult};
+use crate::search::{LoopResult, Search};
 
 use super::{
     game::Game,
@@ -38,10 +38,7 @@ impl Uci {
             let depth = match depth.parse::<usize>() {
                 Ok(depth) => depth,
                 Err(_) => {
-                    return err_result(&format!(
-                        "invalid depth for '{}'",
-                        line
-                    ));
+                    return err_result(&format!("invalid depth for '{}'", line));
                 }
             };
             let perft_result = run_perft_counting_first_move(&self.game, depth);
@@ -66,12 +63,23 @@ impl Uci {
             self.search = Some(search);
             Ok("".to_string())
         } else if line == "stop" {
-            Ok("".to_string())
+            self.finish_search()
         } else {
-            err_result(&format!(
-                "Unknown command: '{}'",
-                line
-            ))
+            err_result(&format!("Unknown command: '{}'", line))
+        }
+    }
+
+    fn finish_search(&mut self) -> ErrorResult<String> {
+        if let Some(search) = &mut self.search {
+            let best_move = search.bestmove();
+            self.search = None;
+
+            match best_move {
+                Some((best_move, _)) => Ok(format!("bestmove {}", best_move)),
+                None => Ok("bestmove (none)".to_string()),
+            }
+        } else {
+            Ok("".to_string())
         }
     }
 
@@ -80,22 +88,11 @@ impl Uci {
             let result = search.iterate()?;
 
             match result {
-                LoopResult::Done => {
-                    let best_move = search.bestmove();
-                    self.search = None;
-
-                    match best_move {
-                        Some((best_move, _)) => {
-                            Ok(format!("bestmove {}", best_move))
-                        }
-                        None => Ok("bestmove (none)".to_string()),
-                    }
-                }
+                LoopResult::Done => self.finish_search(),
                 _ => Ok("".to_string()),
             }
         } else {
             Ok("".to_string())
         }
     }
-
 }

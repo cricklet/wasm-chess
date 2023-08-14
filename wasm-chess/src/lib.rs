@@ -3,8 +3,6 @@ mod perft_for_js;
 
 use wasm_bindgen::prelude::*;
 
-use web_sys::console;
-
 use rust_chess::{
     helpers::{Error, err},
     *, game::Game,

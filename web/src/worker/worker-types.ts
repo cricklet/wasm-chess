@@ -11,6 +11,9 @@ export type SendToWorkerWithResponse = ({
     name: 'counter-count',
 } | {
     name: 'perft-count',
+} | {
+    name: 'uci',
+    line: string,
 }) & { id: number };
 
 export function encodeSendToWorker(msg: SendToWorker): string {
@@ -41,6 +44,9 @@ export type ReceiveFromWorkerResponse = ({
 } | {
     name: 'perft-count',
     perftResult: number,
+} | {
+    name: 'uci',
+    output: string,
 }) & {
     kind: 'response',
     id: number,

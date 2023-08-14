@@ -1,4 +1,4 @@
-import {  SendToWorker, ReceiveFromWorkerResponse, SendToWorkerWithResponse, ReceiveFromWorkerMessage, decodeReceiveFromWorker, ReceiveFromWorker, responseMatchesRequest } from "./worker-types"
+import {  SendToWorker, ReceiveFromWorkerResponse, ReceiveFromWorkerMessage, decodeReceiveFromWorker, ReceiveFromWorker, responseMatchesRequest, SendToWorkerWithResponse } from "./worker-types"
 
 export async function createWorker(url: string) {
     let worker = new Worker(url)
@@ -53,7 +53,7 @@ export async function createWorker(url: string) {
             S extends Omit<SendToWorkerWithResponse, "id">,
         > (data: S): Promise<ReceiveFromWorkerResponse & Pick<S, "name">> => {
             let id = responseId++
-            let sent: SendToWorkerWithResponse = { ...data, id }
+            let sent = { ...data, id } as SendToWorkerWithResponse
 
             worker.postMessage(JSON.stringify(sent))
             return await waitFor((e: ReceiveFromWorker): ReceiveFromWorkerResponse & Pick<S, "name"> | undefined => {
