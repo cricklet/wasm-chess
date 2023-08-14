@@ -6,7 +6,7 @@ describe('wasm-bindings.test.ts', function () {
 
     beforeAll(async function () {
         await bindings.loadWasmBindgen()
-        uciWorker = await bindings.uciWasmWorker()
+        uciWorker = await bindings.loadUciWasmWorker()
     })
 
     it('d', function () {

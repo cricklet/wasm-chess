@@ -92,7 +92,7 @@ export async function wasmWorkerForTesting() {
     }
 }
 
-export async function uciWasmWorker() {
+export async function loadUciWasmWorker() {
     let worker = await createWorker('build/worker/uci-wasm-worker.js')
 
     return {

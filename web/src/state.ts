@@ -20,13 +20,15 @@ export const atomGame = atom<GameState>({
     moves: ['e2e4'],
 })
 
-// const atomEngine = atom(null, (get, set) => {
-//     const game = get(atomGame)
-//     if (game.moves.length % 2 === 0) {
-//         // engine's turn
-//         wasmUci.setPosition(game.start, game.moves)
-//     }
-// })
+let _workerUci: Awaited<ReturnType<typeof wasm.loadUciWasmWorker>> | ReturnType<typeof wasm.loadUciWasmWorker> | undefined = undefined
+export async function workerUci(): ReturnType<typeof wasm.loadUciWasmWorker> {
+    if (!_workerUci) {
+        _workerUci  = wasm.loadUciWasmWorker()
+        _workerUci = await _workerUci
+    }
+
+    return await Promise.resolve(_workerUci)
+}
 
 export function performMove(move: string, game: GameState): GameState {
     return {
