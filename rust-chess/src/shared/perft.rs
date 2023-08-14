@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-
 use crate::bitboard::warm_magic_cache;
 
 use super::{
@@ -295,7 +294,7 @@ pub fn run_perft_recursively(game: Game, max_depth: usize) -> ErrorResult<usize>
 }
 
 pub fn run_perft_iteratively<const N: usize>(game: Game) -> ErrorResult<usize> {
-    let mut data = TraversalStack::<(), N>::new(game)?;
+    let mut data = TraversalStack::<(), N>::new(game, &mut |_| ())?;
     let mut overall_count = 0;
 
     if N <= 1 {
@@ -415,7 +414,6 @@ fn test_perft_start_board_iteratively() {
 
 const MAX_PERFT_DEPTH: usize = 10;
 
-
 #[derive(Debug, PartialEq, Eq)]
 pub enum PerftLoopResult {
     Continue,
@@ -442,7 +440,7 @@ impl PerftLoop {
         }
 
         let game = Game::from_fen(fen).unwrap();
-        let stack = TraversalStack::<(), MAX_PERFT_DEPTH>::new(game).unwrap();
+        let stack = TraversalStack::<(), MAX_PERFT_DEPTH>::new(game, &mut |_| ()).unwrap();
 
         Self {
             stack,
@@ -497,6 +495,4 @@ impl PerftLoop {
 
         PerftLoopResult::Continue
     }
-
-
 }

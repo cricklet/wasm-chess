@@ -32,48 +32,51 @@ pub fn err(msg: &str) -> Error {
     {
         panic!("{}", msg);
     }
-    let backtrace = Backtrace::force_capture();
-    let backtrace_str = backtrace.to_string();
-    let mut backtrace_lines = backtrace_str.lines().collect::<Vec<_>>();
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let backtrace = Backtrace::force_capture();
+        let backtrace_str = backtrace.to_string();
+        let mut backtrace_lines = backtrace_str.lines().collect::<Vec<_>>();
 
-    let project_name = module_path!().split("::").next().unwrap();
+        let project_name = module_path!().split("::").next().unwrap();
 
-    let first_line_without_helpers_err = {
-        let mut first_line_without_helpers_err = None;
-        for (i, line) in backtrace_lines.iter().enumerate() {
-            if line.contains("helpers::err") {
-                first_line_without_helpers_err = Some(i);
-                break;
+        let first_line_without_helpers_err = {
+            let mut first_line_without_helpers_err = None;
+            for (i, line) in backtrace_lines.iter().enumerate() {
+                if line.contains("helpers::err") {
+                    first_line_without_helpers_err = Some(i);
+                    break;
+                }
+            }
+            first_line_without_helpers_err
+        };
+
+        let last_line_with_project_name = {
+            let mut last_line_with_project_name = None;
+            for (i, line) in backtrace_lines.iter().enumerate() {
+                if line.contains(project_name) {
+                    last_line_with_project_name = Some(i);
+                }
+            }
+            last_line_with_project_name
+        };
+
+        if let Some(i) = last_line_with_project_name {
+            backtrace_lines = backtrace_lines[..i + 1].to_vec();
+        }
+
+        if let Some(i) = first_line_without_helpers_err {
+            if i + 2 < backtrace_lines.len() {
+                backtrace_lines = backtrace_lines[i + 2..].to_vec();
             }
         }
-        first_line_without_helpers_err
-    };
 
-    let last_line_with_project_name = {
-        let mut last_line_with_project_name = None;
-        for (i, line) in backtrace_lines.iter().enumerate() {
-            if line.contains(project_name) {
-                last_line_with_project_name = Some(i);
-            }
+        let backtrace_str = pretty_backtrace(&backtrace_lines);
+        let backtrace_str = backtrace_str.unwrap();
+
+        Error {
+            msg: msg.to_string() + "\n" + backtrace_str.as_str(),
         }
-        last_line_with_project_name
-    };
-
-    if let Some(i) = last_line_with_project_name {
-        backtrace_lines = backtrace_lines[..i + 1].to_vec();
-    }
-
-    if let Some(i) = first_line_without_helpers_err {
-        if i + 2 < backtrace_lines.len() {
-            backtrace_lines = backtrace_lines[i + 2..].to_vec();
-        }
-    }
-
-    let backtrace_str = pretty_backtrace(&backtrace_lines);
-    let backtrace_str = backtrace_str.unwrap();
-
-    Error {
-        msg: msg.to_string() + "\n" + backtrace_str.as_str(),
     }
 }
 
@@ -378,18 +381,38 @@ fn test_map_results() {
 }
 
 pub trait OptionResult<T> {
-    fn expect_ok(self, msg: &str) -> ErrorResult<T>;
+    fn expect_ok<F: Fn() -> String>(self, msg_callback: F) -> ErrorResult<T>;
     fn as_result(self) -> ErrorResult<T>;
 }
 
 impl<T> OptionResult<T> for Option<T> {
-    fn expect_ok(self, msg: &str) -> ErrorResult<T> {
-        self.ok_or_else(|| err(msg))
+    fn expect_ok<F: Fn() -> String>(self, msg_callback: F) -> ErrorResult<T> {
+        self.ok_or_else(|| err(&msg_callback()))
     }
 
     fn as_result(self) -> ErrorResult<T> {
-        self.ok_or_else(|| {
-            err("expected Some, got None")
-        })
+        self.ok_or_else(|| err("expected Some, got None"))
     }
+}
+
+pub struct ScopeCall<F: FnMut()> {
+    c: F,
+}
+
+impl<F: FnMut()> Drop for ScopeCall<F> {
+    fn drop(&mut self) {
+        (self.c)();
+    }
+}
+
+#[macro_export]
+macro_rules! defer {
+    ($e:expr) => {
+        use crate::helpers::ScopeCall;
+        let _scope_call = ScopeCall {
+            c: || -> () {
+                $e;
+            },
+        };
+    };
 }

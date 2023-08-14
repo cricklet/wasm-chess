@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use std::{iter, sync::Mutex};
 
-use crate::{search::{LoopResult, Search}, bitboard::warm_magic_cache};
+use crate::{search::{LoopResult, SearchStack}, bitboard::warm_magic_cache};
 
 use super::{
     game::Game,
@@ -15,7 +15,7 @@ pub struct UciAsync {
 
 pub struct Uci {
     pub game: Game,
-    pub search: Option<Search>,
+    pub search: Option<SearchStack>,
 }
 
 impl Uci {
@@ -59,7 +59,7 @@ impl Uci {
             let debug_str = format!("{}\nFen: {}", self.game, self.game.to_fen());
             Ok(debug_str)
         } else if line == "go" {
-            let search = Search::new(self.game)?;
+            let search = SearchStack::new(self.game)?;
             self.search = Some(search);
             Ok("".to_string())
         } else if line == "stop" {

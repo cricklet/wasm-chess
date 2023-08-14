@@ -75,7 +75,7 @@ pub enum MoveType {
     Invalid,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Eq, PartialEq, Clone)]
 pub struct SizedMoveBuffer<const N: usize> {
     pub moves: [Move; N],
     pub size: usize,

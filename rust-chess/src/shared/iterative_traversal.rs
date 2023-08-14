@@ -19,7 +19,7 @@ pub enum FinishedTraversing {
     Yes,
 }
 
-#[derive(Default, Copy, Clone)]
+#[derive(Default)]
 pub struct IndexedMoveBuffer {
     buffer: MoveBuffer,
     index: usize,
@@ -42,7 +42,7 @@ impl Debug for IndexedMoveBuffer {
     }
 }
 
-#[derive(Default, Debug, Copy, Clone)]
+#[derive(Default, Debug)]
 pub struct TraversalStackFrame<D> {
     pub game: Game,
 
@@ -137,12 +137,12 @@ impl<D> TraversalStackFrame<D> {
     }
 }
 
-pub struct TraversalStack<D: Debug + Default + Copy, const N: usize> {
+pub struct TraversalStack<D: Debug, const N: usize> {
     stack: [TraversalStackFrame<D>; N],
     pub depth: usize,
 }
 
-impl<D: Debug + Default + Copy, const N: usize> Debug for TraversalStack<D, N> {
+impl<D: Debug, const N: usize> Debug for TraversalStack<D, N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut debug = f.debug_struct("TraversalStack");
         debug.field("depth", &self.depth);
@@ -157,10 +157,15 @@ impl<D: Debug + Default + Copy, const N: usize> Debug for TraversalStack<D, N> {
     }
 }
 
-impl<D: Debug + Default + Copy, const N: usize> TraversalStack<D, N> {
-    pub fn new(game: Game) -> ErrorResult<Self> {
+impl<D: Debug, const N: usize> TraversalStack<D, N> {
+    pub fn new(game: Game, data_callback: &mut impl FnMut(usize) -> D) -> ErrorResult<Self> {
         let mut data = Self {
-            stack: [TraversalStackFrame::default(); N],
+            stack: std::array::from_fn(|i| TraversalStackFrame {
+                game: Game::default(),
+                danger: None,
+                moves: None,
+                data: data_callback(i),
+            }),
             depth: 0,
         };
         let start = &mut data.stack[0];
@@ -234,8 +239,13 @@ impl<D: Debug + Default + Copy, const N: usize> TraversalStack<D, N> {
         }
 
         let node = self.stack.get(depth - 1).as_result()?;
-        match node.moves {
-            None => err_result(&format!("no moves at previous depth {} to get to {}, {:#?}", depth - 1, depth, self))?,
+        match &node.moves {
+            None => err_result(&format!(
+                "no moves at previous depth {} to get to {}, {:#?}",
+                depth - 1,
+                depth,
+                self
+            ))?,
             Some(moves) => {
                 if moves.index == 0 {
                     return Ok(None);
