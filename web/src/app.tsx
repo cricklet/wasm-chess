@@ -10,7 +10,7 @@ import QueenSvg from './assets/queen.svg'
 import PawnSvg from './assets/pawn.svg'
 import { Board, Piece, Row, locationStr, rankStr, } from './helpers'
 import { atom, useAtom, useAtomValue, useSetAtom } from 'jotai'
-import { atomBoard, logAtom, atomInput, atomLegalMoves, atomCompleteMovesMatchingInput, atomValidPortionOfInput, atomInputIsLegal as atomInputIsLegalMove, atomValidStartsForInput as atomValidStartsMatchingInput, atomStartFromInput, atomValidEndsForInput as atomValidEndsMatchingInput, atomGame, atomLegalStarts, atomEndFromInput, finalizeMove, performMove, workerUci } from './state'
+import { atomBoard, logAtom, atomInput, atomLegalMoves, atomCompleteMovesMatchingInput, atomValidPortionOfInput, atomInputIsLegal as atomInputIsLegalMove, atomValidStartsForInput as atomValidStartsMatchingInput, atomStartFromInput, atomValidEndsForInput as atomValidEndsMatchingInput, atomGame, atomLegalStarts, atomEndFromInput, finalizeMove, performMove } from './state'
 import { isValidElement, useEffect } from 'react'
 import * as wasm from './wasm-bindings'
 
@@ -230,19 +230,10 @@ function App() {
 
   useEffect(() => {
     async function think() {
-      let worker = await workerUci()
-
-      let output = []
-      output.push(await worker.handle_line(`position ${game.start} moves ${game.moves.join(' ')}`))
-      output.push(await worker.handle_line('go'))
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      output.push(await worker.handle_line('stop'))
-
-      for (const line of output) {
-        console.log('(useEffect) thinking:', line)
-      }
+      let worker = await wasm.searchWorker()
+      let bestMove = await worker.search(game.start, game.moves)
+      console.log(`App::useEffect, best move: ${bestMove}`)
     }
-
     think()
   }, [game])
 

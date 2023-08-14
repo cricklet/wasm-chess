@@ -7,10 +7,10 @@ interface GameState {
     moves: string[],
 }
 
-let _wasmUci: ReturnType<typeof wasm.newUciForJs> | undefined = undefined
-function wasmUci(): ReturnType<typeof wasm.newUciForJs> {
+let _wasmUci: ReturnType<typeof wasm.syncWasmUci> | undefined = undefined
+function wasmUci(): ReturnType<typeof wasm.syncWasmUci> {
     if (!_wasmUci) {
-        _wasmUci = wasm.newUciForJs()
+        _wasmUci = wasm.syncWasmUci()
     }
     return _wasmUci
 }
@@ -19,16 +19,6 @@ export const atomGame = atom<GameState>({
     start: 'startpos',
     moves: ['e2e4'],
 })
-
-let _workerUci: Awaited<ReturnType<typeof wasm.loadUciWasmWorker>> | ReturnType<typeof wasm.loadUciWasmWorker> | undefined = undefined
-export async function workerUci(): ReturnType<typeof wasm.loadUciWasmWorker> {
-    if (!_workerUci) {
-        _workerUci  = wasm.loadUciWasmWorker()
-        _workerUci = await _workerUci
-    }
-
-    return await Promise.resolve(_workerUci)
-}
 
 export function performMove(move: string, game: GameState): GameState {
     return {

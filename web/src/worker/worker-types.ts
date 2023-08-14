@@ -57,6 +57,17 @@ export type ReceiveFromWorkerResponse = ({
     id: number,
 };
 
+export function isEmpty(msg: ReceiveFromWorker): boolean {
+    if (msg.name === 'log') {
+        return msg.msg.length === 0;
+    } else if (msg.name === 'uci') {
+        return msg.output.length === 0;
+    } else if (msg.name === 'uci-flush-output') {
+        return msg.output.length === 0;
+    }
+    return false
+}
+
 export function isResponse(msg: ReceiveFromWorker): msg is ReceiveFromWorkerResponse {
     return msg.kind === 'response' && msg.id !== undefined;
 }

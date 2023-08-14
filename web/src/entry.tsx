@@ -1,8 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './app'
-import { loadWasmBindgen } from './wasm-bindings'
-import { workerUci } from './state'
+import { loadWasmBindgen, searchWorker } from './wasm-bindings'
 
 
 new EventSource('/esbuild').addEventListener('change', () => location.reload())
@@ -14,7 +13,7 @@ const root = ReactDOM.createRoot(rootEl);
 
 (async () => {
   await loadWasmBindgen()
-  await workerUci()
+  await searchWorker()
 
   root.render(
     <React.StrictMode>

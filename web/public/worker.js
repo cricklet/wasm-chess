@@ -3,8 +3,6 @@
 // available which we need to initialize our Wasm code.
 importScripts('lib/wasm-pack/wasm_chess.js');
 
-console.log('initializing worker')
-
 async function init_wasm_in_worker() {
     // load the wasm
     await wasm_bindgen('./lib/wasm-pack/wasm_chess_bg.wasm');

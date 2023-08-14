@@ -2,27 +2,25 @@
 import * as bindings from './wasm-bindings'
 
 describe('wasm-bindings.test.ts', function () {
-    let uciWorker: { handle_line: any; terminate: any }
 
     beforeAll(async function () {
         await bindings.loadWasmBindgen()
-        uciWorker = await bindings.loadUciWasmWorker()
     })
 
     it('d', function () {
-        let uci = bindings.newUciForJs()
+        let uci = bindings.syncWasmUci()
         uci.setPosition('startpos', [])
         expect(uci.currentFen()).toBe('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1')
     })
     it('e2e4', function () {
-        let uci = bindings.newUciForJs()
+        let uci = bindings.syncWasmUci()
         let start = 'startpos'
         let moves = ['e2e4']
         uci.setPosition(start, moves)
         expect(uci.currentFen()).toBe('rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 1 1')
     })
     it('possibleMoves`', function () {
-        let uci = bindings.newUciForJs()
+        let uci = bindings.syncWasmUci()
         let start = 'startpos'
         let moves = ['e2e4']
         uci.setPosition(start, moves)
@@ -113,14 +111,16 @@ describe('wasm-bindings.test.ts', function () {
         worker.terminate()
     })
 
-    it('wasmWorkerForTesting() search', async function () {
-        let result = ''
-        result += await uciWorker.handle_line('go')
-        await new Promise(resolve => setTimeout(resolve, 3000))
-        result += await uciWorker.handle_line('stop')
+    describe('wasmWorkerForTesting()', function () {
+        let uciWorker: Awaited<ReturnType<typeof bindings.searchWorker>>
+        beforeEach(async function () {
+            uciWorker = await bindings.searchWorker()
+        })
 
-        console.log(result)
-        expect(result).toContain('bestmove')
-        uciWorker.terminate()
+        it('search via uci commands', async function () {
+            let result = await uciWorker.search('startpos', ['e2e4'])
+            console.log(result)
+            expect(result.length).toBe(4)
+        })
     })
 })

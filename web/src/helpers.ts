@@ -54,3 +54,59 @@ export function boardFromFen(fen: string): Board {
 export function boardString(board: Board): string {
     return [...board].map(row => row.join('')).join('\n');
 }
+
+export function resolveable<T>(): [promise: Promise<T>, resolve: (t: T) => void] {
+    let resolve: (t: T) => void;
+    let promise = new Promise<T>((r) => {
+        resolve = r;
+    });
+    return [promise, resolve!];
+}
+
+function indent_string(lines: string, indent: number): string {
+    let s = ' '.repeat(indent);
+    return lines.split('\n').map(line => s + line).join('\n');
+}
+
+export function prettyJson(json: any, indent?: number): string {
+    if (!indent) {
+        indent = 0;
+    }
+
+    // array
+    if (Array.isArray(json)) {
+        let result = "";
+        for (let value of json) {
+            result += "\n  " + value;
+        }
+        return result;
+    }
+
+    let result = "{" + "\n";
+
+    for (let key in json) {
+        let value = json[key];
+        if (typeof value == 'string') {
+            if (value.indexOf("\n") != -1) {
+                result += "  " + key + ": " + "\n";
+                result += indent_string(value, 4) + "\n";
+            } else {
+                result += "  " + key + ": " + value + "\n";
+            }
+        } else {
+            result += "  " + key + ": " + value + "\n";
+        }
+    }
+
+    return result;
+}
+
+export function omit<T, K extends keyof T>(obj: T, ...keys: K[]): Omit<T, K> {
+    let result: any = {};
+    for (let key in obj) {
+        if (!keys.includes(key as any)) {
+            result[key] = obj[key];
+        }
+    }
+    return result;
+}

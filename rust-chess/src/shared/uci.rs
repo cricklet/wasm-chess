@@ -75,7 +75,7 @@ impl Uci {
             self.search = None;
 
             match best_move {
-                Some((best_move, _)) => Ok(format!("bestmove {}", best_move)),
+                Some((best_move, _)) => Ok(format!("bestmove {}", best_move.to_uci())),
                 None => Ok("bestmove (none)".to_string()),
             }
         } else {
@@ -85,7 +85,7 @@ impl Uci {
 
     pub fn think(&mut self) -> ErrorResult<String> {
         let mut output: Vec<String> = vec![];
-        for _ in 0..10_000 {
+        for _ in 0..100_000 {
             if let Some(search) = &mut self.search {
                 let result = search.iterate()?;
 

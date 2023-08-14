@@ -26,7 +26,7 @@ export function listen(listener: WasmListener): () => void {
 
 globalThis.BindingsJs = {
     log_to_js: (message: string): void => {
-        console.log('> (wasm) log:', message)
+        console.log('wasm-bindings.ts, log_to_js:', message)
         message.split('\n').forEach((line) => {
             listeners.forEach((listener) => listener(line))
         })
@@ -37,6 +37,7 @@ globalThis.BindingsJs = {
 // for modules isn't very mature, the wasm bindings are instead imported via a
 // <script> tag which sets a global variable called `wasm_bindgen`.
 import '../public/lib/wasm-pack/wasm_chess'
+import { resolveable } from './helpers'
 import { createWorker } from './worker/worker-wrapper'
 
 
@@ -47,7 +48,6 @@ export function jsWorkerForTesting() {
         echo: (message: string) => {
             const result = new Promise<string>((resolve) => {
                 worker.onmessage = (e) => {
-                    console.log('message received by typescript:', e.data)
                     resolve(e.data)
                     worker.onmessage = null
                 }
@@ -92,7 +92,7 @@ export async function wasmWorkerForTesting() {
     }
 }
 
-export async function loadUciWasmWorker() {
+export async function newUciWasmWorker() {
     let worker = await createWorker('build/worker/uci-wasm-worker.js')
 
     return {
@@ -106,6 +106,60 @@ export async function loadUciWasmWorker() {
         terminate: () => worker.terminate
     }
 }
+
+let _workerUci: ReturnType<typeof newUciWasmWorker> | undefined = undefined
+async function singletonUciWorker(): ReturnType<typeof newUciWasmWorker> {
+    if (!_workerUci) {
+        _workerUci  = newUciWasmWorker()
+        _workerUci = Promise.resolve(await _workerUci)
+    }
+
+    return await Promise.resolve(_workerUci)
+}
+
+let _searchResults: Map<string, Promise<string>> = new Map()
+
+export async function searchWorker(): Promise<{
+  search: (start: string, moves: string[]) => Promise<string>,
+  terminate: () => void 
+}> {
+    let worker = await singletonUciWorker()
+
+    return {
+        search: async (start: string, moves: string[]) => {
+            let key = `${start}-${moves.join('-')}`
+
+            let result = _searchResults.get(key)
+            if (result) {
+                return await result;
+            }
+
+            let [promise, resolve] = resolveable<string>()
+            _searchResults.set(key, promise)
+
+            // cancel what we're currently doing
+            await worker.handle_line('stop')
+
+            let output = []
+            output.push(await worker.handle_line(`position ${start} moves ${moves.join(' ')}`))
+            output.push(await worker.handle_line('go'))
+            await new Promise(resolve => setTimeout(resolve, 1000))
+            output.push(await worker.handle_line('stop'))
+
+            for (let line of output) {
+                if (line.startsWith('bestmove')) {
+                    let result = line.split(' ')[1]
+                    resolve(result)
+                    return result
+                }
+            }
+
+            throw new Error('no bestmove found')
+        },
+        terminate: () => worker.terminate()
+    }
+}
+
 
 let wasmLoaded = false
 export async function loadWasmBindgen(): Promise<void> {
@@ -125,12 +179,13 @@ export async function loadWasmBindgen(): Promise<void> {
     wasmLoaded = true
 }
 
-export function newUciForJs() {
+export function syncWasmUci() {
     let uci = wasm_bindgen.UciForJs.new()
 
     function handleLineAndLog(line: string) {
         let result = uci.handle_line(line)
-        console.log('> (wasm) returned:', result)
+        console.log('wasm-bindings.ts, syncWasmUci <=', line)
+        console.log('wasm-bindings.ts, syncWasmUci =>', result)
         return result
     }
 
@@ -145,7 +200,7 @@ export function newUciForJs() {
                 }
             }
 
-            console.log('> (wasm) returned currentFen:', fen)
+            console.log('wasm-bindings.ts, syncWasmUci, currentFen() =>', result)
             return fen
         },
         possibleMoves: (): string[] => {
@@ -170,7 +225,7 @@ export function newUciForJs() {
                 }
                 moves.push(move)
             }
-            console.log('> (wasm) returned moves:', moves)
+            console.log('wasm-bindings.ts, syncWasmUci, possibleMoves() =>', moves)
             return moves
         },
         setPosition: (position: string, moves: string[]) => {
