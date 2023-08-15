@@ -71,7 +71,7 @@ fn main() {
         }
 
         println!(
-            "search found: {:?} in {} ms",
+            "search found: {:#?} in {} ms",
             search.bestmove(),
             (std::time::Instant::now() - start_time).as_millis()
         );
