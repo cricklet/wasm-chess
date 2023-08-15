@@ -62,7 +62,7 @@ fn main() {
         let p = Profiler::new("alpha_beta".to_string());
 
         let start_time = std::time::Instant::now();
-        let mut search = SearchStack::with_max_depth(Game::from_fen("startpos").unwrap(), 5).unwrap();
+        let mut search = SearchStack::with(Game::from_fen("startpos").unwrap(), 5).unwrap();
         loop {
             match search.iterate().unwrap() {
                 LoopResult::Continue => {}

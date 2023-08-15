@@ -89,7 +89,16 @@ impl UciForJs {
 
         let elapsed = chrono::Utc::now() - start;
         if elapsed > chrono::Duration::milliseconds(1) {
-            log_to_js(&format!("think() for {} ms", elapsed.num_milliseconds()));
+            let ms = elapsed.num_milliseconds();
+            if ms < 10 {
+                log_to_js("think() for < 10ms");
+            } else if ms < 40 {
+                log_to_js("think() for < 40ms");
+            } else if ms < 200 {
+                log_to_js("think() for < 200ms");
+            } else {
+                log_to_js(&format!("think() for {}ms", ms));
+            }
         }
 
         Ok(result)

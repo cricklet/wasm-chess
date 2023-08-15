@@ -5,7 +5,7 @@ use itertools::Itertools;
 use crate::{
     defer,
     helpers::{err_result, OptionResult},
-    iterative_traversal::{IndexedMoveBuffer, TraversalStack},
+    iterative_traversal::{IndexedMoveBuffer, TraversalStack, null_move_sorter},
 };
 
 use super::{
@@ -399,7 +399,7 @@ pub struct SearchStack {
 }
 
 impl SearchStack {
-    pub fn new(game: Game) -> ErrorResult<Self> {
+    pub fn default(game: Game) -> ErrorResult<Self> {
         Ok(Self {
             traversal: TraversalStack::<SearchFrameData, MAX_ALPHA_BETA_DEPTH>::new(game, || {
                 SearchFrameData::default()
@@ -409,7 +409,7 @@ impl SearchStack {
             done: false,
         })
     }
-    pub fn with_max_depth(game: Game, max_depth: usize) -> ErrorResult<Self> {
+    pub fn with(game: Game, max_depth: usize) -> ErrorResult<Self> {
         Ok(Self {
             traversal: TraversalStack::<SearchFrameData, MAX_ALPHA_BETA_DEPTH>::new(game, || {
                 SearchFrameData::default()
@@ -510,7 +510,7 @@ impl SearchStack {
     }
 
     fn apply_next_move_or_return(&mut self) -> ErrorResult<Option<LoopResult>> {
-        let next_move = self.traversal.get_and_increment_move()?;
+        let next_move = self.traversal.get_and_increment_move(null_move_sorter)?;
         if let Some(next_move) = next_move {
             // If there are moves left at 'current', apply the move
             let (current, next) = self.traversal.current_and_next_mut()?;
@@ -664,7 +664,7 @@ impl InQuiescence {
 
 #[test]
 fn test_start_search() {
-    let mut search = SearchStack::with_max_depth(Game::from_fen("startpos").unwrap(), 4).unwrap();
+    let mut search = SearchStack::with(Game::from_fen("startpos").unwrap(), 4).unwrap();
     loop {
         match search.iterate().unwrap() {
             LoopResult::Continue => {}

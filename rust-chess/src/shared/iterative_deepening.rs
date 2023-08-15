@@ -24,7 +24,7 @@ pub struct IterativeSearch {
 
 impl IterativeSearch {
     pub fn new(game: Game) -> ErrorResult<Self> {
-        let search = SearchStack::with_max_depth(game, 1)?;
+        let search = SearchStack::with(game, 1)?;
         Ok(Self {
             search,
             start_game: game,
@@ -77,7 +77,7 @@ impl IterativeSearch {
                             .push(iter::once(bestmove).chain(response).collect());
 
                         self.search =
-                            SearchStack::with_max_depth(self.start_game.clone(), depth + 1)?;
+                            SearchStack::with(self.start_game.clone(), depth + 1)?;
                     }
                 }
             }

@@ -7,9 +7,9 @@ use super::danger::Danger;
 use super::game::Game;
 use super::game::Legal;
 use super::helpers::err_result;
+use super::helpers::Clearable;
 use super::helpers::ErrorResult;
 use super::helpers::OptionResult;
-use super::helpers::Clearable;
 use super::moves::Move;
 use super::moves::MoveOptions;
 use super::moves::OnlyCaptures;
@@ -36,7 +36,8 @@ impl Clearable for IndexedMoveBuffer {
 
 impl Debug for IndexedMoveBuffer {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut lines = self.buffer
+        let mut lines = self
+            .buffer
             .iter()
             .map(|m| format!("{:?}", m))
             .collect::<Vec<_>>();
@@ -93,11 +94,13 @@ impl<D> TraversalStackFrame<D> {
         self.moves.clear();
 
         self.lazily_generate_danger()?;
-        self.lazily_generate_moves()?;
-
         Ok(())
     }
-    pub fn lazily_generate_moves(&mut self) -> ErrorResult<&IndexedMoveBuffer> {
+
+    pub fn lazily_generate_moves<S: Fn(&mut Vec<Move>) -> ErrorResult<()>>(
+        &mut self,
+        move_sorter: S,
+    ) -> ErrorResult<&IndexedMoveBuffer> {
         if self.moves.is_some() {
             return self.moves.get_ref().as_result();
         }
@@ -114,6 +117,8 @@ impl<D> TraversalStackFrame<D> {
             },
         )?;
 
+        move_sorter(buffer)?;
+
         Ok(self.moves.get_ref().unwrap())
     }
 
@@ -126,8 +131,11 @@ impl<D> TraversalStackFrame<D> {
         Ok(self.danger.as_ref().unwrap())
     }
 
-    pub fn get_and_increment_move(&mut self) -> ErrorResult<Option<Move>> {
-        self.lazily_generate_moves()?;
+    pub fn get_and_increment_move<S: Fn(&mut Vec<Move>) -> ErrorResult<()>>(
+        &mut self,
+        move_sorter: S,
+    ) -> ErrorResult<Option<Move>> {
+        self.lazily_generate_moves(move_sorter)?;
 
         let current_moves = self.moves.get_mut().as_result()?;
         if current_moves.index >= current_moves.buffer.len() {
@@ -230,9 +238,12 @@ impl<D: Debug, const N: usize> TraversalStack<D, N> {
         }
     }
 
-    pub fn get_and_increment_move(&mut self) -> ErrorResult<Option<Move>> {
-        let (current, _) = self.current_mut()?;
-        current.get_and_increment_move()
+    pub fn get_and_increment_move<S: Fn(usize, &mut Vec<Move>) -> ErrorResult<()>>(
+        &mut self,
+        sorter: S,
+    ) -> ErrorResult<Option<Move>> {
+        let (current, current_depth) = self.current_mut()?;
+        current.get_and_increment_move(|moves: &mut Vec<Move>| sorter(current_depth, moves))
     }
 
     pub fn move_applied_before_depth(&self, depth: usize) -> ErrorResult<Option<Move>> {
@@ -258,4 +269,8 @@ impl<D: Debug, const N: usize> TraversalStack<D, N> {
             ))?
         }
     }
+}
+
+pub fn null_move_sorter(_depth: usize, _moves: &mut Vec<Move>) -> ErrorResult<()> {
+    Ok(())
 }
