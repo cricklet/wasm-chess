@@ -40,7 +40,20 @@ pub enum Score {
     Unknown,
     Centipawns(Player, isize),
     WinInN(Player, usize),
-    DrawInN(Player, usize),
+    DrawInN(usize),
+}
+
+impl Score {
+    pub fn increment_turns(self) -> Self {
+        let mut new_score = self;
+        match new_score {
+            Score::WinInN(_, ref mut i) => *i += 1,
+            Score::DrawInN(ref mut i) => *i += 1,
+            Score::Centipawns(..) => {}
+            Score::Unknown => {}
+        }
+        new_score
+    }
 }
 
 impl Default for Score {
@@ -67,11 +80,6 @@ impl Comparison {
 }
 
 impl Score {
-    // struct ComparisonPoints {
-    //     mate: isize, // 0 if no mate. 
-    //     draw: boolean,
-    //     eval: isize,
-    // }
     fn comparison_points(&self, current_player: Player) -> Option<(isize, isize)> {
         match self {
             Score::Centipawns(player, score) => {
@@ -83,19 +91,20 @@ impl Score {
             }
             Score::WinInN(player, n) => {
                 if *player == current_player {
-                    Some((- (*n as isize), 0))
+                    Some((999999 - *n as isize, 0))
                 } else {
-                    Some((*n as isize, 0))
+                    Some((-99999 + *n as isize, 0))
                 }
             }
-            Score::DrawInN(player, n) => {
-                if *player == current_player {
-                    Some((0, 0))
-                } else {
-                    Some((0, 0))
-                }
-            }
+            Score::DrawInN(_) => Some((0, 0)),
             Score::Unknown => None,
+        }
+    }
+
+    fn is_draw(&self) -> bool {
+        match self {
+            Score::DrawInN(_) => true,
+            _ => false,
         }
     }
 
@@ -106,8 +115,16 @@ impl Score {
         if left_points.is_none() || right_points.is_none() {
             return Comparison::Unknown;
         }
-        let (left_mate, left_eval) = left_points.unwrap();
-        let (right_mate, right_eval) = right_points.unwrap();
+        let (left_mate, mut left_eval) = left_points.unwrap();
+        let (right_mate, mut right_eval) = right_points.unwrap();
+
+        if left.is_draw() && !right.is_draw() {
+            right_eval += 400;
+        }
+
+        if right.is_draw() && !left.is_draw() {
+            left_eval += 400;
+        }
 
         if left_mate > right_mate {
             Comparison::Better
@@ -197,8 +214,106 @@ fn test_evaluation_comparison() {
         ),
         Comparison::Worse
     );
+
+    // Don't prefer a draw if you're only losing by a little
+    assert_eq!(
+        Score::compare(
+            Player::White,
+            Score::DrawInN(0),
+            Score::Centipawns(Player::Black, 50),
+        ),
+        Comparison::Worse
+    );
+    assert_eq!(
+        Score::compare(
+            Player::White,
+            Score::DrawInN(0),
+            Score::Centipawns(Player::Black, 500),
+        ),
+        Comparison::Better
+    );
+    assert_eq!(
+        Score::compare(
+            Player::White,
+            Score::DrawInN(0),
+            Score::Centipawns(Player::White, -500),
+        ),
+        Comparison::Better
+    );
+
+    // Don't let them draw if you're winning
+    assert_eq!(
+        Score::compare(
+            Player::Black,
+            Score::Centipawns(Player::Black, 100),
+            Score::DrawInN(0),
+        ),
+        Comparison::Better
+    );
+    assert_eq!(
+        Score::compare(
+            Player::Black,
+            Score::Centipawns(Player::Black, 500),
+            Score::DrawInN(0),
+        ),
+        Comparison::Better
+    );
+    assert_eq!(
+        Score::compare(
+            Player::Black,
+            Score::DrawInN(0),
+            Score::Centipawns(Player::Black, 500),
+        ),
+        Comparison::Worse
+    );
+
+    // Mates beat draws
+    assert_eq!(
+        Score::compare(
+            Player::Black,
+            Score::DrawInN(0),
+            Score::WinInN(Player::Black, 1),
+        ),
+        Comparison::Worse
+    );
+    assert_eq!(
+        Score::compare(
+            Player::Black,
+            Score::DrawInN(0),
+            Score::WinInN(Player::White, 1),
+        ),
+        Comparison::Better
+    );
 }
 
+#[test]
+fn test_evaluation_increment() {
+    // It is better to win sooner
+    assert_eq!(
+        Score::compare(
+            Player::White,
+            Score::WinInN(Player::White, 0),
+            Score::WinInN(Player::White, 1),
+        ),
+        Comparison::Better
+    );
+    assert_eq!(
+        Score::compare(
+            Player::White,
+            Score::WinInN(Player::White, 0).increment_turns(),
+            Score::WinInN(Player::White, 1),
+        ),
+        Comparison::Equal
+    );
+    assert_eq!(
+        Score::compare(
+            Player::White,
+            Score::WinInN(Player::White, 0).increment_turns().increment_turns(),
+            Score::WinInN(Player::White, 1),
+        ),
+        Comparison::Worse
+    );
+}
 // ************************************************************************************************* //
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -361,7 +476,7 @@ impl SearchStack {
             .expect_ok(|| format!("{:#?}", self))?;
 
         let next_evaluation = self.returned_evaluation.as_ref().unwrap();
-        let next_score = next_evaluation.score();
+        let next_score = next_evaluation.score().increment_turns();
 
         let (current, _) = self.traversal.current_mut()?;
         if Score::compare(current.game.player, next_score, current.data.beta).is_better_or_equal() {
@@ -432,7 +547,8 @@ impl SearchStack {
                 self.returned_evaluation =
                     Some(SearchResult::StaticEvaluation(StaticEvaluationReturn {
                         score: Score::WinInN(current.game.player.other(), 0),
-                        previous_move: self.traversal
+                        previous_move: self
+                            .traversal
                             .move_applied_before_depth(current_depth)?
                             .as_result()?,
                         depth: current_depth,
@@ -443,8 +559,9 @@ impl SearchStack {
             } else {
                 self.returned_evaluation =
                     Some(SearchResult::StaticEvaluation(StaticEvaluationReturn {
-                        score: Score::WinInN(current.game.player.other(), 0),
-                        previous_move: self.traversal
+                        score: Score::DrawInN(0),
+                        previous_move: self
+                            .traversal
                             .move_applied_before_depth(current_depth)?
                             .as_result()?,
                         depth: current_depth,
