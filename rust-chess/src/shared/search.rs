@@ -5,7 +5,7 @@ use itertools::Itertools;
 use crate::{
     defer,
     helpers::{err_result, OptionResult},
-    iterative_traversal::{TraversalStack, IndexedMoveBuffer},
+    iterative_traversal::{IndexedMoveBuffer, TraversalStack},
 };
 
 use super::{
@@ -362,17 +362,13 @@ impl SearchResult {
         let mut variation = vec![];
         match self {
             SearchResult::BestMove(result) => {
-                variation.clear();
                 variation.push(result.best_move);
                 for m in result.response_moves.iter() {
                     variation.push(*m);
                 }
             }
-            SearchResult::StaticEvaluation(result) => {
-                variation.clear();
-                variation.push(result.previous_move);
-            }
-            SearchResult::BetaCutoff(_) => variation.clear(),
+            SearchResult::StaticEvaluation(_) => {}
+            SearchResult::BetaCutoff(_) => {}
         }
         variation
     }
