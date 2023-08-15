@@ -3,7 +3,7 @@ use std::{iter, sync::Mutex};
 
 use crate::{
     bitboard::warm_magic_cache,
-    search::{LoopResult, SearchStack},
+    search::{LoopResult, SearchStack}, iterative_deepening::IterativeSearch,
 };
 
 use super::{
@@ -18,7 +18,7 @@ pub struct UciAsync {
 
 pub struct Uci {
     pub game: Game,
-    pub search: Option<SearchStack>,
+    pub search: Option<IterativeSearch>,
 }
 
 impl Uci {
@@ -62,7 +62,7 @@ impl Uci {
             let debug_str = format!("{}\nFen: {}", self.game, self.game.to_fen());
             Ok(debug_str)
         } else if line == "go" {
-            let search = SearchStack::new(self.game)?;
+            let search = IterativeSearch::new(self.game)?;
             self.search = Some(search);
             Ok("".to_string())
         } else if line == "stop" {
@@ -78,7 +78,7 @@ impl Uci {
             self.search = None;
 
             match best_move {
-                Some((best_move, response_moves, _)) => Ok(format!(
+                Some((best_move, response_moves)) => Ok(format!(
                     "bestmove {} ponder {}",
                     best_move.to_uci(),
                     response_moves.iter().map(|v| v.to_uci()).join(" ")
@@ -94,16 +94,7 @@ impl Uci {
         let mut output: Vec<String> = vec![];
         for _ in 0..100_000 {
             if let Some(search) = &mut self.search {
-                let result = search.iterate()?;
-
-                match result {
-                    LoopResult::Done => {
-                        let bestmove = self.finish_search()?;
-                        output.push(bestmove);
-                        break;
-                    }
-                    _ => {}
-                }
+                search.iterate(&mut output)?;
             }
         }
 

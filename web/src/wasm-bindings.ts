@@ -26,7 +26,7 @@ export function listen(listener: WasmListener): () => void {
 
 globalThis.BindingsJs = {
     log_to_js: (message: string): void => {
-        console.log('wasm-bindings.ts, syncWasmUci, log_to_js:', message)
+        // console.log('wasm-bindings.ts, syncWasmUci, log_to_js:', message)
         message.split('\n').forEach((line) => {
             listeners.forEach((listener) => listener(line))
         })
@@ -184,8 +184,8 @@ export function syncWasmUci() {
 
     function handleLineAndLog(line: string) {
         let result = uci.handle_line(line)
-        console.log('wasm-bindings.ts, syncWasmUci <=', line)
-        console.log('wasm-bindings.ts, syncWasmUci =>', result)
+        // console.log('wasm-bindings.ts, syncWasmUci <=', line)
+        // console.log('wasm-bindings.ts, syncWasmUci =>', result)
         return result
     }
 
@@ -200,7 +200,7 @@ export function syncWasmUci() {
                 }
             }
 
-            console.log('wasm-bindings.ts, syncWasmUci, currentFen() =>', result)
+            // console.log('wasm-bindings.ts, syncWasmUci, currentFen() =>', result)
             return fen
         },
         possibleMoves: (): string[] => {
@@ -225,7 +225,7 @@ export function syncWasmUci() {
                 }
                 moves.push(move)
             }
-            console.log('wasm-bindings.ts, syncWasmUci, possibleMoves() =>', moves)
+            // console.log('wasm-bindings.ts, syncWasmUci, possibleMoves() =>', moves)
             return moves
         },
         setPosition: (position: string, moves: string[]) => {

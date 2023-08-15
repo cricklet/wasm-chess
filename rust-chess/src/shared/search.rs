@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, fmt::Display};
 
 use itertools::Itertools;
 
@@ -41,6 +41,20 @@ pub enum Score {
     Centipawns(Player, isize),
     WinInN(Player, usize),
     DrawInN(usize),
+}
+
+impl Display for Score {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Score::Unknown => write!(f, "?"),
+            Score::Centipawns(player, score) => match player {
+                Player::White => write!(f, "{}", score),
+                Player::Black => write!(f, "{}", -score),
+            },
+            Score::WinInN(player, n) => write!(f, "{} wins +{} mate", player.to_fen(), n),
+            Score::DrawInN(n) => write!(f, "draw +{}", n),
+        }
+    }
 }
 
 impl Score {

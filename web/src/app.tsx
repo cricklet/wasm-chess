@@ -214,6 +214,8 @@ function InputComponent() {
   )
 }
 
+let worker = await wasm.searchWorker()
+
 function App() {
   let board = useAtomValue(atomBoard)
   let [game, setGame] = useAtom(atomGame)
@@ -237,9 +239,8 @@ function App() {
         return
       }
 
-      let worker = await wasm.searchWorker()
       let bestMove = await worker.search(start, moves)
-      console.log(`App::useEffect, best move: ${bestMove}`)
+      // console.log(`App::useEffect, best move: ${bestMove}`)
 
       setGame((_) => performMove(bestMove, { start, moves }))
     }

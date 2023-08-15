@@ -4,9 +4,10 @@ mod perft_for_js;
 use wasm_bindgen::prelude::*;
 
 use rust_chess::{
+    bitboard::warm_magic_cache,
     game::Game,
     helpers::{err, Error},
-    *, bitboard::warm_magic_cache,
+    *,
 };
 
 pub fn set_panic_hook() {
@@ -69,7 +70,7 @@ impl UciForJs {
         }
     }
     pub fn handle_line(&mut self, line: &str) -> Result<String, JsError> {
-        log_to_js(&format!("handle_line received: {}", line));
+        log_to_js(&format!("handle_line({})", line));
 
         if line.contains("\n") {
             return Err(JsError::from(err(&format!("{} contains newline", line))));
@@ -84,14 +85,13 @@ impl UciForJs {
 
     pub fn think(&mut self) -> Result<String, JsError> {
         let start = chrono::Utc::now();
-
-        let result = self.uci.think().map_err(|e| JsError::from(e));
+        let result = self.uci.think().map_err(|e| JsError::from(e))?;
 
         let elapsed = chrono::Utc::now() - start;
         if elapsed > chrono::Duration::milliseconds(1) {
-            log_to_js(&format!("thinking for {} ms", elapsed.num_milliseconds()));
+            log_to_js(&format!("think() for {} ms", elapsed.num_milliseconds()));
         }
 
-        result
+        Ok(result)
     }
 }
