@@ -1,5 +1,7 @@
 use std::collections::HashSet;
 
+use itertools::Itertools;
+
 use crate::{
     defer,
     helpers::{err_result, OptionResult},
@@ -38,6 +40,7 @@ pub enum Score {
     Unknown,
     Centipawns(Player, isize),
     WinInN(Player, usize),
+    DrawInN(Player, usize),
 }
 
 impl Default for Score {
@@ -64,6 +67,11 @@ impl Comparison {
 }
 
 impl Score {
+    // struct ComparisonPoints {
+    //     mate: isize, // 0 if no mate. 
+    //     draw: boolean,
+    //     eval: isize,
+    // }
     fn comparison_points(&self, current_player: Player) -> Option<(isize, isize)> {
         match self {
             Score::Centipawns(player, score) => {
@@ -75,9 +83,16 @@ impl Score {
             }
             Score::WinInN(player, n) => {
                 if *player == current_player {
-                    Some((1000 - *n as isize, 0))
+                    Some((- (*n as isize), 0))
                 } else {
-                    Some((-1000 + *n as isize, 0))
+                    Some((*n as isize, 0))
+                }
+            }
+            Score::DrawInN(player, n) => {
+                if *player == current_player {
+                    Some((0, 0))
+                } else {
+                    Some((0, 0))
                 }
             }
             Score::Unknown => None,
@@ -275,10 +290,9 @@ pub struct SearchStack {
 impl SearchStack {
     pub fn new(game: Game) -> ErrorResult<Self> {
         Ok(Self {
-            traversal: TraversalStack::<SearchFrameData, MAX_ALPHA_BETA_DEPTH>::new(
-                game,
-                &mut |_| SearchFrameData::default(),
-            )?,
+            traversal: TraversalStack::<SearchFrameData, MAX_ALPHA_BETA_DEPTH>::new(game, || {
+                SearchFrameData::default()
+            })?,
             returned_evaluation: None,
             max_depth: 3,
             done: false,
@@ -286,19 +300,22 @@ impl SearchStack {
     }
     pub fn with_max_depth(game: Game, max_depth: usize) -> ErrorResult<Self> {
         Ok(Self {
-            traversal: TraversalStack::<SearchFrameData, MAX_ALPHA_BETA_DEPTH>::new(
-                game,
-                &mut |_| SearchFrameData::default(),
-            )?,
+            traversal: TraversalStack::<SearchFrameData, MAX_ALPHA_BETA_DEPTH>::new(game, || {
+                SearchFrameData::default()
+            })?,
             returned_evaluation: None,
             max_depth,
             done: false,
         })
     }
 
-    pub fn bestmove(&self) -> Option<(Move, Score)> {
+    pub fn bestmove(&self) -> Option<(Move, Vec<Move>, Score)> {
         match self.returned_evaluation.as_ref() {
-            Some(SearchResult::BestMove(result)) => Some((result.best_move, result.score)),
+            Some(SearchResult::BestMove(result)) => Some((
+                result.best_move,
+                result.response_moves.collect(),
+                result.score,
+            )),
             _ => None,
         }
     }
@@ -316,12 +333,7 @@ impl SearchStack {
             previous_move: self
                 .traversal
                 .move_applied_before_depth(current_depth)?
-                .expect_ok(|| {
-                    format!(
-                        "invalid move at current_depth {}, {:#?}",
-                        current_depth, self
-                    )
-                })?,
+                .as_result()?,
             score,
             depth: current_depth,
             previous_previous_move: self
@@ -409,12 +421,38 @@ impl SearchStack {
         }
 
         // We're out of moves to traverse, return the best move and pop up the stack.
-        let (current, _) = self.traversal.current_mut()?;
+        let (current, current_depth) = self.traversal.current_mut()?;
 
         if let Some(best_move) = &current.data.best_move {
             self.returned_evaluation = Some(SearchResult::BestMove(best_move.clone()));
         } else {
-            todo!("checkmate or draw");
+            current.lazily_generate_danger()?;
+
+            if current.danger.unwrap().check {
+                self.returned_evaluation =
+                    Some(SearchResult::StaticEvaluation(StaticEvaluationReturn {
+                        score: Score::WinInN(current.game.player.other(), 0),
+                        previous_move: self.traversal
+                            .move_applied_before_depth(current_depth)?
+                            .as_result()?,
+                        depth: current_depth,
+                        previous_previous_move: self
+                            .traversal
+                            .move_applied_before_depth(current_depth - 1)?,
+                    }));
+            } else {
+                self.returned_evaluation =
+                    Some(SearchResult::StaticEvaluation(StaticEvaluationReturn {
+                        score: Score::WinInN(current.game.player.other(), 0),
+                        previous_move: self.traversal
+                            .move_applied_before_depth(current_depth)?
+                            .as_result()?,
+                        depth: current_depth,
+                        previous_previous_move: self
+                            .traversal
+                            .move_applied_before_depth(current_depth - 1)?,
+                    }));
+            }
         }
 
         if self.traversal.depth == 0 {
@@ -513,7 +551,7 @@ impl InQuiescence {
 
 #[test]
 fn test_start_search() {
-    let mut search = SearchStack::with_max_depth(Game::from_fen("startpos").unwrap(), 2).unwrap();
+    let mut search = SearchStack::with_max_depth(Game::from_fen("startpos").unwrap(), 3).unwrap();
     loop {
         match search.iterate().unwrap() {
             LoopResult::Continue => {}

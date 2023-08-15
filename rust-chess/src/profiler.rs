@@ -9,10 +9,7 @@ use pprof::protos::Message;
 pub mod shared;
 pub use shared::*;
 
-use crate::{
-    async_perft::AsyncPerftRunner,
-    search::{LoopResult, Search},
-};
+use crate::search::{LoopResult, SearchStack};
 
 use {game::Game, perft::run_perft_iteratively_to_depth, perft::run_perft_recursively};
 
@@ -49,18 +46,6 @@ impl<'a> Profiler<'a> {
     }
 }
 
-fn log_fn(s: &str) {
-    println!("{}", s);
-}
-
-fn yield_fn() -> Pin<Box<dyn Future<Output = ()> + Send>> {
-    Box::pin(tokio::time::sleep(Duration::from_millis(1)))
-}
-
-fn done_fn(count: usize) {
-    println!("done: {}", count);
-}
-
 fn main() {
     let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -77,7 +62,7 @@ fn main() {
         let p = Profiler::new("alpha_beta".to_string());
 
         let start_time = std::time::Instant::now();
-        let mut search = Search::with_max_depth(Game::from_fen("startpos").unwrap(), 5).unwrap();
+        let mut search = SearchStack::with_max_depth(Game::from_fen("startpos").unwrap(), 5).unwrap();
         loop {
             match search.iterate().unwrap() {
                 LoopResult::Continue => {}

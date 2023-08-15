@@ -1,6 +1,5 @@
 pub use super::*;
 
-pub mod async_perft;
 pub mod bitboard;
 pub mod danger;
 pub mod evaluation;

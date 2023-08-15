@@ -233,6 +233,10 @@ function App() {
       let start = game.start
       let moves = [... game.moves]
 
+      if (moves.length % 2 === 0) {
+        return
+      }
+
       let worker = await wasm.searchWorker()
       let bestMove = await worker.search(start, moves)
       console.log(`App::useEffect, best move: ${bestMove}`)

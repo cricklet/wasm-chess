@@ -17,7 +17,7 @@ function wasmUci(): ReturnType<typeof wasm.syncWasmUci> {
 
 export const atomGame = atom<GameState>({
     start: 'startpos',
-    moves: ['e2e4'],
+    moves: [],
 })
 
 export function performMove(move: string, game: GameState): GameState {

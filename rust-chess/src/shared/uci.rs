@@ -1,7 +1,10 @@
 use itertools::Itertools;
 use std::{iter, sync::Mutex};
 
-use crate::{search::{LoopResult, SearchStack}, bitboard::warm_magic_cache};
+use crate::{
+    bitboard::warm_magic_cache,
+    search::{LoopResult, SearchStack},
+};
 
 use super::{
     game::Game,
@@ -75,7 +78,11 @@ impl Uci {
             self.search = None;
 
             match best_move {
-                Some((best_move, _)) => Ok(format!("bestmove {}", best_move.to_uci())),
+                Some((best_move, response_moves, _)) => Ok(format!(
+                    "bestmove {} ponder {}",
+                    best_move.to_uci(),
+                    response_moves.iter().map(|v| v.to_uci()).join(" ")
+                )),
                 None => Ok("bestmove (none)".to_string()),
             }
         } else {
@@ -94,8 +101,8 @@ impl Uci {
                         let bestmove = self.finish_search()?;
                         output.push(bestmove);
                         break;
-                    },
-                    _ => {},
+                    }
+                    _ => {}
                 }
             }
         }

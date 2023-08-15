@@ -8,7 +8,7 @@
         "build-wasm-debug": "wasm-pack build --debug --target=no-modules wasm-chess/",
 
         "build-wasm": "wasm-pack build --release --target=no-modules wasm-chess/",
-        "build-perft": "cargo build --release --bin perft --features \"profiling async_feat\"",
+        "build-perft": "cargo build --release --bin perft --features \"profiling\"",
         "build-uci": "cargo build --release --bin main",
 
         "run-uci": "yarn build-uci && ./target/release/main",

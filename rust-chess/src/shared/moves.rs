@@ -132,6 +132,10 @@ impl<const N: usize> SizedMoveBuffer<N> {
     pub fn iter(&self) -> impl Iterator<Item = &Move> {
         self.moves[..self.size].iter()
     }
+
+    pub fn collect(&self) -> Vec<Move> {
+        self.moves[..self.size].to_vec()
+    }
 }
 
 impl<const N: usize> IntoIterator for SizedMoveBuffer<N> {

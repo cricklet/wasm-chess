@@ -294,7 +294,7 @@ pub fn run_perft_recursively(game: Game, max_depth: usize) -> ErrorResult<usize>
 }
 
 pub fn run_perft_iteratively<const N: usize>(game: Game) -> ErrorResult<usize> {
-    let mut data = TraversalStack::<(), N>::new(game, &mut |_| ())?;
+    let mut data = TraversalStack::<(), N>::new(game, || ())?;
     let mut overall_count = 0;
 
     if N <= 1 {
@@ -440,7 +440,7 @@ impl PerftLoop {
         }
 
         let game = Game::from_fen(fen).unwrap();
-        let stack = TraversalStack::<(), MAX_PERFT_DEPTH>::new(game, &mut |_| ()).unwrap();
+        let stack = TraversalStack::<(), MAX_PERFT_DEPTH>::new(game, || ()).unwrap();
 
         Self {
             stack,
