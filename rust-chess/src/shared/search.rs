@@ -17,24 +17,6 @@ use super::{
     types::*,
 };
 
-struct MoveHistory<'h> {
-    history: &'h mut Vec<Move>,
-}
-
-impl<'h> MoveHistory<'h> {
-    pub fn track(history: &'h mut Vec<Move>, m: Move) -> Self {
-        history.push(m);
-        MoveHistory { history }
-    }
-}
-
-impl<'h> Drop for MoveHistory<'h> {
-    fn drop(&mut self) {
-        self.history.pop();
-    }
-}
-// ************************************************************************************************* //
-
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Score {
     Unknown,

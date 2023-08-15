@@ -62,7 +62,7 @@ impl IterativeSearch {
                     Some((bestmove, response, score)) => {
                         let depth = self.search.max_depth;
                         log.push(format!(
-                            "at depth {}:\nbestmove {} ponder {} ({})",
+                            "at depth {}: bestmove {} ponder {} ({})",
                             depth,
                             bestmove.to_uci(),
                             response
@@ -72,6 +72,7 @@ impl IterativeSearch {
                                 .join(" "),
                             score
                         ));
+
                         self.best_variations_per_depth
                             .push(iter::once(bestmove).chain(response).collect());
 

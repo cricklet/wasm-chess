@@ -110,7 +110,7 @@ export async function newUciWasmWorker() {
 let _workerUci: ReturnType<typeof newUciWasmWorker> | undefined = undefined
 async function singletonUciWorker(): ReturnType<typeof newUciWasmWorker> {
     if (!_workerUci) {
-        _workerUci  = newUciWasmWorker()
+        _workerUci = newUciWasmWorker()
         _workerUci = Promise.resolve(await _workerUci)
     }
 
@@ -120,8 +120,8 @@ async function singletonUciWorker(): ReturnType<typeof newUciWasmWorker> {
 let _searchResults: Map<string, Promise<string>> = new Map()
 
 export async function searchWorker(): Promise<{
-  search: (start: string, moves: string[]) => Promise<string>,
-  terminate: () => void 
+    search: (start: string, moves: string[]) => Promise<string>,
+    terminate: () => void
 }> {
     let worker = await singletonUciWorker()
 
@@ -146,7 +146,13 @@ export async function searchWorker(): Promise<{
             await new Promise(resolve => setTimeout(resolve, 1000))
             output.push(await worker.handle_line('stop'))
 
-            for (let line of output) {
+            let reversed = output
+                .flatMap(line => line.split('\n'))
+                .map(line => line.trim())
+                .filter(line => line !== '')
+                .reverse()
+
+            for (let line of reversed) {
                 if (line.startsWith('bestmove')) {
                     let result = line.split(' ')[1]
                     resolve(result)
