@@ -75,78 +75,6 @@ pub enum MoveType {
     Invalid,
 }
 
-#[derive(Eq, PartialEq, Clone)]
-pub struct SizedMoveBuffer<const N: usize> {
-    pub moves: [Move; N],
-    pub size: usize,
-}
-
-pub type MoveBuffer = SizedMoveBuffer<80>;
-
-impl<const N: usize> Debug for SizedMoveBuffer<N> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SizedMoveBuffer")
-            .field("moves", &self.moves[..self.size].iter())
-            .field("size", &self.size)
-            .finish()
-    }
-}
-
-impl<const N: usize> Default for SizedMoveBuffer<N> {
-    fn default() -> Self {
-        Self {
-            moves: [Move::invalid(); N],
-            size: 0,
-        }
-    }
-}
-
-impl<const N: usize> SizedMoveBuffer<N> {
-    pub fn clear(&mut self) {
-        self.size = 0;
-    }
-
-    pub fn get(&self, index: usize) -> &Move {
-        &self.moves[index]
-    }
-
-    pub fn get_mut(&mut self, index: usize) -> &mut Move {
-        &mut self.moves[index]
-    }
-
-    pub fn set_size(&mut self, size: usize) {
-        self.size = size;
-    }
-
-    pub fn push_mut(&mut self) -> &mut Move {
-        self.size += 1;
-        let m = self.get_mut(self.size - 1);
-        m
-    }
-
-    pub fn push(&mut self, m: Move) {
-        self.size += 1;
-        self.moves[self.size - 1] = m;
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = &Move> {
-        self.moves[..self.size].iter()
-    }
-
-    pub fn collect(&self) -> Vec<Move> {
-        self.moves[..self.size].to_vec()
-    }
-}
-
-impl<const N: usize> IntoIterator for SizedMoveBuffer<N> {
-    type Item = Move;
-    type IntoIter = std::vec::IntoIter<Self::Item>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.moves[..self.size].to_vec().into_iter()
-    }
-}
-
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Move {
     pub piece: PlayerPiece,
@@ -206,7 +134,7 @@ pub enum JumpingPiece {
 }
 
 pub fn potential_bb_to_moves(
-    buffer: &mut MoveBuffer,
+    buffer: &mut Vec<Move>,
     PlayerPiece { player, piece }: PlayerPiece,
     piece_index: BoardIndex,
     potential: Bitboard,
@@ -281,7 +209,7 @@ pub fn walk_potential_bb(
 }
 
 pub fn walk_moves(
-    buffer: &mut MoveBuffer,
+    buffer: &mut Vec<Move>,
     PlayerPiece { player, piece }: PlayerPiece,
     bitboards: &Bitboards,
     only_captures: OnlyCaptures,
@@ -316,7 +244,7 @@ pub fn jumping_bitboard(index: BoardIndex, jumping_piece: JumpingPiece) -> Bitbo
 }
 
 pub fn jump_moves(
-    buffer: &mut MoveBuffer,
+    buffer: &mut Vec<Move>,
     player: Player,
     bitboards: &Bitboards,
     jumping_piece: JumpingPiece,
@@ -383,7 +311,7 @@ pub fn pawn_quiet_move(
 }
 
 pub fn pawn_moves(
-    buffer: &mut MoveBuffer,
+    buffer: &mut Vec<Move>,
     player: Player,
     bitboards: &Bitboards,
     only_captures: OnlyCaptures,
@@ -468,7 +396,7 @@ pub fn pawn_moves(
 }
 
 pub fn en_passant_move(
-    buffer: &mut MoveBuffer,
+    buffer: &mut Vec<Move>,
     player: Player,
     bitboards: &Bitboards,
     en_passant_index: Option<BoardIndex>,
@@ -502,7 +430,7 @@ pub fn en_passant_move(
     Ok(())
 }
 
-pub fn castling_moves(buffer: &mut MoveBuffer, player: Player, state: &Game) -> ErrorResult<()> {
+pub fn castling_moves(buffer: &mut Vec<Move>, player: Player, state: &Game) -> ErrorResult<()> {
     let allowed_castling_sides = CASTLING_SIDES
         .iter()
         .filter(move |&&castling_side| state.can_castle[player][castling_side]);
@@ -549,7 +477,7 @@ pub fn castling_moves(buffer: &mut MoveBuffer, player: Player, state: &Game) -> 
 }
 
 pub fn all_moves<'game>(
-    buffer: &mut MoveBuffer,
+    buffer: &mut Vec<Move>,
     player: Player,
     state: &'game Game,
     options: MoveOptions,
@@ -673,7 +601,7 @@ mod test {
 
         let mut count_moves = HashMap::<String, usize>::new();
 
-        let mut moves_buffer = MoveBuffer::default();
+        let mut moves_buffer = vec![];
         all_moves(
             &mut moves_buffer,
             game.player,
@@ -699,7 +627,7 @@ mod test {
         let game = Game::from_position_uci(position).unwrap();
 
         let mut count_moves = HashMap::<String, usize>::new();
-        let mut moves_buffer = MoveBuffer::default();
+        let mut moves_buffer = vec![];
         all_moves(
             &mut moves_buffer,
             game.player,

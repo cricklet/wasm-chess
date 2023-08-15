@@ -1,4 +1,4 @@
-use std::{backtrace::Backtrace, io::Write, iter};
+use std::{backtrace::Backtrace, io::Write, iter, fmt::Debug};
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct Error {
@@ -415,4 +415,66 @@ macro_rules! defer {
             },
         };
     };
+}
+
+
+pub struct StableOption<T> {
+    value: T,
+    is_some: bool,
+}
+
+impl<T: Default> Default for StableOption<T> {
+    fn default() -> Self {
+        Self {
+            value: T::default(),
+            is_some: false,
+        }
+    }
+}
+
+impl<T: Debug> Debug for StableOption<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.is_some {
+            write!(f, "Some({:?})", &self.value)
+        } else {
+            write!(f, "None")
+        }
+    }
+}
+
+impl<T> StableOption<T> {
+    pub fn get_ref(&self) -> Option<&T> {
+        if self.is_some {
+            Some(&self.value)
+        } else {
+            None
+        }
+    }
+
+    pub fn get_mut(&mut self) -> Option<&mut T> {
+        if self.is_some {
+            Some(&mut self.value)
+        } else {
+            None
+        }
+    }
+
+    pub fn is_some(&self) -> bool {
+        self.is_some
+    }
+
+    pub fn prepare_update(&mut self) {
+        self.is_some = true;
+    }
+}
+
+pub trait Clearable {
+    fn clear(&mut self);
+}
+
+impl<T: Clearable> StableOption<T> {
+    pub fn clear(&mut self) {
+        self.is_some = false;
+        self.value.clear();
+    }
 }

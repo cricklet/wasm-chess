@@ -7,7 +7,7 @@ use super::{
     game::{Game, Legal},
     helpers::{err_result, indent, ErrorResult},
     iterative_traversal::TraversalStack,
-    moves::{Move, MoveBuffer, MoveOptions},
+    moves::{Move, MoveOptions},
 };
 
 fn assert_fen_matches(expected_fen: &str) {
@@ -104,7 +104,7 @@ fn traverse_game_callback(
 
     let danger = Danger::from(game.player, &game.board)?;
 
-    let mut moves = MoveBuffer::default();
+    let mut moves = vec![];
     game.fill_pseudo_move_buffer(&mut moves, MoveOptions::default())?;
 
     for &m in moves.iter() {
@@ -150,7 +150,7 @@ pub fn run_perft_counting_first_move(
 
     let danger = Danger::from(game.player, &game.board)?;
 
-    let mut moves = MoveBuffer::default();
+    let mut moves = vec![];
     game.fill_pseudo_move_buffer(&mut moves, MoveOptions::default())?;
 
     for &next_move in moves.iter() {

@@ -1,14 +1,16 @@
 use std::fmt::Debug;
 use std::fmt::Formatter;
 
+use crate::helpers::StableOption;
+
 use super::danger::Danger;
 use super::game::Game;
 use super::game::Legal;
 use super::helpers::err_result;
 use super::helpers::ErrorResult;
 use super::helpers::OptionResult;
+use super::helpers::Clearable;
 use super::moves::Move;
-use super::moves::MoveBuffer;
 use super::moves::MoveOptions;
 use super::moves::OnlyCaptures;
 use super::moves::OnlyQueenPromotion;
@@ -21,18 +23,25 @@ pub enum FinishedTraversing {
 
 #[derive(Default)]
 pub struct IndexedMoveBuffer {
-    buffer: MoveBuffer,
+    buffer: Vec<Move>,
     index: usize,
+}
+
+impl Clearable for IndexedMoveBuffer {
+    fn clear(&mut self) {
+        self.buffer.clear();
+        self.index = 0;
+    }
 }
 
 impl Debug for IndexedMoveBuffer {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut lines = self.buffer.moves[..self.buffer.size]
+        let mut lines = self.buffer
             .iter()
             .map(|m| format!("{:?}", m))
             .collect::<Vec<_>>();
 
-        if self.index < self.buffer.size {
+        if self.index < self.buffer.len() {
             lines[self.index] = format!("{} <=========", lines[self.index]);
         }
 
@@ -47,7 +56,7 @@ pub struct TraversalStackFrame<D> {
     pub game: Game,
 
     pub danger: Option<Danger>,
-    pub moves: Option<IndexedMoveBuffer>,
+    pub moves: StableOption<IndexedMoveBuffer>,
 
     pub data: D,
 }
@@ -62,7 +71,7 @@ impl<D> TraversalStackFrame<D> {
         self.game.make_move(*next_move)?;
 
         self.danger = None;
-        self.moves = None;
+        self.moves.clear();
 
         previous.lazily_generate_danger()?;
 
@@ -81,7 +90,7 @@ impl<D> TraversalStackFrame<D> {
         self.game = game;
 
         self.danger = None;
-        self.moves = None;
+        self.moves.clear();
 
         self.lazily_generate_danger()?;
         self.lazily_generate_moves()?;
@@ -90,26 +99,22 @@ impl<D> TraversalStackFrame<D> {
     }
     pub fn lazily_generate_moves(&mut self) -> ErrorResult<&IndexedMoveBuffer> {
         if self.moves.is_some() {
-            return self.moves.as_ref().as_result();
+            return self.moves.get_ref().as_result();
         }
 
-        self.moves = Some(IndexedMoveBuffer {
-            buffer: MoveBuffer::default(),
-            index: 0,
-        });
-
-        let moves = self.moves.as_mut().as_result()?;
+        self.moves.clear();
+        self.moves.prepare_update();
+        let buffer = &mut self.moves.get_mut().as_result()?.buffer;
 
         self.game.fill_pseudo_move_buffer(
-            &mut moves.buffer,
+            buffer,
             MoveOptions {
                 only_captures: OnlyCaptures::No,
                 only_queen_promotion: OnlyQueenPromotion::No,
             },
         )?;
-        moves.index = 0;
 
-        Ok(self.moves.as_ref().unwrap())
+        Ok(self.moves.get_ref().unwrap())
     }
 
     pub fn lazily_generate_danger(&mut self) -> ErrorResult<&Danger> {
@@ -124,16 +129,15 @@ impl<D> TraversalStackFrame<D> {
     pub fn get_and_increment_move(&mut self) -> ErrorResult<Option<Move>> {
         self.lazily_generate_moves()?;
 
-        let current_moves = self.moves.as_mut().as_result()?;
-
-        if current_moves.index >= current_moves.buffer.size {
+        let current_moves = self.moves.get_mut().as_result()?;
+        if current_moves.index >= current_moves.buffer.len() {
             return Ok(None);
         }
 
         let m = current_moves.buffer.get(current_moves.index);
         current_moves.index += 1;
 
-        Ok(Some(*m))
+        Ok(m.cloned())
     }
 }
 
@@ -163,7 +167,7 @@ impl<D: Debug, const N: usize> TraversalStack<D, N> {
             stack: std::array::from_fn::<_, N, _>(|_| TraversalStackFrame::<D> {
                 game: Game::default(),
                 danger: None,
-                moves: None,
+                moves: StableOption::default(),
                 data: data_callback(),
             }),
             depth: 0,
@@ -239,19 +243,19 @@ impl<D: Debug, const N: usize> TraversalStack<D, N> {
         }
 
         let node = self.stack.get(depth - 1).as_result()?;
-        match &node.moves {
-            None => err_result(&format!(
+        if node.moves.is_some() {
+            let moves = node.moves.get_ref().unwrap();
+            if moves.index == 0 {
+                return Ok(None);
+            }
+            Ok(moves.buffer.get(moves.index - 1).cloned())
+        } else {
+            err_result(&format!(
                 "no moves at previous depth {} to get to {}, {:#?}",
                 depth - 1,
                 depth,
                 self
-            ))?,
-            Some(moves) => {
-                if moves.index == 0 {
-                    return Ok(None);
-                }
-                Ok(Some(*moves.buffer.get(moves.index - 1)))
-            }
+            ))?
         }
     }
 }

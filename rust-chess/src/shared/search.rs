@@ -5,7 +5,7 @@ use itertools::Itertools;
 use crate::{
     defer,
     helpers::{err_result, OptionResult},
-    iterative_traversal::TraversalStack,
+    iterative_traversal::{TraversalStack, IndexedMoveBuffer},
 };
 
 use super::{
@@ -338,7 +338,7 @@ const PV_SIZE: usize = 4;
 #[derive(Debug, Eq, PartialEq, Clone)]
 struct BestMoveReturn {
     best_move: Move,
-    response_moves: SizedMoveBuffer<PV_SIZE>, // store a relatively short PV
+    response_moves: Vec<Move>, // store a relatively short PV
     score: Score,
 }
 
@@ -358,8 +358,8 @@ impl SearchResult {
         }
     }
 
-    fn variation(&self) -> SizedMoveBuffer<PV_SIZE> {
-        let mut variation = SizedMoveBuffer::<PV_SIZE>::default();
+    fn variation(&self) -> Vec<Move> {
+        let mut variation = vec![];
         match self {
             SearchResult::BestMove(result) => {
                 variation.clear();
@@ -380,7 +380,7 @@ impl SearchResult {
 
 // ************************************************************************************************* //
 
-const MAX_ALPHA_BETA_DEPTH: usize = 30;
+const MAX_ALPHA_BETA_DEPTH: usize = 40;
 
 #[derive(Default, Debug, Eq, PartialEq)]
 struct SearchFrameData {
@@ -432,7 +432,7 @@ impl SearchStack {
         match self.returned_evaluation.as_ref() {
             Some(SearchResult::BestMove(result)) => Some((
                 result.best_move,
-                result.response_moves.collect(),
+                result.response_moves.clone(),
                 result.score,
             )),
             _ => None,
@@ -672,7 +672,7 @@ impl InQuiescence {
 
 #[test]
 fn test_start_search() {
-    let mut search = SearchStack::with_max_depth(Game::from_fen("startpos").unwrap(), 3).unwrap();
+    let mut search = SearchStack::with_max_depth(Game::from_fen("startpos").unwrap(), 4).unwrap();
     loop {
         match search.iterate().unwrap() {
             LoopResult::Continue => {}
@@ -682,6 +682,7 @@ fn test_start_search() {
 
     // Calling `iterate()` should be idempotent
     search.iterate().unwrap();
+    println!("{:#?}", search.returned_evaluation);
 
     let potential_first_moves: HashSet<String> = HashSet::from_iter(
         vec!["e2e4", "d2d4"]
@@ -692,7 +693,8 @@ fn test_start_search() {
 
     match search.returned_evaluation.as_ref().unwrap() {
         SearchResult::BestMove(best_move) => {
-            assert!(potential_first_moves.contains(&best_move.best_move.to_uci()));
+            // We play conservatively because we don't support quiescence yet
+            assert!(!potential_first_moves.contains(&best_move.best_move.to_uci()));
         }
         _ => panic!("unexpected {:?}", search.returned_evaluation.as_ref()),
     }

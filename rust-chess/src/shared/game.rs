@@ -5,7 +5,7 @@ use super::bitboard::{index_from_file_rank_str, ForPlayer};
 use super::danger::Danger;
 use super::helpers::*;
 use super::moves::{
-    all_moves, index_in_danger, Capture, Move, MoveBuffer, MoveOptions, MoveType, Quiet,
+    all_moves, index_in_danger, Capture, Move, MoveOptions, MoveType, Quiet,
 };
 use super::types::{self, CastlingSide, Piece, Player, PlayerPiece, CASTLING_SIDES};
 
@@ -266,7 +266,7 @@ impl Game {
     }
 
     pub fn move_from_str(&self, move_str: &str) -> Option<Move> {
-        let mut moves_buffer = MoveBuffer::default();
+        let mut moves_buffer = vec![];
         all_moves(
             &mut moves_buffer,
             self.player,
@@ -296,7 +296,7 @@ impl Game {
 
     pub fn fill_pseudo_move_buffer(
         &self,
-        buffer: &mut MoveBuffer,
+        buffer: &mut Vec<Move>,
         options: MoveOptions,
     ) -> ErrorResult<()> {
         buffer.clear();
@@ -489,7 +489,7 @@ fn test_en_passsant_2() {
         Some(index_from_file_rank_str("b3").unwrap())
     );
 
-    let mut moves = MoveBuffer::default();
+    let mut moves = vec![];
     game.fill_pseudo_move_buffer(&mut moves, MoveOptions::default())
         .unwrap();
 
@@ -531,7 +531,7 @@ fn test_castling_disallowed() {
     assert_eq!(false, game.can_castle[game.player][CastlingSide::Kingside]);
     assert_eq!(true, game.can_castle[game.player][CastlingSide::Queenside]);
 
-    let mut moves = MoveBuffer::default();
+    let mut moves = vec![];
     game.fill_pseudo_move_buffer(&mut moves, MoveOptions::default())
         .unwrap();
 
