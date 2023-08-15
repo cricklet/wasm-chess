@@ -308,7 +308,9 @@ fn test_evaluation_increment() {
     assert_eq!(
         Score::compare(
             Player::White,
-            Score::WinInN(Player::White, 0).increment_turns().increment_turns(),
+            Score::WinInN(Player::White, 0)
+                .increment_turns()
+                .increment_turns(),
             Score::WinInN(Player::White, 1),
         ),
         Comparison::Worse
@@ -331,10 +333,12 @@ struct StaticEvaluationReturn {
     previous_previous_move: Option<Move>,
 }
 
+const PV_SIZE: usize = 4;
+
 #[derive(Debug, Eq, PartialEq, Clone)]
 struct BestMoveReturn {
     best_move: Move,
-    response_moves: SizedMoveBuffer<8>, // store a relatively short PV
+    response_moves: SizedMoveBuffer<PV_SIZE>, // store a relatively short PV
     score: Score,
 }
 
@@ -354,8 +358,8 @@ impl SearchResult {
         }
     }
 
-    fn variation(&self) -> SizedMoveBuffer<8> {
-        let mut variation = SizedMoveBuffer::<8>::default();
+    fn variation(&self) -> SizedMoveBuffer<PV_SIZE> {
+        let mut variation = SizedMoveBuffer::<PV_SIZE>::default();
         match self {
             SearchResult::BestMove(result) => {
                 variation.clear();
@@ -376,7 +380,7 @@ impl SearchResult {
 
 // ************************************************************************************************* //
 
-const MAX_ALPHA_BETA_DEPTH: usize = 40;
+const MAX_ALPHA_BETA_DEPTH: usize = 30;
 
 #[derive(Default, Debug, Eq, PartialEq)]
 struct SearchFrameData {
