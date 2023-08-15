@@ -230,9 +230,14 @@ function App() {
 
   useEffect(() => {
     async function think() {
+      let start = game.start
+      let moves = [... game.moves]
+
       let worker = await wasm.searchWorker()
-      let bestMove = await worker.search(game.start, game.moves)
+      let bestMove = await worker.search(start, moves)
       console.log(`App::useEffect, best move: ${bestMove}`)
+
+      setGame((_) => performMove(bestMove, { start, moves }))
     }
     think()
   }, [game])
