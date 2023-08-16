@@ -1,13 +1,16 @@
 use strum::IntoEnumIterator;
 
+use crate::board::Board;
+
+use super::bitboard::FileRank;
 use super::bitboard::{self, castling_allowed_after_move, Bitboards, BoardIndex};
 use super::bitboard::{index_from_file_rank_str, ForPlayer};
 use super::danger::Danger;
 use super::helpers::*;
-use super::moves::{
-    all_moves, index_in_danger, Capture, Move, MoveOptions, MoveType, Quiet,
-};
+use super::moves::{all_moves, index_in_danger, Capture, Move, MoveOptions, MoveType, Quiet};
 use super::types::{self, CastlingSide, Piece, Player, PlayerPiece, CASTLING_SIDES};
+use super::zobrist::ZobristHash;
+use derive_getters::Getters;
 
 #[derive(Debug, Default, Copy, Clone)]
 pub struct CanCastleOnSide {
@@ -90,36 +93,34 @@ pub enum Legal {
 
 #[derive(Copy, Clone)]
 pub struct Game {
-    pub board: bitboard::Bitboards,
-    pub player: types::Player,
-    pub can_castle: ForPlayer<CanCastleOnSide>,
-    pub en_passant: Option<BoardIndex>,
+    board: Board,
     pub half_moves_since_pawn_or_capture: usize,
     pub full_moves_total: usize,
 }
 
 impl std::fmt::Display for Game {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}\n{}", self.to_fen(), self.board)
+        write!(f, "{}\n{}", self.to_fen(), self.board.bitboards())
     }
 }
 
 impl std::fmt::Debug for Game {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}\n{}", self.to_fen(), self.board)
+        write!(f, "{}\n{}", self.to_fen(), self.board.bitboards())
     }
 }
 
 impl Default for Game {
     fn default() -> Self {
+        let board = Bitboards::new();
+        let player = Player::White;
+        let can_castle = ForPlayer {
+            white: Default::default(),
+            black: Default::default(),
+        };
+        let en_passant = None;
         Self {
-            board: bitboard::state::Bitboards::new(),
-            player: types::Player::White,
-            can_castle: ForPlayer {
-                white: Default::default(),
-                black: Default::default(),
-            },
-            en_passant: None,
+            board: Board::new(board, player, can_castle, en_passant),
             half_moves_since_pawn_or_capture: 0,
             full_moves_total: 1,
         }
@@ -134,10 +135,11 @@ impl Game {
     pub fn to_fen(&self) -> String {
         format!(
             "{} {} {} {} {} {}",
-            self.board.to_fen(),
-            self.player.to_fen(),
-            self.can_castle.to_fen(),
-            self.en_passant
+            self.board.bitboards().to_fen(),
+            self.board.player().to_fen(),
+            self.board.can_castle().to_fen(),
+            self.board
+                .en_passant()
                 .map(|i| i.to_string())
                 .unwrap_or("-".to_string()),
             self.half_moves_since_pawn_or_capture,
@@ -205,7 +207,7 @@ impl Game {
             return err_result(&format!("empty fen {}", fen));
         }
 
-        let board = Bitboards::from_fen(split[0]);
+        let board = Bitboards::from_fen(split[0])?;
         game.board = board?;
 
         if split.len() <= 1 {
@@ -213,8 +215,8 @@ impl Game {
         }
 
         game.player = match split[1] {
-            "w" => types::Player::White,
-            "b" => types::Player::Black,
+            "w" => Player::White,
+            "b" => Player::Black,
             _ => return err_result(&format!("invalid player {}", split[1])),
         };
 
@@ -452,7 +454,7 @@ impl Game {
 
         self.player = enemy;
         self.half_moves_since_pawn_or_capture += 1;
-        if self.player == types::Player::White {
+        if self.player == Player::White {
             self.full_moves_total += 1;
         }
 

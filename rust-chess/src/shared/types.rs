@@ -7,6 +7,12 @@ pub enum Player {
     Black,
 }
 
+impl Player {
+    pub fn to_usize(self) -> usize {
+        self as usize
+    }
+}
+
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct PlayerPiece {
     pub player: Player,
@@ -95,6 +101,12 @@ pub fn other_player(player: Player) -> Player {
 pub enum CastlingSide {
     Kingside,
     Queenside,
+}
+
+impl CastlingSide {
+    pub fn to_usize(self) -> usize {
+        self as usize
+    }
 }
 
 pub static CASTLING_SIDES: [CastlingSide; 2] = [CastlingSide::Kingside, CastlingSide::Queenside];
