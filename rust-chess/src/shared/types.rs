@@ -18,6 +18,10 @@ impl PlayerPiece {
         Self { player, piece }
     }
 
+    pub fn to_usize(self) -> usize {
+        self.player as usize * 6 + self.piece as usize
+    }
+
     pub fn from(c: char) -> Option<PlayerPiece> {
         let piece = match c.to_ascii_uppercase() {
             'P' => Piece::Pawn,

@@ -10,5 +10,6 @@ pub mod iterative_traversal;
 pub mod moves;
 pub mod perft;
 pub mod search;
+pub mod zobrist;
 pub mod types;
 pub mod uci;

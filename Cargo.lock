@@ -1208,6 +1208,7 @@ dependencies = [
  "num-format",
  "pprof",
  "rand",
+ "rand_chacha",
  "rust-chess",
  "scopeguard",
  "strum",

@@ -119,6 +119,14 @@ impl BoardIndex {
             rank: self.i / 8,
         }
     }
+
+    pub fn file(&self) -> usize {
+        self.i % 8
+    }
+
+    pub fn rank(&self) -> usize {
+        self.i / 8
+    }
 }
 
 impl std::fmt::Debug for BoardIndex {

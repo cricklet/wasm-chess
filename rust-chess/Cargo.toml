@@ -29,7 +29,7 @@ enum-map = "2.6.0"
 lazy_static = "1.4.0"
 memoize = "0.4.0"
 num = "0.4.1"
-rand = "0.8.5"
+rand = { version = "0.8.5", features = ["small_rng"] }
 scopeguard = "1.2.0"
 strum = { version = "0.25.0", features = ["derive"] }
 getrandom = { version = "0.2", features = ["js"] }
@@ -41,3 +41,4 @@ pprof = { version = "0.12.0", features = [
     "prost-codec",
     "protobuf-codec",
 ], optional = true }
+rand_chacha = "0.3.1"
