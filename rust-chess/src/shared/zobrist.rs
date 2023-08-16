@@ -3,11 +3,12 @@ use std::{sync::Mutex, fmt::{Display, Formatter}};
 use lazy_static::lazy_static;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
+use strum::IntoEnumIterator;
 
 use crate::{
     bitboard::{BoardIndex, self, Bitboards, ForPlayer},
     game::{Game, CanCastleOnSide},
-    types::{CastlingSide, Player, PlayerPiece},
+    types::{CastlingSide, Player, PlayerPiece, Piece},
 };
 
 lazy_static! {
@@ -15,12 +16,22 @@ lazy_static! {
         let r = ChaCha8Rng::seed_from_u64(32879419);
         Mutex::new(r)
     };
-    static ref ZOBRIST_PIECE_AT_SQUARE: [[u64; 64]; 13] = {
-        let mut arr = [[0; 64]; 13];
+    static ref ZOBRIST_PIECE_AT_SQUARE: [[u64; 64]; 12] = {
+        let mut arr = [[0; 64]; 12];
         let mut r = RANDOMIZER.lock().unwrap();
-        for piece in 1..13 {
-            for board_index in 0..64 {
-                arr[piece][board_index] = r.gen();
+        for player in Player::iter() {
+            for piece in Piece::iter() {
+                let player_piece = PlayerPiece::new(player, piece);
+                for board_index in 0..64 {
+                    arr[player_piece.to_usize()][board_index] = r.gen();
+                }
+            }
+        }
+        for row in arr {
+            for v in row {
+                if v == 0 {
+                    panic!("failed to initialize zobrist array");
+                }
             }
         }
         arr
@@ -60,6 +71,10 @@ impl Display for ZobristHash {
 
 
 impl ZobristHash {
+    pub fn value(self) -> u64 {
+        self.value
+    }
+
     pub fn from(
         bitboards: &Bitboards,
         player: Player,

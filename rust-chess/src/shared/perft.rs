@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{bitboard::warm_magic_cache, iterative_traversal::null_move_sorter};
+use crate::{bitboard::warm_magic_cache, iterative_traversal::null_move_sort};
 
 use super::{
     danger::Danger,
@@ -309,7 +309,7 @@ pub fn run_perft_iteratively<const N: usize>(game: Game) -> ErrorResult<usize> {
         }
 
         // We have moves to traverse, dig deeper
-        let next_move = data.get_and_increment_move(null_move_sorter)?;
+        let next_move = data.get_and_increment_move(null_move_sort)?;
         if let Some(next_move) = next_move {
             let (current, next) = data.current_and_next_mut()?;
 
@@ -463,7 +463,7 @@ impl PerftLoop {
         }
 
         // We have moves to traverse, dig deeper
-        let next_move = traversal.get_and_increment_move(null_move_sorter).unwrap();
+        let next_move = traversal.get_and_increment_move(null_move_sort).unwrap();
         if let Some(next_move) = next_move {
             let (current, next) = traversal.current_and_next_mut().unwrap();
 

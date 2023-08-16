@@ -113,7 +113,7 @@ impl std::fmt::Debug for Game {
 
 impl Default for Game {
     fn default() -> Self {
-        let board = Bitboards::new();
+        let bitboards = Bitboards::new();
         let player = Player::White;
         let can_castle = ForPlayer {
             white: Default::default(),
@@ -121,7 +121,7 @@ impl Default for Game {
         };
         let en_passant = None;
         Self {
-            board: Board::new(board, player, can_castle, en_passant),
+            board: Board::new(bitboards, player, can_castle, en_passant),
             half_moves_since_pawn_or_capture: 0,
             full_moves_total: 1,
         }
@@ -135,19 +135,16 @@ impl Game {
 
     pub fn to_fen(&self) -> String {
         format!(
-            "{} {} {} {} {} {}",
-            self.board.bitboards().to_fen(),
-            self.board.player().to_fen(),
-            self.board.can_castle().to_fen(),
-            self.board
-                .en_passant()
-                .map(|i| i.to_string())
-                .unwrap_or("-".to_string()),
+            "{} {} {}",
+            self.board.to_fen(),
             self.half_moves_since_pawn_or_capture,
             self.full_moves_total
         )
     }
 
+    pub fn board(&self) -> &Board {
+        &self.board
+    }
     pub fn bitboards(&self) -> &Bitboards {
         self.board.bitboards()
     }

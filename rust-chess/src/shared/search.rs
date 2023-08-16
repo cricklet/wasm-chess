@@ -1,11 +1,11 @@
-use std::{collections::HashSet, fmt::Display};
+use std::{collections::HashSet, fmt::Display, ptr::null};
 
 use itertools::Itertools;
 
 use crate::{
     defer,
     helpers::{err_result, OptionResult},
-    iterative_traversal::{IndexedMoveBuffer, TraversalStack, null_move_sorter},
+    iterative_traversal::{null_move_sort, IndexedMoveBuffer, TraversalStack},
 };
 
 use super::{
@@ -475,7 +475,8 @@ impl SearchStack {
         let next_score = next_evaluation.score().increment_turns();
 
         let (current, _) = self.traversal.current_mut()?;
-        if Score::compare(current.game.player(), next_score, current.data.beta).is_better_or_equal() {
+        if Score::compare(current.game.player(), next_score, current.data.beta).is_better_or_equal()
+        {
             // The enemy can force a better score. Cutoff early.
             // Beta is the lower bound for the score we can get at this board state.
             self.returned_evaluation = Some(SearchResult::BetaCutoff(next_score));
@@ -509,8 +510,11 @@ impl SearchStack {
         Ok(Some(LoopResult::Continue))
     }
 
-    fn apply_next_move_or_return(&mut self) -> ErrorResult<Option<LoopResult>> {
-        let next_move = self.traversal.get_and_increment_move(null_move_sorter)?;
+    fn apply_next_move_or_return<S>(&mut self, sorter: S) -> ErrorResult<Option<LoopResult>>
+    where
+        S: Fn(&Game, &mut Vec<Move>) -> ErrorResult<()>,
+    {
+        let next_move = self.traversal.get_and_increment_move(sorter)?;
         if let Some(next_move) = next_move {
             // If there are moves left at 'current', apply the move
             let (current, next) = self.traversal.current_and_next_mut()?;
@@ -578,7 +582,10 @@ impl SearchStack {
         }
     }
 
-    pub fn iterate(&mut self) -> ErrorResult<LoopResult> {
+    pub fn iterate<S>(&mut self, sorter: S) -> ErrorResult<LoopResult>
+    where
+        S: Fn(&Game, &mut Vec<Move>) -> ErrorResult<()>,
+    {
         // eg for the first move
         //  previous (startpos) --> last_move (e2e4) --> current (startpos moves e2e4)
 
@@ -611,7 +618,7 @@ impl SearchStack {
         }
 
         // Otherwise, continue traversing or return the best move we've found so far
-        if let Some(result) = self.apply_next_move_or_return()? {
+        if let Some(result) = self.apply_next_move_or_return(sorter)? {
             return Ok(result);
         }
 
@@ -666,14 +673,14 @@ impl InQuiescence {
 fn test_start_search() {
     let mut search = SearchStack::with(Game::from_fen("startpos").unwrap(), 4).unwrap();
     loop {
-        match search.iterate().unwrap() {
+        match search.iterate(null_move_sort).unwrap() {
             LoopResult::Continue => {}
             LoopResult::Done => break,
         }
     }
 
     // Calling `iterate()` should be idempotent
-    search.iterate().unwrap();
+    search.iterate(null_move_sort).unwrap();
     println!("{:#?}", search.returned_evaluation);
 
     let potential_first_moves: HashSet<String> = HashSet::from_iter(
