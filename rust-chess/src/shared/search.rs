@@ -698,7 +698,7 @@ impl InQuiescence {
 
 #[test]
 fn test_start_search() {
-    let mut search = SearchStack::with(Game::from_fen("startpos").unwrap(), 4).unwrap();
+    let mut search = SearchStack::with(Game::from_fen("startpos").unwrap(), 3).unwrap();
     loop {
         match search.iterate(null_move_sort).unwrap() {
             LoopResult::Continue => {}
@@ -719,8 +719,7 @@ fn test_start_search() {
 
     match search.returned_evaluation.as_ref().unwrap() {
         SearchResult::BestMove(best_move) => {
-            // We play conservatively because we don't support quiescence yet
-            assert!(!potential_first_moves.contains(&best_move.best_move.to_uci()));
+            assert!(potential_first_moves.contains(&best_move.best_move.to_uci()));
         }
         _ => panic!("unexpected {:?}", search.returned_evaluation.as_ref()),
     }
