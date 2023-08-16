@@ -12,12 +12,13 @@ use crate::{
     bitboard::BoardIndex,
     game::Game,
     helpers::{ErrorResult, Joinable, OptionResult},
+    iterative_traversal::null_move_sort,
     moves::Move,
-    search::{LoopResult, SearchStack}, iterative_traversal::null_move_sort,
+    search::{LoopResult, SearchStack},
 };
 
 pub struct BestMovesCache {
-    best_moves: Vec<(BoardIndex, BoardIndex)>,
+    best_moves: Vec<Option<(BoardIndex, BoardIndex)>>,
     bits: usize,
     mask: u64,
 }
@@ -25,7 +26,7 @@ pub struct BestMovesCache {
 impl BestMovesCache {
     pub fn new() -> Self {
         Self {
-            best_moves: Vec::with_capacity((2 as usize).pow(20)),
+            best_moves: vec![None; (2 as usize).pow(20)],
             bits: 20, // 1 mb
             mask: (2 as u64).pow(20) - 1,
         }
@@ -35,24 +36,35 @@ impl BestMovesCache {
         let hash = game.zobrist().value();
         let masked = hash & self.mask;
 
-        self.best_moves[masked as usize] = (m.start_index, m.end_index);
+        self.best_moves[masked as usize] = Some((m.start_index, m.end_index));
+    }
+
+    pub fn update(&mut self, game: &Game, moves: &Vec<Move>) -> ErrorResult<()> {
+        let mut game = game.clone();
+
+        for m in moves {
+            self.add(&game, *m);
+            game.make_move(*m)?;
+        }
+
+        Ok(())
     }
 
     pub fn get(&self, game: &Game) -> Option<(BoardIndex, BoardIndex)> {
         let hash = game.zobrist().value();
         let masked = hash & self.mask;
 
-        self.best_moves.get(masked as usize).cloned()
+        self.best_moves[masked as usize]
     }
 
     pub fn sort(&self, game: &Game, moves: &mut Vec<Move>) -> ErrorResult<()> {
         let hash = game.zobrist().value();
         let masked = hash & self.mask;
 
-        if let Some((start, end)) = self.best_moves.get(masked as usize) {
+        if let Some((start, end)) = self.best_moves[masked as usize] {
             let i = moves
                 .iter()
-                .position(|m| m.start_index == *start && m.end_index == *end);
+                .position(|m| m.start_index == start && m.end_index == end);
             if let Some(i) = i {
                 moves.swap(0, i);
             }
@@ -69,6 +81,8 @@ pub struct IterativeSearch {
     best_variations_per_depth: Vec<Vec<Move>>,
     best_moves_cache: BestMovesCache,
 
+    use_cache_sort: bool,
+
     no_moves_found: bool,
 }
 
@@ -81,6 +95,7 @@ impl IterativeSearch {
             start_game: game,
             best_variations_per_depth: vec![],
             best_moves_cache,
+            use_cache_sort: true,
             no_moves_found: false,
         })
     }
@@ -103,7 +118,18 @@ impl IterativeSearch {
             return Ok(());
         }
 
-        match self.search.iterate(null_move_sort)? {
+        let use_cache_sort = self.use_cache_sort;
+        let best_moves_cache = &self.best_moves_cache;
+
+        let sorter = move |game: &Game, moves: &mut Vec<Move>| -> ErrorResult<()> {
+            if use_cache_sort {
+                best_moves_cache.sort(game, moves)
+            } else {
+                null_move_sort(game, moves)
+            }
+        };
+
+        match self.search.iterate(sorter)? {
             LoopResult::Done => {
                 let result = self.search.bestmove();
                 match result {
@@ -114,20 +140,21 @@ impl IterativeSearch {
                     Some((bestmove, response, score)) => {
                         let depth = self.search.max_depth;
                         log.push(format!(
-                            "at depth {}: bestmove {} ponder {} ({})",
+                            "at depth {}: bestmove {} ponder {} ({}), beta-cutoffs {}, evaluations {}",
                             depth,
                             bestmove.to_uci(),
                             response.join_vec(" "),
-                            score
+                            score,
+                            self.search.num_beta_cutoffs,
+                            self.search.num_evaluations,
                         ));
 
-                        self.best_variations_per_depth
-                            .push(iter::once(bestmove).chain(response).collect());
+                        let best_variation = iter::once(bestmove).chain(response).collect();
+                        self.best_moves_cache
+                            .update(&self.start_game, &best_variation)?;
+                        self.best_variations_per_depth.push(best_variation);
 
-                        self.search = SearchStack::with(
-                            self.start_game.clone(),
-                            depth + 1,
-                        )?;
+                        self.search = SearchStack::with(self.start_game.clone(), depth + 1)?;
                     }
                 }
             }
@@ -140,16 +167,21 @@ impl IterativeSearch {
 
 #[test]
 fn test_start_iterative_deepening() {
-    let mut search = IterativeSearch::new(Game::from_fen("startpos").unwrap()).unwrap();
-    let mut log = vec![];
+    for &use_cache_sort in [false, true].iter() {
+        let mut search = IterativeSearch::new(Game::from_fen("startpos").unwrap()).unwrap();
+        search.use_cache_sort = use_cache_sort;
 
-    for _ in 0..1_000_000 {
+        let mut log = vec![];
+
+        for _ in 0..1_000_000 {
+            search.iterate(&mut log).unwrap();
+        }
+
+        // Calling `iterate()` should be idempotent
         search.iterate(&mut log).unwrap();
+
+        println!("\nuse_cache_sort {}", use_cache_sort);
+        println!("{:#?}", log);
+        println!("{:#?}", search.bestmove());
     }
-
-    // Calling `iterate()` should be idempotent
-    search.iterate(&mut log).unwrap();
-
-    println!("{:#?}", log);
-    println!("{:#?}", search.bestmove());
 }

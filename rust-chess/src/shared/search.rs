@@ -396,6 +396,9 @@ pub struct SearchStack {
 
     pub done: bool,
     pub max_depth: usize,
+
+    pub num_beta_cutoffs: usize,
+    pub num_evaluations: usize,
 }
 
 impl SearchStack {
@@ -407,6 +410,8 @@ impl SearchStack {
             returned_evaluation: None,
             max_depth: 3,
             done: false,
+            num_beta_cutoffs: 0,
+            num_evaluations: 0,
         })
     }
     pub fn with(game: Game, max_depth: usize) -> ErrorResult<Self> {
@@ -417,6 +422,8 @@ impl SearchStack {
             returned_evaluation: None,
             max_depth,
             done: false,
+            num_beta_cutoffs: 0,
+            num_evaluations: 0,
         })
     }
 
@@ -452,6 +459,8 @@ impl SearchStack {
                 .move_applied_before_depth(current_depth - 1)?,
         }));
 
+        self.num_evaluations += 1;
+
         // Return early (pop up the stack)
         self.traversal.depth -= 1;
         Ok(Some(LoopResult::Continue))
@@ -480,6 +489,8 @@ impl SearchStack {
             // The enemy can force a better score. Cutoff early.
             // Beta is the lower bound for the score we can get at this board state.
             self.returned_evaluation = Some(SearchResult::BetaCutoff(next_score));
+
+            self.num_beta_cutoffs += 1;
 
             // Return early (pop up the stack)
             self.traversal.depth -= 1;
