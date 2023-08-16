@@ -140,13 +140,14 @@ impl IterativeSearch {
                     Some((bestmove, response, score)) => {
                         let depth = self.search.max_depth;
                         log.push(format!(
-                            "at depth {}: bestmove {} ponder {} ({}), beta-cutoffs {}, evaluations {}",
+                            "at depth {}: bestmove {} ponder {} ({}), beta-cutoffs {}, evaluations {}, start moves searched {}",
                             depth,
                             bestmove.to_uci(),
-                            response.join_vec(" "),
+                            response.iter().map(|m| m.to_uci()).collect::<Vec<_>>().join_vec(" "),
                             score,
                             self.search.num_beta_cutoffs,
                             self.search.num_evaluations,
+                            self.search.num_starting_moves_searched,
                         ));
 
                         let best_variation = iter::once(bestmove).chain(response).collect();
@@ -176,6 +177,14 @@ fn test_start_iterative_deepening() {
         for _ in 0..1_000_000 {
             search.iterate(&mut log).unwrap();
         }
+
+        log.push(format!(
+            "at depth {}: beta-cutoffs {}, evaluations {}, start moves searched {}",
+            search.search.max_depth,
+            search.search.num_beta_cutoffs,
+            search.search.num_evaluations,
+            search.search.num_starting_moves_searched,
+        ));
 
         // Calling `iterate()` should be idempotent
         search.iterate(&mut log).unwrap();

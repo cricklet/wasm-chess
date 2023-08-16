@@ -19,7 +19,6 @@ use super::{
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Score {
-    Unknown,
     Centipawns(Player, isize),
     WinInN(Player, usize),
     DrawInN(usize),
@@ -28,7 +27,6 @@ pub enum Score {
 impl Display for Score {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Score::Unknown => write!(f, "?"),
             Score::Centipawns(player, score) => match player {
                 Player::White => write!(f, "{}", score),
                 Player::Black => write!(f, "{}", -score),
@@ -46,15 +44,8 @@ impl Score {
             Score::WinInN(_, ref mut i) => *i += 1,
             Score::DrawInN(ref mut i) => *i += 1,
             Score::Centipawns(..) => {}
-            Score::Unknown => {}
         }
         new_score
-    }
-}
-
-impl Default for Score {
-    fn default() -> Self {
-        Score::Unknown
     }
 }
 
@@ -93,7 +84,6 @@ impl Score {
                 }
             }
             Score::DrawInN(_) => Some((0, 0)),
-            Score::Unknown => None,
         }
     }
 
@@ -374,13 +364,24 @@ impl SearchResult {
 
 const MAX_ALPHA_BETA_DEPTH: usize = 40;
 
-#[derive(Default, Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 struct SearchFrameData {
     alpha: Score,
     beta: Score,
     in_quiescence: InQuiescence,
 
     best_move: Option<BestMoveReturn>,
+}
+
+impl SearchFrameData {
+    pub fn for_player(player: Player) -> Self {
+        Self {
+            alpha: Score::WinInN(player.other(), 0),
+            beta: Score::WinInN(player, 0),
+            in_quiescence: InQuiescence::No,
+            best_move: None,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -399,31 +400,31 @@ pub struct SearchStack {
 
     pub num_beta_cutoffs: usize,
     pub num_evaluations: usize,
+    pub num_starting_moves_searched: usize,
 }
 
 impl SearchStack {
     pub fn default(game: Game) -> ErrorResult<Self> {
-        Ok(Self {
-            traversal: TraversalStack::<SearchFrameData, MAX_ALPHA_BETA_DEPTH>::new(game, || {
-                SearchFrameData::default()
-            })?,
-            returned_evaluation: None,
-            max_depth: 3,
-            done: false,
-            num_beta_cutoffs: 0,
-            num_evaluations: 0,
-        })
+        Self::with(game, 4)
     }
     pub fn with(game: Game, max_depth: usize) -> ErrorResult<Self> {
         Ok(Self {
-            traversal: TraversalStack::<SearchFrameData, MAX_ALPHA_BETA_DEPTH>::new(game, || {
-                SearchFrameData::default()
+            traversal: TraversalStack::<SearchFrameData, MAX_ALPHA_BETA_DEPTH>::new(game, |i| {
+                let player = {
+                    if i % 2 == 0 {
+                        game.player()
+                    } else {
+                        game.player().other()
+                    }
+                };
+                SearchFrameData::for_player(player)
             })?,
             returned_evaluation: None,
             max_depth,
             done: false,
             num_beta_cutoffs: 0,
             num_evaluations: 0,
+            num_starting_moves_searched: 0,
         })
     }
 
@@ -484,6 +485,11 @@ impl SearchStack {
         let next_score = next_evaluation.score().increment_turns();
 
         let (current, _) = self.traversal.current_mut()?;
+        // println!(
+        //     "process_next_move_evaluation alpha {}, beta {}, next-score {}",
+        //     current.data.alpha, current.data.beta, next_score
+        // );
+
         if Score::compare(current.game.player(), next_score, current.data.beta).is_better_or_equal()
         {
             // The enemy can force a better score. Cutoff early.
@@ -540,6 +546,10 @@ impl SearchStack {
             next.data.beta = current.data.alpha;
             next.data.in_quiescence = current.data.in_quiescence;
             next.data.best_move = None;
+
+            if self.traversal.depth == 0 {
+                self.num_starting_moves_searched += 1;
+            }
 
             // Recurse into our newly applied move
             self.traversal.depth += 1;

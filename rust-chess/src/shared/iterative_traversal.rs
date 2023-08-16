@@ -170,13 +170,13 @@ impl<D: Debug, const N: usize> Debug for TraversalStack<D, N> {
 }
 
 impl<D: Debug, const N: usize> TraversalStack<D, N> {
-    pub fn new<F: Fn() -> D>(game: Game, data_callback: F) -> ErrorResult<Self> {
+    pub fn new<F: Fn(usize) -> D>(game: Game, data_callback: F) -> ErrorResult<Self> {
         let mut data = Self {
-            stack: std::array::from_fn::<_, N, _>(|_| TraversalStackFrame::<D> {
+            stack: std::array::from_fn::<_, N, _>(|i| TraversalStackFrame::<D> {
                 game: Game::default(),
                 danger: None,
                 moves: StableOption::default(),
-                data: data_callback(),
+                data: data_callback(i),
             }),
             depth: 0,
         };
