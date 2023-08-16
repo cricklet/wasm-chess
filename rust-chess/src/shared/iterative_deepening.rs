@@ -168,8 +168,9 @@ impl IterativeSearch {
 
 #[test]
 fn test_start_iterative_deepening() {
+    let fen = "b1k4r/p4ppp/4n3/1R6/8/8/PPP2P1P/2KR4 w - - 0 20";
     for &use_cache_sort in [false, true].iter() {
-        let mut search = IterativeSearch::new(Game::from_fen("startpos").unwrap()).unwrap();
+        let mut search = IterativeSearch::new(Game::from_fen(fen).unwrap()).unwrap();
         search.use_cache_sort = use_cache_sort;
 
         let mut log = vec![];
