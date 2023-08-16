@@ -101,13 +101,13 @@ pub struct Game {
 
 impl std::fmt::Display for Game {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}\n{}", self.to_fen(), self.board.bitboards())
+        write!(f, "{} ({})\n{}", self.to_fen(), self.board.zobrist(), self.board.bitboards())
     }
 }
 
 impl std::fmt::Debug for Game {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}\n{}", self.to_fen(), self.board.bitboards())
+        write!(f, "{} ({})\n{}", self.to_fen(), self.board.zobrist(), self.board.bitboards())
     }
 }
 
@@ -159,6 +159,9 @@ impl Game {
     }
     pub fn en_passant(&self) -> Option<BoardIndex> {
         *self.board.en_passant()
+    }
+    pub fn zobrist(&self) -> ZobristHash {
+        *self.board.zobrist()
     }
 
     pub fn from_position_uci(uci_line: &str) -> ErrorResult<Game> {

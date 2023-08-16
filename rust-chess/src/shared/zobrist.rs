@@ -1,4 +1,4 @@
-use std::sync::Mutex;
+use std::{sync::Mutex, fmt::{Display, Formatter}};
 
 use lazy_static::lazy_static;
 use rand::{Rng, SeedableRng};
@@ -51,6 +51,14 @@ lazy_static! {
 pub struct ZobristHash {
     value: u64,
 }
+
+impl Display for ZobristHash {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:x}", self.value)
+    }
+}
+
+
 impl ZobristHash {
     pub fn from(
         bitboards: &Bitboards,

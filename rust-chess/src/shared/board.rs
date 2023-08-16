@@ -1,6 +1,8 @@
 
+use std::collections::{HashSet, HashMap};
+
 use derive_getters::Getters;
-use crate::{bitboard::{Bitboards, ForPlayer, BoardIndex}, types::{Player, CastlingSide, PlayerPiece}, game::CanCastleOnSide, zobrist::ZobristHash, helpers::{ErrorResult, err_result}};
+use crate::{bitboard::{Bitboards, ForPlayer, BoardIndex}, types::{Player, CastlingSide, PlayerPiece}, game::{CanCastleOnSide, Game}, zobrist::ZobristHash, helpers::{ErrorResult, err_result}, perft::traverse_game_callback};
 
 
 #[derive(Getters, Debug, Clone, Copy)]
@@ -86,4 +88,29 @@ impl Board {
         self.zobrist.on_update_square(index, piece);
         Ok(())
     }
+}
+
+#[test]
+fn test_no_early_zobrist_repeats() {
+    let game = Game::from_fen("startpos").unwrap();
+
+    let mut hash_for_board_fen: HashMap<ZobristHash, String> = HashMap::new();
+    let mut moves_stack = vec![];
+
+    traverse_game_callback(&mut moves_stack, &game, 0, 4, &mut |params| {
+        let hash = params.game.zobrist();
+        let board_fen = params.game.bitboards().to_fen();
+
+        if let Some(previous) = hash_for_board_fen.get(&hash) {
+            if previous != &board_fen {
+                panic!(
+                    "found duplicate zobrist hash for board: {} and {}",
+                    previous, board_fen
+                );
+            }
+        } else {
+            hash_for_board_fen.insert(hash, board_fen);
+        }
+    }).unwrap();
+    
 }

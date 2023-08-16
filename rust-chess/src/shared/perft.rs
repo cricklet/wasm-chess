@@ -43,11 +43,11 @@ fn test_fen_start_board() {
     assert_fen_matches(fen);
 }
 
-struct TraverseGameCallbackParams<'game> {
-    moves_stack: &'game Vec<Move>,
-    game: &'game Game,
-    depth: usize,
-    max_depth: usize,
+pub struct TraverseGameCallbackParams<'game> {
+    pub moves_stack: &'game Vec<Move>,
+    pub game: &'game Game,
+    pub depth: usize,
+    pub max_depth: usize,
 }
 
 fn print_game(fen: &str, moves: &Vec<Move>) -> String {
@@ -84,7 +84,7 @@ fn print_game(fen: &str, moves: &Vec<Move>) -> String {
     format!("'{}': {{\n{}\n}}", uci, indent(&s, 2))
 }
 
-fn traverse_game_callback(
+pub fn traverse_game_callback(
     moves_stack: &mut Vec<Move>,
     game: &Game,
     depth: usize,
