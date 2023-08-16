@@ -438,7 +438,7 @@ impl SearchStack {
             return Ok(None);
         }
 
-        let score = Score::Centipawns(current.game.player, evaluate(&current.game));
+        let score = Score::Centipawns(current.game.player(), evaluate(&current.game));
 
         self.returned_evaluation = Some(SearchResult::StaticEvaluation(StaticEvaluationReturn {
             previous_move: self
@@ -475,7 +475,7 @@ impl SearchStack {
         let next_score = next_evaluation.score().increment_turns();
 
         let (current, _) = self.traversal.current_mut()?;
-        if Score::compare(current.game.player, next_score, current.data.beta).is_better_or_equal() {
+        if Score::compare(current.game.player(), next_score, current.data.beta).is_better_or_equal() {
             // The enemy can force a better score. Cutoff early.
             // Beta is the lower bound for the score we can get at this board state.
             self.returned_evaluation = Some(SearchResult::BetaCutoff(next_score));
@@ -487,7 +487,7 @@ impl SearchStack {
 
         if current.data.best_move.is_none()
             || Score::compare(
-                current.game.player,
+                current.game.player(),
                 next_score,
                 current.data.best_move.as_ref().unwrap().score,
             )
@@ -499,7 +499,7 @@ impl SearchStack {
                 response_moves: next_evaluation.variation(),
             });
 
-            if Score::compare(current.game.player, next_score, current.data.alpha).is_better() {
+            if Score::compare(current.game.player(), next_score, current.data.alpha).is_better() {
                 // Enemy won't prevent us from making this move. Keep searching
                 current.data.alpha = next_score;
             }
@@ -542,7 +542,7 @@ impl SearchStack {
             if current.danger.unwrap().check {
                 self.returned_evaluation =
                     Some(SearchResult::StaticEvaluation(StaticEvaluationReturn {
-                        score: Score::WinInN(current.game.player.other(), 0),
+                        score: Score::WinInN(current.game.player().other(), 0),
                         previous_move: self
                             .traversal
                             .move_applied_before_depth(current_depth)?

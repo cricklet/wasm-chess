@@ -433,14 +433,14 @@ pub fn en_passant_move(
 pub fn castling_moves(buffer: &mut Vec<Move>, player: Player, state: &Game) -> ErrorResult<()> {
     let allowed_castling_sides = CASTLING_SIDES
         .iter()
-        .filter(move |&&castling_side| state.can_castle[player][castling_side]);
+        .filter(move |&&castling_side| state.can_castle()[player][castling_side]);
 
     let castling_requirements = allowed_castling_sides
         .map(move |&castling_side| castling_requirements(player, castling_side));
 
     let empty_castling_sides = castling_requirements.filter(move |&req| {
         for &empty_index in &req.require_empty {
-            if state.board.piece_at_index(empty_index).is_some() {
+            if state.bitboards().piece_at_index(empty_index).is_some() {
                 return false;
             }
         }
@@ -450,7 +450,7 @@ pub fn castling_moves(buffer: &mut Vec<Move>, player: Player, state: &Game) -> E
     let safe_castling_sides = empty_castling_sides
         .map(move |req| -> ErrorResult<Option<&CastlingRequirements>> {
             for &safe_index in &req.require_safe {
-                if index_in_danger(player, safe_index, &state.board)? {
+                if index_in_danger(player, safe_index, state.bitboards())? {
                     return Ok(None);
                 }
             }
@@ -487,45 +487,45 @@ pub fn all_moves<'game>(
     pawn_moves(
         buffer,
         player,
-        &state.board,
+        state.bitboards(),
         options.only_captures,
         options.only_queen_promotion,
     )?;
     jump_moves(
         buffer,
         player,
-        &state.board,
+        state.bitboards(),
         JumpingPiece::Knight,
         options.only_captures,
     )?;
     jump_moves(
         buffer,
         player,
-        &state.board,
+        state.bitboards(),
         JumpingPiece::King,
         options.only_captures,
     )?;
     walk_moves(
         buffer,
         PlayerPiece::new(player, Piece::Bishop),
-        &state.board,
+        state.bitboards(),
         options.only_captures,
     )?;
     walk_moves(
         buffer,
         PlayerPiece::new(player, Piece::Rook),
-        &state.board,
+        state.bitboards(),
         options.only_captures,
     )?;
     walk_moves(
         buffer,
         PlayerPiece::new(player, Piece::Queen),
-        &state.board,
+        state.bitboards(),
         options.only_captures,
     )?;
     castling_moves(buffer, player, state)?;
 
-    en_passant_move(buffer, player, &state.board, state.en_passant)?;
+    en_passant_move(buffer, player, state.bitboards(), state.en_passant())?;
 
     Ok(())
 }
@@ -604,7 +604,7 @@ mod test {
         let mut moves_buffer = vec![];
         all_moves(
             &mut moves_buffer,
-            game.player,
+            game.player(),
             &game,
             MoveOptions::default(),
         )
@@ -630,7 +630,7 @@ mod test {
         let mut moves_buffer = vec![];
         all_moves(
             &mut moves_buffer,
-            game.player,
+            game.player(),
             &game,
             MoveOptions::default(),
         )

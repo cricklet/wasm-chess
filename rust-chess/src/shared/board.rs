@@ -1,5 +1,5 @@
-use derive_getters::Getters;
 
+use derive_getters::Getters;
 use crate::{bitboard::{Bitboards, ForPlayer, BoardIndex}, types::{Player, CastlingSide, PlayerPiece}, game::CanCastleOnSide, zobrist::ZobristHash, helpers::{ErrorResult, err_result}};
 
 
@@ -40,12 +40,16 @@ impl Board {
         self.zobrist.on_castling_change(player, side);
     }
 
-    pub fn update_player(&mut self) {
-        self.player = self.player.other();
+    pub fn update_player(&mut self, player: Player) -> ErrorResult<()> {
+        if self.player == player {
+            return err_result("cannot update player to the same player");
+        }
+        self.player = player;
         self.zobrist.on_player_change();
+        Ok(())
     }
 
-    pub fn set_en_passant(&mut self, target: Option<BoardIndex>) {
+    pub fn update_en_passant(&mut self, target: Option<BoardIndex>) {
         if self.en_passant == target {
             return;
         }

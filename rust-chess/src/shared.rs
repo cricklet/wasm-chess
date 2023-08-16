@@ -14,3 +14,4 @@ pub mod search;
 pub mod types;
 pub mod uci;
 pub mod zobrist;
+pub mod fen;

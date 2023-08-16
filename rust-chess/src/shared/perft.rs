@@ -102,7 +102,7 @@ fn traverse_game_callback(
         return Ok(());
     }
 
-    let danger = Danger::from(game.player, &game.board)?;
+    let danger = Danger::from(game.player(), game.bitboards())?;
 
     let mut moves = vec![];
     game.fill_pseudo_move_buffer(&mut moves, MoveOptions::default())?;
@@ -148,7 +148,7 @@ pub fn run_perft_counting_first_move(
     let mut total_count = 0;
     let mut count_per_move: HashMap<String, usize> = HashMap::new();
 
-    let danger = Danger::from(game.player, &game.board)?;
+    let danger = Danger::from(game.player(), game.bitboards())?;
 
     let mut moves = vec![];
     game.fill_pseudo_move_buffer(&mut moves, MoveOptions::default())?;

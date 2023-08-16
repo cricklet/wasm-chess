@@ -127,7 +127,7 @@ impl<D> TraversalStackFrame<D> {
             return Ok(self.danger.as_ref().unwrap());
         }
 
-        self.danger = Some(Danger::from(self.game.player, &self.game.board)?);
+        self.danger = Some(Danger::from(self.game.player(), self.game.bitboards())?);
         Ok(self.danger.as_ref().unwrap())
     }
 

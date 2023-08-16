@@ -124,7 +124,7 @@ fn centipawn_evaluation(game: &Game, player: Player) -> isize {
     let mut score = 0;
 
     {
-        let pieces = &game.board.pieces[player];
+        let pieces = &game.bitboards().pieces[player];
         for piece in Piece::iter() {
             score += pieces[piece].count_ones() as isize * piece.centipawns();
         }
@@ -132,7 +132,7 @@ fn centipawn_evaluation(game: &Game, player: Player) -> isize {
 
     {
         let enemy = player.other();
-        let pieces = &game.board.pieces[enemy];
+        let pieces = &game.bitboards().pieces[enemy];
         for piece in Piece::iter() {
             score -= pieces[piece].count_ones() as isize * piece.centipawns();
         }
@@ -146,8 +146,8 @@ fn development_evaluation(game: &Game, player: Player) -> isize {
 
     let enemy = player.other();
 
-    let player_pieces = game.board.pieces[player];
-    let enemy_pieces = game.board.pieces[enemy];
+    let player_pieces = game.bitboards().pieces[player];
+    let enemy_pieces = game.bitboards().pieces[enemy];
     for piece in Piece::iter() {
         {
             let player_piece = player_pieces[piece];
@@ -168,39 +168,39 @@ fn development_evaluation(game: &Game, player: Player) -> isize {
 }
 
 pub fn evaluate(game: &Game) -> isize {
-    centipawn_evaluation(game, game.player) + development_evaluation(game, game.player)
+    centipawn_evaluation(game, game.player()) + development_evaluation(game, game.player())
 }
 
 #[test]
 fn test_early_game_evaluation() {
     let game = Game::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR").unwrap();
-    assert_eq!(development_evaluation(&game, game.player), 0);
+    assert_eq!(development_evaluation(&game, game.player()), 0);
 
     // after e4, white is winning
     let game =
         Game::from_fen("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1").unwrap();
-    let score = development_evaluation(&game, game.player);
+    let score = development_evaluation(&game, game.player());
     assert!(score < 0, "{} should be negative", score);
 
     // after e6, white is still winning
     let game =
         Game::from_fen("rnbqkbnr/pppp1ppp/4p3/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2").unwrap();
-    let score = development_evaluation(&game, game.player);
+    let score = development_evaluation(&game, game.player());
     assert!(score > 0, "{} should be positive", score);
 }
 
 #[test]
 fn test_point_evaluation() {
     let game = Game::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR").unwrap();
-    assert_eq!(centipawn_evaluation(&game, game.player), 0);
+    assert_eq!(centipawn_evaluation(&game, game.player()), 0);
 
     let game =
         Game::from_fen("rnbqkbnr/ppp2ppp/4p3/3P4/3P4/8/PPP2PPP/RNBQKBNR b KQkq - 0 3").unwrap();
-    let score = centipawn_evaluation(&game, game.player);
+    let score = centipawn_evaluation(&game, game.player());
     assert_eq!(score, -100, "white has taken a pawn");
 
     let game =
         Game::from_fen("rnbqkbnr/ppp2ppp/4p3/3P4/3P4/8/PPP2PPP/RNBQKBNR w KQkq - 0 3").unwrap();
-    let score = centipawn_evaluation(&game, game.player);
+    let score = centipawn_evaluation(&game, game.player());
     assert_eq!(score, 100, "white has taken a pawn");
 }

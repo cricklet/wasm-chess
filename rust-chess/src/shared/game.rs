@@ -1,6 +1,7 @@
 use strum::IntoEnumIterator;
 
 use crate::board::Board;
+use crate::fen::FenDefinition;
 
 use super::bitboard::FileRank;
 use super::bitboard::{self, castling_allowed_after_move, Bitboards, BoardIndex};
@@ -147,6 +148,19 @@ impl Game {
         )
     }
 
+    pub fn bitboards(&self) -> &Bitboards {
+        self.board.bitboards()
+    }
+    pub fn player(&self) -> Player {
+        *self.board.player()
+    }
+    pub fn can_castle(&self) -> &ForPlayer<CanCastleOnSide> {
+        self.board.can_castle()
+    }
+    pub fn en_passant(&self) -> Option<BoardIndex> {
+        *self.board.en_passant()
+    }
+
     pub fn from_position_uci(uci_line: &str) -> ErrorResult<Game> {
         let uci_line = uci_line.trim();
 
@@ -196,82 +210,24 @@ impl Game {
             return Game::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
         }
 
-        let mut game = Game::default();
-
-        let split = fen.split(' ');
-        let split = split.filter(|v| !v.is_empty()).collect::<Vec<_>>();
-
-        // parse a string like "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
-
-        if split.len() == 0 {
-            return err_result(&format!("empty fen {}", fen));
-        }
-
-        let board = Bitboards::from_fen(split[0])?;
-        game.board = board?;
-
-        if split.len() <= 1 {
-            return Ok(game);
-        }
-
-        game.player = match split[1] {
-            "w" => Player::White,
-            "b" => Player::Black,
-            _ => return err_result(&format!("invalid player {}", split[1])),
-        };
-
-        if split.len() <= 2 {
-            return Ok(game);
-        }
-
-        let can_castle_on_side_for_player = ForPlayer::<CanCastleOnSide>::from_str(split[2]);
-        game.can_castle = can_castle_on_side_for_player?;
-
-        if split.len() <= 3 {
-            return Ok(game);
-        }
-
-        let en_passant_str = split[3];
-        game.en_passant = match en_passant_str {
-            "-" => None,
-            _ => Some(index_from_file_rank_str(en_passant_str)?),
-        };
-
-        if split.len() <= 4 {
-            return Ok(game);
-        }
-
-        game.half_moves_since_pawn_or_capture = match split[4].parse::<usize>() {
-            Ok(half_moves_since_pawn_or_capture) => half_moves_since_pawn_or_capture,
-            Err(e) => {
-                return err_result(&format!(
-                    "error parsing half moves since pawn or capture: {}",
-                    e
-                ))
-            }
-        };
-
-        if split.len() <= 5 {
-            return Ok(game);
-        }
-
-        game.full_moves_total = match split[5].parse::<usize>() {
-            Ok(full_moves_total) => full_moves_total,
-            Err(e) => return err_result(&format!("error parsing full moves total: {}", e)),
-        };
-
-        if split.len() > 6 {
-            return err_result(&format!("invalid fen {}", fen));
-        }
-
-        Ok(game)
+        let definition = FenDefinition::from(fen)?;
+        Ok(Game {
+            board: Board::new(
+                definition.bitboards,
+                definition.player,
+                definition.can_castle,
+                definition.en_passant,
+            ),
+            half_moves_since_pawn_or_capture: definition.half_moves_since_pawn_or_capture,
+            full_moves_total: definition.full_moves_total,
+        })
     }
 
     pub fn move_from_str(&self, move_str: &str) -> Option<Move> {
         let mut moves_buffer = vec![];
         all_moves(
             &mut moves_buffer,
-            self.player,
+            self.player(),
             &self,
             MoveOptions::default(),
         )
@@ -281,8 +237,11 @@ impl Game {
             let mut next_game = *self;
             next_game.make_move(m).unwrap();
 
-            let king_index = next_game.board.index_of_piece(self.player, Piece::King);
-            let illegal_move = index_in_danger(self.player, king_index, &next_game.board).unwrap();
+            let king_index = next_game
+                .bitboards()
+                .index_of_piece(self.player(), Piece::King);
+            let illegal_move =
+                index_in_danger(self.player(), king_index, &next_game.bitboards()).unwrap();
 
             if illegal_move {
                 continue;
@@ -302,13 +261,13 @@ impl Game {
         options: MoveOptions,
     ) -> ErrorResult<()> {
         buffer.clear();
-        all_moves(buffer, self.player, &self, options)?;
+        all_moves(buffer, self.player(), &self, options)?;
 
         Ok(())
     }
 
     pub fn move_legality(&self, m: &Move, previous_danger: &Danger) -> Legal {
-        let previous_player = self.player.other();
+        let previous_player = self.player().other();
 
         let be_extra_careful = previous_danger.check
             || m.piece.piece == Piece::King
@@ -316,8 +275,11 @@ impl Game {
             || previous_danger.piece_is_pinned(m.start_index);
 
         if be_extra_careful {
-            let king_index = self.board.index_of_piece(previous_player, Piece::King);
-            let illegal_move = index_in_danger(previous_player, king_index, &self.board).unwrap();
+            let king_index = self
+                .bitboards()
+                .index_of_piece(previous_player, Piece::King);
+            let illegal_move =
+                index_in_danger(previous_player, king_index, self.bitboards()).unwrap();
             if illegal_move {
                 return Legal::No;
             }
@@ -333,37 +295,46 @@ impl Game {
             if m.piece.piece != Piece::King && m.piece.piece != Piece::Rook {
                 continue;
             }
-            let ref mut player_can_castle = self.can_castle[player][castling_side];
-            if !*player_can_castle {
+            let player_can_castle = self.can_castle()[player][castling_side];
+            if !player_can_castle {
                 continue;
             }
-            *player_can_castle = castling_allowed_after_move(player, castling_side, m.start_index);
+
+            self.board.update_castling(
+                player,
+                castling_side,
+                castling_allowed_after_move(player, castling_side, m.start_index),
+            );
         }
 
         for &castling_side in CASTLING_SIDES.iter() {
             if let MoveType::Capture(Capture::Take { .. }) = m.move_type {
-                let ref mut enemy_can_castle = self.can_castle[enemy][castling_side];
-                if !*enemy_can_castle {
+                let enemy_can_castle = self.can_castle()[enemy][castling_side];
+                if !enemy_can_castle {
                     continue;
                 }
-                *enemy_can_castle &= castling_allowed_after_move(enemy, castling_side, m.end_index);
+                self.board.update_castling(
+                    enemy,
+                    castling_side,
+                    castling_allowed_after_move(enemy, castling_side, m.end_index),
+                );
             }
         }
 
-        self.en_passant = None;
+        self.board.update_en_passant(None);
 
         match m.move_type {
             MoveType::Invalid => {
                 return self.err(&format!("invalid move ({:?})", m));
             }
             MoveType::Quiet(q) => {
-                if self.board.is_occupied(m.end_index) {
+                if self.bitboards().is_occupied(m.end_index) {
                     return self.err(&format!(
                         "invalid quiet move ({:?}): end index {} is occupied",
                         m, m.end_index
                     ));
                 }
-                if self.board.piece_at_index(m.start_index) != Some(m.piece) {
+                if self.bitboards().piece_at_index(m.start_index) != Some(m.piece) {
                     return self.err(&format!(
                         "invalid quiet move ({:?}): piece isn't at start index {}",
                         m, m.start_index
@@ -372,8 +343,8 @@ impl Game {
 
                 match q {
                     Quiet::Move => {
-                        self.board.clear_square(m.start_index, m.piece);
-                        self.board.set_square(m.end_index, m.piece);
+                        self.board.clear_square(m.start_index, m.piece)?;
+                        self.board.set_square(m.end_index, m.piece)?;
                     }
                     Quiet::Castle {
                         rook_start,
@@ -383,7 +354,7 @@ impl Game {
                             return self
                                 .err(&format!("invalid castle move ({:?}), piece isn't king", m));
                         }
-                        if self.board.piece_at_index(rook_start)
+                        if self.bitboards().piece_at_index(rook_start)
                             != Some(PlayerPiece::new(player, Piece::Rook))
                         {
                             return self.err(&format!(
@@ -392,35 +363,35 @@ impl Game {
                             ));
                         }
 
-                        self.board.clear_square(m.start_index, m.piece);
-                        self.board.set_square(m.end_index, m.piece);
+                        self.board.clear_square(m.start_index, m.piece)?;
+                        self.board.set_square(m.end_index, m.piece)?;
 
                         self.board
-                            .clear_square(rook_start, PlayerPiece::new(player, Piece::Rook));
+                            .clear_square(rook_start, PlayerPiece::new(player, Piece::Rook))?;
                         self.board
-                            .set_square(rook_end, PlayerPiece::new(player, Piece::Rook));
+                            .set_square(rook_end, PlayerPiece::new(player, Piece::Rook))?;
                     }
                     Quiet::PawnSkip { skipped_index } => {
-                        self.board.clear_square(m.start_index, m.piece);
-                        self.board.set_square(m.end_index, m.piece);
+                        self.board.clear_square(m.start_index, m.piece)?;
+                        self.board.set_square(m.end_index, m.piece)?;
 
-                        self.en_passant = Some(skipped_index);
+                        self.board.update_en_passant(Some(skipped_index));
                     }
                 }
             }
             MoveType::Capture(c) => match c {
                 Capture::EnPassant { taken_index } => {
                     let taken_piece = PlayerPiece::new(enemy, Piece::Pawn);
-                    if self.board.piece_at_index(taken_index) != Some(taken_piece) {
+                    if self.bitboards().piece_at_index(taken_index) != Some(taken_piece) {
                         return self.err(&format!(
                             "invalid en-passant {:?}: taken piece isn't enemy pawn",
                             m
                         ));
                     }
-                    self.board.clear_square(taken_index, taken_piece);
+                    self.board.clear_square(taken_index, taken_piece)?;
 
-                    self.board.clear_square(m.start_index, m.piece);
-                    self.board.set_square(m.end_index, m.piece);
+                    self.board.clear_square(m.start_index, m.piece)?;
+                    self.board.set_square(m.end_index, m.piece)?;
                 }
                 Capture::Take { taken_piece } => {
                     if taken_piece.player != enemy {
@@ -429,10 +400,10 @@ impl Game {
                             m
                         ));
                     }
-                    self.board.clear_square(m.end_index, taken_piece);
+                    self.board.clear_square(m.end_index, taken_piece)?;
 
-                    self.board.clear_square(m.start_index, m.piece);
-                    self.board.set_square(m.end_index, m.piece);
+                    self.board.clear_square(m.start_index, m.piece)?;
+                    self.board.set_square(m.end_index, m.piece)?;
                 }
             },
         }
@@ -448,13 +419,13 @@ impl Game {
                     .as_str(),
                 );
             }
-            self.board.clear_square(m.end_index, m.piece);
-            self.board.set_square(m.end_index, promo_piece);
+            self.board.clear_square(m.end_index, m.piece)?;
+            self.board.set_square(m.end_index, promo_piece)?;
         }
 
-        self.player = enemy;
+        self.board.update_player(enemy)?;
         self.half_moves_since_pawn_or_capture += 1;
-        if self.player == Player::White {
+        if self.player() == Player::White {
             self.full_moves_total += 1;
         }
 
@@ -487,7 +458,7 @@ fn test_en_passant_1() {
 fn test_en_passsant_2() {
     let game = Game::from_position_uci("position startpos moves e2e4 a7a5 e4e5 a5a4 b2b4").unwrap();
     assert_eq!(
-        game.en_passant,
+        game.en_passant(),
         Some(index_from_file_rank_str("b3").unwrap())
     );
 
@@ -530,8 +501,8 @@ fn test_castling_disallowed() {
     )
     .unwrap();
 
-    assert_eq!(false, game.can_castle[game.player][CastlingSide::Kingside]);
-    assert_eq!(true, game.can_castle[game.player][CastlingSide::Queenside]);
+    assert_eq!(false, game.can_castle()[game.player()][CastlingSide::Kingside]);
+    assert_eq!(true, game.can_castle()[game.player()][CastlingSide::Queenside]);
 
     let mut moves = vec![];
     game.fill_pseudo_move_buffer(&mut moves, MoveOptions::default())
