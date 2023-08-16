@@ -2,6 +2,7 @@ use std::fmt::Debug;
 use std::fmt::Formatter;
 
 use crate::helpers::StableOption;
+use crate::helpers::indent;
 
 use super::danger::Danger;
 use super::game::Game;
@@ -46,9 +47,7 @@ impl Debug for IndexedMoveBuffer {
             lines[self.index] = format!("{} <=========", lines[self.index]);
         }
 
-        f.debug_struct("IndexedMoveBuffer")
-            .field("moves", &lines)
-            .finish()
+        write!(f, "\n{}", &indent(&lines.join("\n"), 2))
     }
 }
 
@@ -59,26 +58,29 @@ pub struct TraversalStackFrame<D> {
     pub danger: Option<Danger>,
     pub moves: StableOption<IndexedMoveBuffer>,
 
+    pub history_move: Option<Move>,
+
     pub data: D,
 }
 
-impl<D> TraversalStackFrame<D> {
+impl<D: Debug> TraversalStackFrame<D> {
     pub fn setup_from_move(
         &mut self,
         previous: &mut TraversalStackFrame<D>,
-        next_move: &Move,
+        move_to_apply: &Move,
     ) -> ErrorResult<Legal> {
         self.game = previous.game;
-        self.game.make_move(*next_move)?;
+        self.game.make_move(*move_to_apply)?;
 
         self.danger = None;
         self.moves.clear();
+        self.history_move = Some(move_to_apply.clone());
 
         previous.lazily_generate_danger()?;
 
         if self
             .game
-            .move_legality(next_move, previous.danger.as_ref().as_result()?)
+            .move_legality(move_to_apply, previous.danger.as_ref().as_result()?)
             == Legal::No
         {
             return Ok(Legal::No);
@@ -95,6 +97,18 @@ impl<D> TraversalStackFrame<D> {
 
         self.lazily_generate_danger()?;
         Ok(())
+    }
+
+    pub fn last_future_move(&self) -> ErrorResult<Option<Move>> {
+        if self.moves.is_some() {
+            let moves = self.moves.get_ref().unwrap();
+            if moves.index == 0 {
+                return Ok(None);
+            }
+            Ok(moves.buffer.get(moves.index - 1).cloned())
+        } else {
+            err_result(&format!("no moves for {:#?}", self))?
+        }
     }
 
     pub fn lazily_generate_moves<S: Fn(&Game, &mut Vec<Move>) -> ErrorResult<()>>(
@@ -176,6 +190,7 @@ impl<D: Debug, const N: usize> TraversalStack<D, N> {
                 game: Game::default(),
                 danger: None,
                 moves: StableOption::default(),
+                history_move: None,
                 data: data_callback(i),
             }),
             depth: 0,
@@ -232,7 +247,7 @@ impl<D: Debug, const N: usize> TraversalStack<D, N> {
         &mut self,
     ) -> ErrorResult<(&mut TraversalStackFrame<D>, &mut TraversalStackFrame<D>)> {
         if let Some((current, remainder)) = self.stack[self.depth..].split_first_mut() {
-            Ok((current, remainder.first_mut().unwrap()))
+            Ok((current, remainder.first_mut().as_result()?))
         } else {
             err_result("current index invalid")
         }
@@ -245,33 +260,8 @@ impl<D: Debug, const N: usize> TraversalStack<D, N> {
         let (current, _) = self.current_mut()?;
         current.get_and_increment_move(sorter)
     }
-
-    pub fn move_applied_before_depth(&self, depth: usize) -> ErrorResult<Option<Move>> {
-        if depth == 0 {
-            // eg if we're searching from startpos, there's no previous move
-            // to get to that state.
-            return Ok(None);
-        }
-
-        let node = self.stack.get(depth - 1).as_result()?;
-        if node.moves.is_some() {
-            let moves = node.moves.get_ref().unwrap();
-            if moves.index == 0 {
-                return Ok(None);
-            }
-            Ok(moves.buffer.get(moves.index - 1).cloned())
-        } else {
-            err_result(&format!(
-                "no moves at previous depth {} to get to {}, {:#?}",
-                depth - 1,
-                depth,
-                self
-            ))?
-        }
-    }
 }
 
 pub fn null_move_sort(_game: &Game, _moves: &mut Vec<Move>) -> ErrorResult<()> {
     Ok(())
 }
-

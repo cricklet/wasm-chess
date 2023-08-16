@@ -310,13 +310,11 @@ struct StaticEvaluationReturn {
     //  previous_move: e2e4
     //  score: +x
     //  depth: 1
-    //  previous_previous_move: None
     previous_move: Move,
     score: Score,
 
     // extra data for error checking
     depth: usize,
-    previous_previous_move: Option<Move>,
 }
 
 const PV_SIZE: usize = 4;
@@ -439,56 +437,46 @@ impl SearchStack {
         }
     }
 
-    fn statically_evaluate_leaf(&mut self) -> ErrorResult<Option<LoopResult>> {
+    fn statically_evaluate_leaf(&mut self) -> ErrorResult<LoopResult> {
         let (current, current_depth) = self.traversal.current()?;
 
         if current_depth < self.max_depth {
-            return Ok(None);
+            return err_result("statically_evaluate_leaf() called on a non-leaf node");
         }
 
         let score = Score::Centipawns(current.game.player(), evaluate(&current.game));
 
         self.returned_evaluation = Some(SearchResult::StaticEvaluation(StaticEvaluationReturn {
-            previous_move: self
-                .traversal
-                .move_applied_before_depth(current_depth)?
-                .as_result()?,
+            previous_move: current.history_move.as_result()?,
             score,
             depth: current_depth,
-            previous_previous_move: self
-                .traversal
-                .move_applied_before_depth(current_depth - 1)?,
         }));
 
         self.num_evaluations += 1;
 
         // Return early (pop up the stack)
         self.traversal.depth -= 1;
+        Ok(LoopResult::Continue)
+    }
+
+    fn enter_quiescence(&mut self) -> ErrorResult<Option<LoopResult>> {
+        let (current, _) = self.traversal.current_mut()?;
+        current.data.in_quiescence = InQuiescence::Yes;
         Ok(Some(LoopResult::Continue))
     }
 
     fn process_next_move_evaluation(&mut self) -> ErrorResult<Option<LoopResult>> {
         // The previously searched child might have a return value. If so, check against alpha/beta & clear the return value.
-        let current_depth = self.traversal.current_depth();
-        let next_depth = current_depth + 1;
-
         if self.returned_evaluation.is_none() {
             return Ok(None);
         }
-
-        let next_move = self
-            .traversal
-            .move_applied_before_depth(next_depth)?
-            .expect_ok(|| format!("{:#?}", self))?;
 
         let next_evaluation = self.returned_evaluation.as_ref().unwrap();
         let next_score = next_evaluation.score().increment_turns();
 
         let (current, _) = self.traversal.current_mut()?;
-        // println!(
-        //     "process_next_move_evaluation alpha {}, beta {}, next-score {}",
-        //     current.data.alpha, current.data.beta, next_score
-        // );
+
+        let next_move = current.last_future_move()?.as_result()?;
 
         if Score::compare(current.game.player(), next_score, current.data.beta).is_better_or_equal()
         {
@@ -568,27 +556,15 @@ impl SearchStack {
                 self.returned_evaluation =
                     Some(SearchResult::StaticEvaluation(StaticEvaluationReturn {
                         score: Score::WinInN(current.game.player().other(), 0),
-                        previous_move: self
-                            .traversal
-                            .move_applied_before_depth(current_depth)?
-                            .as_result()?,
+                        previous_move: current.history_move.as_result()?,
                         depth: current_depth,
-                        previous_previous_move: self
-                            .traversal
-                            .move_applied_before_depth(current_depth - 1)?,
                     }));
             } else {
                 self.returned_evaluation =
                     Some(SearchResult::StaticEvaluation(StaticEvaluationReturn {
                         score: Score::DrawInN(0),
-                        previous_move: self
-                            .traversal
-                            .move_applied_before_depth(current_depth)?
-                            .as_result()?,
+                        previous_move: current.history_move.as_result()?,
                         depth: current_depth,
-                        previous_previous_move: self
-                            .traversal
-                            .move_applied_before_depth(current_depth - 1)?,
                     }));
             }
         }
@@ -619,8 +595,38 @@ impl SearchStack {
         }
 
         // If we're at a leaf, statically evaluate
-        if let Some(result) = self.statically_evaluate_leaf()? {
-            return Ok(result);
+        {
+            let (current, current_depth) = self.traversal.current_mut()?;
+            current.lazily_generate_danger()?;
+
+            if current.data.in_quiescence == InQuiescence::No && current_depth >= self.max_depth {
+                if is_quiet_position(&current.danger.as_result()?, current.history_move.as_ref()) {
+                    let result = self.statically_evaluate_leaf()?;
+                    return Ok(result);
+                } else {
+                    current.data.in_quiescence = InQuiescence::Yes;
+                    return Ok(LoopResult::Continue);
+                }
+            }
+
+            if current.data.in_quiescence == InQuiescence::Yes {
+                let result = self.statically_evaluate_leaf()?;
+                return Ok(result);
+            }
+
+            // if current.data.in_quiescence == InQuiescence::Yes {
+            //     if danger.check {
+            //         // assume we can find a score better than stand-pat
+            //         let stand_pat = Evaluation::Centipawns(player, evaluate(game, player));
+            //         if Evaluation::compare(player, stand_pat, beta).is_better_or_equal() {
+            //             // the enemy will avoid this line
+            //             return Ok(beta);
+            //         } else if Evaluation::compare(player, stand_pat, alpha).is_better() {
+            //             // we should be able to find a move that is better than stand-pat
+            //             best_score = Some(stand_pat);
+            //         }
+            //     }
+            // }
         }
 
         // If we have a return value from a move we applied, process w.r.t. alpha/beta
@@ -645,20 +651,6 @@ impl SearchStack {
 
         return Ok(LoopResult::Continue);
     }
-
-    fn is_quiet_position(&self, danger: &Danger, last_move: Option<&Move>) -> bool {
-        if danger.check {
-            return false;
-        }
-
-        if let Some(last_move) = last_move {
-            if !last_move.is_quiet() {
-                return false;
-            }
-        }
-
-        true
-    }
 }
 
 // ************************************************************************************************* //
@@ -667,6 +659,20 @@ impl SearchStack {
 enum InQuiescence {
     No,
     Yes,
+}
+
+fn is_quiet_position(danger: &Danger, last_move: Option<&Move>) -> bool {
+    if danger.check {
+        return false;
+    }
+
+    if let Some(last_move) = last_move {
+        if !last_move.is_quiet() {
+            return false;
+        }
+    }
+
+    true
 }
 
 impl Default for InQuiescence {
