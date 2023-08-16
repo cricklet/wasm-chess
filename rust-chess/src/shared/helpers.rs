@@ -1,4 +1,9 @@
-use std::{backtrace::Backtrace, io::Write, iter, fmt::Debug};
+use std::{
+    backtrace::Backtrace,
+    fmt::{Debug, Display},
+    io::Write,
+    iter,
+};
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct Error {
@@ -417,7 +422,6 @@ macro_rules! defer {
     };
 }
 
-
 pub struct StableOption<T> {
     value: T,
     is_some: bool,
@@ -476,5 +480,18 @@ impl<T: Clearable> StableOption<T> {
     pub fn clear(&mut self) {
         self.is_some = false;
         self.value.clear();
+    }
+}
+
+pub trait Joinable {
+    fn join_vec(&self, join: &str) -> String;
+}
+
+impl<T: Display> Joinable for Vec<T> {
+    fn join_vec(&self, join: &str) -> String {
+        self.iter()
+            .map(|m| format!("{}", m))
+            .collect::<Vec<_>>()
+            .join(join)
     }
 }

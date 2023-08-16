@@ -10,7 +10,7 @@ use std::iter;
 
 use crate::{
     game::Game,
-    helpers::{ErrorResult, OptionResult},
+    helpers::{ErrorResult, Joinable, OptionResult},
     moves::Move,
     search::{LoopResult, SearchStack},
 };
@@ -65,19 +65,14 @@ impl IterativeSearch {
                             "at depth {}: bestmove {} ponder {} ({})",
                             depth,
                             bestmove.to_uci(),
-                            response
-                                .iter()
-                                .map(|m| m.to_uci())
-                                .collect::<Vec<_>>()
-                                .join(" "),
+                            response.join_vec(" "),
                             score
                         ));
 
                         self.best_variations_per_depth
                             .push(iter::once(bestmove).chain(response).collect());
 
-                        self.search =
-                            SearchStack::with(self.start_game.clone(), depth + 1)?;
+                        self.search = SearchStack::with(self.start_game.clone(), depth + 1)?;
                     }
                 }
             }
