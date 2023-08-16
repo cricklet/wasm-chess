@@ -2,7 +2,7 @@ use std::fmt::{Debug, Formatter};
 
 use super::{bitboard::*, game::Game, helpers::*, types::*};
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct MoveOptions {
     pub only_captures: OnlyCaptures,
     pub only_queen_promotion: OnlyQueenPromotion,
@@ -29,7 +29,7 @@ impl Default for OnlyCaptures {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum OnlyQueenPromotion {
     No,
     Yes,

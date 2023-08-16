@@ -519,7 +519,10 @@ impl SearchStack {
     where
         S: Fn(&Game, &mut Vec<Move>) -> ErrorResult<()>,
     {
-        let next_move = self.traversal.get_and_increment_move(sorter)?;
+        let (current, _) = self.traversal.current()?;
+        let move_options = current.data.in_quiescence.move_options();
+        let next_move = self.traversal.get_and_increment_move(move_options, sorter)?;
+
         if let Some(next_move) = next_move {
             // If there are moves left at 'current', apply the move
             let (current, next) = self.traversal.current_and_next_mut()?;
@@ -613,20 +616,6 @@ impl SearchStack {
                 let result = self.statically_evaluate_leaf()?;
                 return Ok(result);
             }
-
-            // if current.data.in_quiescence == InQuiescence::Yes {
-            //     if danger.check {
-            //         // assume we can find a score better than stand-pat
-            //         let stand_pat = Evaluation::Centipawns(player, evaluate(game, player));
-            //         if Evaluation::compare(player, stand_pat, beta).is_better_or_equal() {
-            //             // the enemy will avoid this line
-            //             return Ok(beta);
-            //         } else if Evaluation::compare(player, stand_pat, alpha).is_better() {
-            //             // we should be able to find a move that is better than stand-pat
-            //             best_score = Some(stand_pat);
-            //         }
-            //     }
-            // }
         }
 
         // If we have a return value from a move we applied, process w.r.t. alpha/beta
