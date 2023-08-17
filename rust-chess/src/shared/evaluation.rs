@@ -65,16 +65,16 @@ lazy_static! {
             [-1, 0, 0, 1, 1, 0, 0, -1],
             [-1, -1, -1, 0, 0, -1, -1, -1],
         ]);
-    static ref ENEMY_KING_ENDGAME_BBS: [Vec<(isize, Bitboard)>; 2] =
+    static ref KING_DEVELOPMENT_BBS: [Vec<(isize, Bitboard)>; 2] =
         evaluation_bitboards_per_player([
-            [4, 3, 2, 2, 2, 2, 4, 4],
-            [3, 2, 1, 1, 1, 1, 2, 3],
-            [2, 1, 0, 0, 0, 0, 1, 2],
-            [2, 1, 0, 0, 0, 0, 1, 2],
-            [2, 1, 0, 0, 0, 0, 1, 2],
-            [2, 1, 0, 0, 0, 0, 1, 2],
-            [3, 2, 1, 1, 1, 1, 2, 3],
-            [4, 3, 2, 2, 2, 2, 4, 4],
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 1, 1, 1, 1, 1, 1, 0],
+            [0, 1, 1, 1, 1, 1, 1, 0],
+            [0, 1, 1, 1, 1, 1, 1, 0],
+            [0, 1, 1, 1, 1, 1, 1, 0],
+            [-1, 1, 1, 1, 1, 1, 1, -1],
+            [-1, 1, 1, 0, 0, 1, 1, -1],
+            [-1, 1, 1, 0, 0, 1, 1, -1],
         ]);
 }
 
@@ -117,7 +117,7 @@ fn evaluation_bitboards_for_piece(player: Player, piece: Piece) -> &'static Vec<
         Piece::Bishop => &BISHOP_DEVELOPMENT_BBS[player as usize],
         Piece::Knight => &KNIGHT_DEVELOPMENT_BBS[player as usize],
         Piece::Queen => &QUEEN_DEVELOPMENT_BBS[player as usize],
-        Piece::King => &ENEMY_KING_ENDGAME_BBS[player as usize],
+        Piece::King => &KING_DEVELOPMENT_BBS[player as usize],
     }
 }
 fn centipawn_evaluation(game: &Game, player: Player) -> isize {
