@@ -521,7 +521,9 @@ impl SearchStack {
     {
         let (current, _) = self.traversal.current()?;
         let move_options = current.data.in_quiescence.move_options();
-        let next_move = self.traversal.get_and_increment_move(move_options, sorter)?;
+        let next_move = self
+            .traversal
+            .get_and_increment_move(move_options, sorter)?;
 
         if let Some(next_move) = next_move {
             // If there are moves left at 'current', apply the move
@@ -712,4 +714,21 @@ fn test_start_search() {
         }
         _ => panic!("unexpected {:?}", search.returned_evaluation.as_ref()),
     }
+}
+
+#[test]
+fn test_dont_capture() {
+    let fen = "6k1/8/4p3/3r4/5n2/1Q6/1K1R4/8 w";
+    let mut search = SearchStack::with(Game::from_fen(fen).unwrap(), 3).unwrap();
+
+    loop {
+        match search.iterate(null_move_sort).unwrap() {
+            LoopResult::Continue => {}
+            LoopResult::Done => break,
+        }
+    }
+
+    // Calling `iterate()` should be idempotent
+    search.iterate(null_move_sort).unwrap();
+    println!("{:#?}", search.returned_evaluation);
 }
