@@ -437,11 +437,11 @@ impl SearchStack {
         }
     }
 
-    fn statically_evaluate_leaf(&mut self) -> ErrorResult<LoopResult> {
+    fn statically_evaluate_leaf(&mut self) -> ErrorResult<Option<LoopResult>> {
         let (current, current_depth) = self.traversal.current()?;
 
         if current_depth < self.max_depth {
-            return err_result("statically_evaluate_leaf() called on a non-leaf node");
+            return Ok(None)
         }
 
         let score = Score::Centipawns(current.game.player(), evaluate(&current.game));
@@ -456,12 +456,6 @@ impl SearchStack {
 
         // Return early (pop up the stack)
         self.traversal.depth -= 1;
-        Ok(LoopResult::Continue)
-    }
-
-    fn enter_quiescence(&mut self) -> ErrorResult<Option<LoopResult>> {
-        let (current, _) = self.traversal.current_mut()?;
-        current.data.in_quiescence = InQuiescence::Yes;
         Ok(Some(LoopResult::Continue))
     }
 
@@ -599,21 +593,7 @@ impl SearchStack {
 
         // If we're at a leaf, statically evaluate
         {
-            let (current, current_depth) = self.traversal.current_mut()?;
-            if current.data.in_quiescence == InQuiescence::No && current_depth >= self.max_depth {
-                let current_history_move = current.history_move;
-                let current_danger = current.danger();
-                if is_quiet_position(current_danger?, current_history_move.as_ref()) {
-                    let result = self.statically_evaluate_leaf()?;
-                    return Ok(result);
-                } else {
-                    current.data.in_quiescence = InQuiescence::Yes;
-                    return Ok(LoopResult::Continue);
-                }
-            }
-
-            if current.data.in_quiescence == InQuiescence::Yes {
-                let result = self.statically_evaluate_leaf()?;
+            if let Some(result) = self.statically_evaluate_leaf()? {
                 return Ok(result);
             }
         }
