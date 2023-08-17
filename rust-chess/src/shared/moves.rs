@@ -736,14 +736,13 @@ impl LazyMoves {
         }
     }
 
-    pub fn last(&self) -> ErrorResult<Option<Move>> {
+    pub fn last(&self) -> ErrorResult<Option<&Move>> {
         if self.buffer.is_some() {
             let buffer = self.buffer.as_ref().unwrap();
             if self.index == 0 {
                 return Ok(None);
             }
-            let m = buffer[self.index - 1];
-            Ok(Some(m))
+            Ok(Some(&buffer[self.index - 1]))
         } else {
             Ok(None)
         }

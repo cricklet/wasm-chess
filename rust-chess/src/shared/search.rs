@@ -476,7 +476,7 @@ impl SearchStack {
             .is_better()
         {
             parent.data.best_move = Some(BestMoveReturn {
-                best_move: parent_to_child_move,
+                best_move: *parent_to_child_move,
                 score: child_score,
                 response_moves: child_result.variation(),
             });
@@ -539,9 +539,44 @@ impl SearchStack {
             return Ok(LoopResult::Done);
         }
 
-        // If we're at a leaf, statically evaluate
-        if let Some(result) = self.statically_evaluate_leaf()? {
-            return Ok(result);
+        let in_quiescence = {
+            let (current, _) = self.traversal.current()?;
+            current.data.in_quiescence == InQuiescence::Yes
+        };
+
+        if !in_quiescence {
+            let (current, current_depth) = self.traversal.current_mut()?;
+            if current_depth >= self.max_depth {
+                let current_danger = current.danger()?;
+                let current_recent_move = current.recent_move()?;
+                if is_quiet_position(&current_danger, current_recent_move) {
+                    return Ok(self.statically_evaluate_leaf()?.as_result()?);
+                } else {
+                    current.data.in_quiescence = InQuiescence::Yes;
+                    return Ok(LoopResult::Continue);
+                }
+            }
+        }
+
+        if in_quiescence {
+            let (current, _) = self.traversal.current_mut()?;
+            let current_danger = current.danger()?;
+            let current_game = &current.game;
+            let current_player = current_game.player();
+            let current_alpha = current.data.alpha;
+            let current_beta = current.data.beta;
+            if !current_danger.check {
+                // Assume we can find a score better than stand-pat
+                let stand_pat = Score::Centipawns(current_player, evaluate(current_game));
+
+                if Score::compare(current_player, stand_pat, current_beta).is_better_or_equal() {
+                    // The enemy will avoid this line
+                    return Ok(self.return_early(SearchResult::BetaCutoff(current_beta))?.as_result()?);
+                } else if Score::compare(current_player, stand_pat, current_alpha).is_better() {
+                    // we should be able to find a move that is better than stand-pat
+                    current.data.alpha = stand_pat;
+                }
+            }
         }
 
         // Apply some moves

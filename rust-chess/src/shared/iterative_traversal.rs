@@ -30,11 +30,11 @@ pub struct TraversalStackFrame<D> {
 }
 
 impl<D: Debug> TraversalStackFrame<D> {
-    pub fn danger(&mut self) -> ErrorResult<&Danger> {
-        self.danger.get(self.game.player(), self.game.bitboards())
+    pub fn danger(&mut self) -> ErrorResult<Danger> {
+        self.danger.get(self.game.player(), self.game.bitboards()).cloned()
     }
 
-    pub fn recent_move(&self) -> ErrorResult<Option<Move>> {
+    pub fn recent_move(&self) -> ErrorResult<Option<&Move>> {
         self.moves.last()
     }
 
@@ -51,7 +51,7 @@ impl<D: Debug> TraversalStackFrame<D> {
 
         self.history_move = Some(move_to_apply.clone());
 
-        if self.game.move_legality(move_to_apply, previous.danger()?) == Legal::No {
+        if self.game.move_legality(move_to_apply, &previous.danger()?) == Legal::No {
             return Ok(Legal::No);
         }
 
