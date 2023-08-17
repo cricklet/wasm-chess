@@ -1,7 +1,4 @@
-use crate::{
-    helpers::{OptionResult, StableOption},
-    lazy::Lazy,
-};
+use crate::helpers::{OptionResult, StableOption};
 use lazy_static::lazy_static;
 
 use super::{
