@@ -18,16 +18,18 @@ use super::moves::OnlyCaptures;
 use super::moves::OnlyQueenPromotion;
 
 #[derive(Default, Debug)]
-pub struct TraversalStackFrame {
+pub struct TraversalStackFrame<D> {
     pub game: Game,
 
     danger: LazyDanger,
     pub moves: LazyMoves,
 
     pub history_move: Option<Move>,
+
+    pub data: D,
 }
 
-impl TraversalStackFrame {
+impl<D: Debug> TraversalStackFrame<D> {
     pub fn danger(&mut self) -> ErrorResult<&Danger> {
         self.danger.get(self.game.player(), self.game.bitboards())
     }
@@ -38,7 +40,7 @@ impl TraversalStackFrame {
 
     pub fn setup(
         &mut self,
-        previous: &mut TraversalStackFrame,
+        previous: &mut TraversalStackFrame<D>,
         move_to_apply: &Move,
     ) -> ErrorResult<Legal> {
         self.game = previous.game;
@@ -57,12 +59,12 @@ impl TraversalStackFrame {
     }
 }
 
-pub struct TraversalStack {
-    stack: Vec<TraversalStackFrame>,
+pub struct TraversalStack<D: Debug + Default> {
+    stack: Vec<TraversalStackFrame<D>>,
     depth: usize,
 }
 
-impl Debug for TraversalStack {
+impl<D: Debug + Default> Debug for TraversalStack<D> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut debug = f.debug_struct("TraversalStack");
         debug.field("depth", &self.depth);
@@ -77,15 +79,16 @@ impl Debug for TraversalStack {
     }
 }
 
-impl TraversalStack {
-    pub fn new(game: Game) -> ErrorResult<Self> {
+impl<D: Debug + Default> TraversalStack<D> {
+    pub fn new(game: Game, data: D) -> ErrorResult<Self> {
         let data = Self {
             stack: vec![
-                TraversalStackFrame{
+                TraversalStackFrame::<D> {
                     game,
                     danger: LazyDanger::default(),
                     moves: LazyMoves::default(),
                     history_move: None,
+                    data,
                 },
                 Default::default(),
             ],
@@ -110,16 +113,16 @@ impl TraversalStack {
         self.depth -= 1;
     }
 
-    pub fn root(&self) -> &TraversalStackFrame {
+    pub fn root(&self) -> &TraversalStackFrame<D> {
         self.stack.get(0).unwrap()
     }
 
-    pub fn current(&self) -> ErrorResult<(&TraversalStackFrame, usize)> {
+    pub fn current(&self) -> ErrorResult<(&TraversalStackFrame<D>, usize)> {
         let current_depth = self.depth;
         Ok((self.stack.get(current_depth).as_result()?, current_depth))
     }
 
-    pub fn current_mut(&mut self) -> ErrorResult<(&mut TraversalStackFrame, usize)> {
+    pub fn current_mut(&mut self) -> ErrorResult<(&mut TraversalStackFrame<D>, usize)> {
         let current_depth = self.depth;
         Ok((
             self.stack.get_mut(current_depth).as_result()?,
@@ -131,17 +134,17 @@ impl TraversalStack {
         self.depth
     }
 
-    pub fn next(&self) -> ErrorResult<(&TraversalStackFrame, usize)> {
+    pub fn next(&self) -> ErrorResult<(&TraversalStackFrame<D>, usize)> {
         let next_depth = self.depth + 1;
         Ok((self.stack.get(next_depth).as_result()?, next_depth))
     }
 
-    pub fn next_mut(&mut self) -> ErrorResult<(&mut TraversalStackFrame, usize)> {
+    pub fn next_mut(&mut self) -> ErrorResult<(&mut TraversalStackFrame<D>, usize)> {
         let next_depth = self.depth + 1;
         Ok((self.stack.get_mut(next_depth).as_result()?, next_depth))
     }
 
-    fn previous(&self) -> ErrorResult<Option<(&TraversalStackFrame, usize)>> {
+    fn previous(&self) -> ErrorResult<Option<(&TraversalStackFrame<D>, usize)>> {
         if self.depth == 0 {
             return Ok(None);
         }
@@ -154,7 +157,7 @@ impl TraversalStack {
 
     pub fn current_and_next_mut(
         &mut self,
-    ) -> ErrorResult<(&mut TraversalStackFrame, &mut TraversalStackFrame)> {
+    ) -> ErrorResult<(&mut TraversalStackFrame<D>, &mut TraversalStackFrame<D>)> {
         if let Some((current, remainder)) = self.stack[self.depth..].split_first_mut() {
             Ok((current, remainder.first_mut().as_result()?))
         } else {
