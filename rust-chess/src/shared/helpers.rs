@@ -516,22 +516,20 @@ fn test_understanding_mutability_rules() {
     println!("y: {}", y);
 }
 
-pub struct AutoVec<T> {
+pub struct AutoVec<T: Default> {
     vec: Vec<T>,
-    constructor: fn(usize) -> T,
 }
 
-impl<T> AutoVec<T> {
-    pub fn new(t: T, constructor: fn(usize) -> T) -> Self {
+impl<T: Default> AutoVec<T> {
+    pub fn new(t: T) -> Self {
         Self {
             vec: vec![t],
-            constructor,
         }
     }
 
-    pub fn get_current(&mut self, i: usize) -> ErrorResult<&mut T> {
+    pub fn get(&mut self, i: usize) -> ErrorResult<&mut T> {
         while self.vec.len() <= i {
-            self.vec.push((self.constructor)(self.vec.len()));
+            self.vec.push(Default::default());
         }
 
         self.vec.get_mut(i).as_result()
@@ -539,7 +537,7 @@ impl<T> AutoVec<T> {
 
     pub fn get_current_next(&mut self, i: usize) -> ErrorResult<(&mut T, &mut T)> {
         while self.vec.len() <= i + 1 {
-            self.vec.push((self.constructor)(self.vec.len()));
+            self.vec.push(Default::default());
         }
 
         if let Some((current, remainder)) = self.vec[i..].split_first_mut() {
@@ -551,7 +549,7 @@ impl<T> AutoVec<T> {
 
     pub fn get_previous_current(&mut self, i: usize) -> ErrorResult<(Option<&mut T>, &mut T)> {
         while self.vec.len() <= i {
-            self.vec.push((self.constructor)(self.vec.len()));
+            self.vec.push(Default::default());
         }
 
         if i >= 1 {
