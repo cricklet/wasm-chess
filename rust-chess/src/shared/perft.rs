@@ -1,6 +1,6 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, default};
 
-use crate::{bitboard::warm_magic_cache, iterative_traversal::null_move_sort};
+use crate::{bitboard::warm_magic_cache, iterative_traversal::null_move_sort, moves::all_moves};
 
 use super::{
     danger::Danger,
@@ -105,7 +105,7 @@ pub fn traverse_game_callback(
     let danger = Danger::from(game.player(), game.bitboards())?;
 
     let mut moves = vec![];
-    game.fill_pseudo_move_buffer(&mut moves, MoveOptions::default())?;
+    all_moves(&mut moves, game.player(), game, MoveOptions::default())?;
 
     for &m in moves.iter() {
         let mut next_game = game.clone();
@@ -151,7 +151,7 @@ pub fn run_perft_counting_first_move(
     let danger = Danger::from(game.player(), game.bitboards())?;
 
     let mut moves = vec![];
-    game.fill_pseudo_move_buffer(&mut moves, MoveOptions::default())?;
+    all_moves(&mut moves, game.player(), game, MoveOptions::default())?;
 
     for &next_move in moves.iter() {
         let mut next_game = game.clone();
@@ -309,11 +309,14 @@ pub fn run_perft_iteratively<const N: usize>(game: Game) -> ErrorResult<usize> {
         }
 
         // We have moves to traverse, dig deeper
-        let next_move = data.get_and_increment_move(MoveOptions::default(), null_move_sort)?;
+        let (current, _) = data.current_mut()?;
+        let current_game = &current.game;
+        let current_moves = &mut current.moves;
+        let next_move = current_moves.next(current_game, MoveOptions::default(), null_move_sort)?;
         if let Some(next_move) = next_move {
             let (current, next) = data.current_and_next_mut()?;
 
-            let result = next.setup_from_move(current, &next_move)?;
+            let result = next.setup(current, &next_move)?;
             if result == Legal::No {
                 continue;
             } else {
@@ -463,11 +466,14 @@ impl PerftLoop {
         }
 
         // We have moves to traverse, dig deeper
-        let next_move = traversal.get_and_increment_move(MoveOptions::default(), null_move_sort).unwrap();
+        let (current, _) = traversal.current_mut().unwrap();
+        let current_moves = &mut current.moves;
+        let current_game = &current.game;
+        let next_move = current_moves.next(current_game, MoveOptions::default(), null_move_sort).unwrap();
         if let Some(next_move) = next_move {
             let (current, next) = traversal.current_and_next_mut().unwrap();
 
-            let result = next.setup_from_move(current, &next_move).unwrap();
+            let result = next.setup(current, &next_move).unwrap();
             if result == Legal::No {
                 return PerftLoopResult::Continue;
             } else {

@@ -101,13 +101,25 @@ pub struct Game {
 
 impl std::fmt::Display for Game {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} ({})\n{}", self.to_fen(), self.board.zobrist(), self.board.bitboards())
+        write!(
+            f,
+            "{} ({})\n{}",
+            self.to_fen(),
+            self.board.zobrist(),
+            self.board.bitboards()
+        )
     }
 }
 
 impl std::fmt::Debug for Game {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} ({})\n{}", self.to_fen(), self.board.zobrist(), self.board.bitboards())
+        write!(
+            f,
+            "{} ({})\n{}",
+            self.to_fen(),
+            self.board.zobrist(),
+            self.board.bitboards()
+        )
     }
 }
 
@@ -253,17 +265,6 @@ impl Game {
         }
 
         None
-    }
-
-    pub fn fill_pseudo_move_buffer(
-        &self,
-        buffer: &mut Vec<Move>,
-        options: MoveOptions,
-    ) -> ErrorResult<()> {
-        buffer.clear();
-        all_moves(buffer, self.player(), &self, options)?;
-
-        Ok(())
     }
 
     pub fn move_legality(&self, m: &Move, previous_danger: &Danger) -> Legal {
@@ -463,8 +464,7 @@ fn test_en_passsant_2() {
     );
 
     let mut moves = vec![];
-    game.fill_pseudo_move_buffer(&mut moves, MoveOptions::default())
-        .unwrap();
+    all_moves(&mut moves, game.player(), &game, MoveOptions::default()).unwrap();
 
     for m in moves.iter() {
         let mut next_game = game.clone();
@@ -501,12 +501,17 @@ fn test_castling_disallowed() {
     )
     .unwrap();
 
-    assert_eq!(false, game.can_castle()[game.player()][CastlingSide::Kingside]);
-    assert_eq!(true, game.can_castle()[game.player()][CastlingSide::Queenside]);
+    assert_eq!(
+        false,
+        game.can_castle()[game.player()][CastlingSide::Kingside]
+    );
+    assert_eq!(
+        true,
+        game.can_castle()[game.player()][CastlingSide::Queenside]
+    );
 
     let mut moves = vec![];
-    game.fill_pseudo_move_buffer(&mut moves, MoveOptions::default())
-        .unwrap();
+    all_moves(&mut moves, game.player(), &game, MoveOptions::default()).unwrap();
 
     let mut castling_count = 0;
     for m in moves.iter() {

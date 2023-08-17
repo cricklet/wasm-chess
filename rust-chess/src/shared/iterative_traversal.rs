@@ -4,12 +4,12 @@ use std::fmt::Formatter;
 use crate::danger::LazyDanger;
 use crate::helpers::indent;
 use crate::helpers::StableOption;
+use crate::moves::LazyMoves;
 
 use super::danger::Danger;
 use super::game::Game;
 use super::game::Legal;
 use super::helpers::err_result;
-use super::helpers::Clearable;
 use super::helpers::ErrorResult;
 use super::helpers::OptionResult;
 use super::moves::Move;
@@ -17,48 +17,12 @@ use super::moves::MoveOptions;
 use super::moves::OnlyCaptures;
 use super::moves::OnlyQueenPromotion;
 
-#[derive(PartialEq, Eq)]
-pub enum FinishedTraversing {
-    No,
-    Yes,
-}
-
-#[derive(Default)]
-pub struct IndexedMoveBuffer {
-    buffer: Vec<Move>,
-    index: usize,
-}
-
-impl Clearable for IndexedMoveBuffer {
-    fn clear(&mut self) {
-        self.buffer.clear();
-        self.index = 0;
-    }
-}
-
-impl Debug for IndexedMoveBuffer {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut lines = self
-            .buffer
-            .iter()
-            .map(|m| format!("{:?}", m))
-            .collect::<Vec<_>>();
-
-        if self.index < self.buffer.len() {
-            lines[self.index] = format!("{} <=========", lines[self.index]);
-        }
-
-        write!(f, "\n{}", &indent(&lines.join("\n"), 2))
-    }
-}
-
 #[derive(Default, Debug)]
 pub struct TraversalStackFrame<D> {
     pub game: Game,
 
-    move_options: Option<MoveOptions>,
     danger: LazyDanger,
-    pub moves: StableOption<IndexedMoveBuffer>,
+    pub moves: LazyMoves,
 
     pub history_move: Option<Move>,
 
@@ -70,7 +34,11 @@ impl<D: Debug> TraversalStackFrame<D> {
         self.danger.get(self.game.player(), self.game.bitboards())
     }
 
-    pub fn setup_from_move(
+    pub fn recent_move(&self) -> ErrorResult<Option<Move>> {
+        self.moves.last()
+    }
+
+    pub fn setup(
         &mut self,
         previous: &mut TraversalStackFrame<D>,
         move_to_apply: &Move,
@@ -78,16 +46,12 @@ impl<D: Debug> TraversalStackFrame<D> {
         self.game = previous.game;
         self.game.make_move(*move_to_apply)?;
 
-        self.move_options = None;
         self.danger.reset();
-        self.moves.clear();
+        self.moves.reset();
+
         self.history_move = Some(move_to_apply.clone());
 
-        if self
-            .game
-            .move_legality(move_to_apply, previous.danger()?)
-            == Legal::No
-        {
+        if self.game.move_legality(move_to_apply, previous.danger()?) == Legal::No {
             return Ok(Legal::No);
         }
 
@@ -97,80 +61,10 @@ impl<D: Debug> TraversalStackFrame<D> {
     pub fn setup_from_scratch(&mut self, game: Game) -> ErrorResult<()> {
         self.game = game;
 
-        self.move_options = None;
         self.danger.reset();
-        self.moves.clear();
+        self.moves.reset();
 
         Ok(())
-    }
-
-    pub fn set_move_options(&mut self, move_options: MoveOptions) -> ErrorResult<()> {
-        if self.moves.is_some() {
-            return err_result("cannot set move options after moves have been generated");
-        }
-        self.move_options = Some(move_options);
-        Ok(())
-    }
-
-    pub fn last_future_move(&self) -> ErrorResult<Option<Move>> {
-        if self.moves.is_some() {
-            let moves = self.moves.as_ref().unwrap();
-            if moves.index == 0 {
-                return Ok(None);
-            }
-            Ok(moves.buffer.get(moves.index - 1).cloned())
-        } else {
-            err_result(&format!("no moves for {:#?}", self))?
-        }
-    }
-
-    pub fn lazily_generate_moves<S: Fn(&Game, &mut Vec<Move>) -> ErrorResult<()>>(
-        &mut self,
-        move_sorter: S,
-    ) -> ErrorResult<&IndexedMoveBuffer> {
-        if self.moves.is_some() {
-            return self.moves.as_ref().as_result();
-        }
-
-        self.moves.clear();
-        self.moves.update(&mut |moves| -> ErrorResult<()> {
-            self.game
-                .fill_pseudo_move_buffer(&mut moves.buffer, self.move_options.as_result()?)?;
-
-            move_sorter(&self.game, &mut moves.buffer)?;
-            Ok(())
-        })?;
-
-        Ok(self.moves.as_ref().unwrap())
-    }
-
-    pub fn get_and_increment_move<S: Fn(&Game, &mut Vec<Move>) -> ErrorResult<()>>(
-        &mut self,
-        options: MoveOptions,
-        move_sorter: S,
-    ) -> ErrorResult<Option<Move>> {
-        match self.move_options {
-            Some(current_options) => {
-                if current_options != options {
-                    return err_result("move options changed");
-                }
-            }
-            None => {
-                self.set_move_options(options)?;
-            }
-        }
-
-        self.lazily_generate_moves(move_sorter)?;
-
-        let current_moves = self.moves.as_mut().as_result()?;
-        if current_moves.index >= current_moves.buffer.len() {
-            return Ok(None);
-        }
-
-        let m = current_moves.buffer.get(current_moves.index);
-        current_moves.index += 1;
-
-        Ok(m.cloned())
     }
 }
 
@@ -199,9 +93,8 @@ impl<D: Debug, const N: usize> TraversalStack<D, N> {
         let mut data = Self {
             stack: std::array::from_fn::<_, N, _>(|i| TraversalStackFrame::<D> {
                 game: Game::default(),
-                move_options: None,
                 danger: LazyDanger::default(),
-                moves: StableOption::default(),
+                moves: LazyMoves::default(),
                 history_move: None,
                 data: data_callback(i),
             }),
@@ -265,14 +158,6 @@ impl<D: Debug, const N: usize> TraversalStack<D, N> {
         }
     }
 
-    pub fn get_and_increment_move<S: Fn(&Game, &mut Vec<Move>) -> ErrorResult<()>>(
-        &mut self,
-        options: MoveOptions,
-        sorter: S,
-    ) -> ErrorResult<Option<Move>> {
-        let (current, _) = self.current_mut()?;
-        current.get_and_increment_move(options, sorter)
-    }
 }
 
 pub fn null_move_sort(_game: &Game, _moves: &mut Vec<Move>) -> ErrorResult<()> {

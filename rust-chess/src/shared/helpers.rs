@@ -471,23 +471,16 @@ impl<T> StableOption<T> {
         !self.is_some
     }
 
+    pub fn reset(&mut self) {
+        self.is_some = false;
+    }
+
     pub fn update<F: Fn(&mut T) -> ErrorResult<()>>(
         &mut self,
         callback: &mut F,
     ) -> ErrorResult<()> {
         self.is_some = true;
         callback(&mut self.value)
-    }
-}
-
-pub trait Clearable {
-    fn clear(&mut self);
-}
-
-impl<T: Clearable> StableOption<T> {
-    pub fn clear(&mut self) {
-        self.is_some = false;
-        self.value.clear();
     }
 }
 
@@ -502,4 +495,23 @@ impl<T: Display> Joinable for Vec<T> {
             .collect::<Vec<_>>()
             .join(join)
     }
+}
+
+struct Foo {
+    x: i32,
+    y: i32,
+}
+
+#[test]
+fn test_understanding_mutability_rules() {
+    let mut f = Foo { x: 0, y: 0 };
+    let f = &mut f;
+    let x = &mut f.x;
+    // let x2 = &f.x;
+    let y = &f.y;
+
+    *x += 1;
+    println!("x: {}", x);
+    // println!("x2: {}", x2);
+    println!("y: {}", y);
 }

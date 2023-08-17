@@ -647,3 +647,105 @@ mod test {
         assert_eq!(*count_moves.get("b2b1n").unwrap(), 1);
     }
 }
+
+#[derive(Default)]
+pub struct LazyMoves {
+    buffer: StableOption<Vec<Move>>,
+    buffer_generated_with: MoveOptions,
+    index: usize,
+}
+
+impl Debug for LazyMoves {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        if self.buffer.is_none() {
+            write!(f, "LazyMoves(None)")
+        } else {
+            let mut lines = self
+                .buffer
+                .as_ref()
+                .iter()
+                .map(|m| format!("{:?}", m))
+                .collect::<Vec<_>>();
+
+            if self.index < lines.len() {
+                lines[self.index] = format!("{} <=========", lines[self.index]);
+            }
+
+            write!(f, "\n{}", &indent(&lines.join("\n"), 2))
+        }
+    }
+}
+
+impl LazyMoves {
+    pub fn reset(&mut self) {
+        if self.buffer.is_some() {
+            self.buffer.as_mut().unwrap().clear();
+        }
+
+        self.buffer.reset();
+        self.index = 0;
+    }
+
+    pub fn get<S>(
+        &mut self,
+        state: &Game,
+        options: MoveOptions,
+        sorter: S,
+    ) -> ErrorResult<&Vec<Move>>
+    where
+        S: Fn(&Game, &mut Vec<Move>) -> ErrorResult<()>,
+    {
+        if self.buffer.is_none() {
+            self.buffer.update(&mut |buffer| -> ErrorResult<()> {
+                all_moves(buffer, state.player(), state, options)?;
+                sorter(state, buffer)?;
+                Ok(())
+            })?;
+            self.buffer_generated_with = options;
+        }
+
+        if self.buffer_generated_with != options {
+            return err_result("move options changed");
+        }
+
+        self.buffer.as_ref().as_result()
+    }
+
+    pub fn next<S>(
+        &mut self,
+        state: &Game,
+        options: MoveOptions,
+        sorter: S,
+    ) -> ErrorResult<Option<Move>>
+    where
+        S: Fn(&Game, &mut Vec<Move>) -> ErrorResult<()>,
+    {
+        // lazily generate buffer
+        self.get(state, options, sorter)?;
+        if self.buffer.is_none() {
+            return err_result("should have generated moves");
+        }
+
+        let buffer = self.buffer.as_ref().as_result()?;
+        if self.index >= buffer.len() {
+            Ok(None)
+        } else {
+            let m = buffer[self.index];
+            self.index += 1;
+            Ok(Some(m))
+        }
+    }
+
+    pub fn last(&self) -> ErrorResult<Option<Move>> {
+        if self.buffer.is_some() {
+            let buffer = self.buffer.as_ref().unwrap();
+            if self.index == 0 {
+                return Ok(None);
+            }
+            let m = buffer[self.index - 1];
+            Ok(Some(m))
+        } else {
+            Ok(None)
+        }
+    }
+}

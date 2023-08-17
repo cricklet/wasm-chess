@@ -5,7 +5,7 @@ use itertools::Itertools;
 use crate::{
     defer,
     helpers::{err_result, OptionResult},
-    iterative_traversal::{null_move_sort, IndexedMoveBuffer, TraversalStack},
+    iterative_traversal::{null_move_sort, TraversalStack},
 };
 
 use super::{
@@ -476,7 +476,7 @@ impl SearchStack {
 
         let (current, _) = self.traversal.current_mut()?;
 
-        let next_move = current.last_future_move()?.as_result()?;
+        let next_move = current.recent_move()?.as_result()?;
 
         if Score::compare(current.game.player(), next_score, current.data.beta).is_better_or_equal()
         {
@@ -519,16 +519,16 @@ impl SearchStack {
     where
         S: Fn(&Game, &mut Vec<Move>) -> ErrorResult<()>,
     {
-        let (current, _) = self.traversal.current()?;
-        let move_options = current.data.in_quiescence.move_options();
-        let next_move = self
-            .traversal
-            .get_and_increment_move(move_options, sorter)?;
+        let (current, _) = self.traversal.current_mut()?;
+        let current_options = current.data.in_quiescence.move_options();
+        let current_game = &current.game;
+        let current_moves = &mut current.moves;
+        let next_move = current_moves.next(current_game, current_options, sorter)?;
 
         if let Some(next_move) = next_move {
             // If there are moves left at 'current', apply the move
             let (current, next) = self.traversal.current_and_next_mut()?;
-            let result = next.setup_from_move(current, &next_move).unwrap();
+            let result = next.setup(current, &next_move).unwrap();
 
             if result == Legal::No {
                 return Ok(Some(LoopResult::Continue));
