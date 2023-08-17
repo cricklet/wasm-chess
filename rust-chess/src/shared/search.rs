@@ -4,7 +4,7 @@ use itertools::Itertools;
 
 use crate::{
     defer,
-    helpers::{err_result, OptionResult},
+    helpers::{err_result, OptionResult, Joinable},
     iterative_traversal::{null_move_sort, TraversalStack},
 };
 
@@ -17,7 +17,7 @@ use super::{
     types::*,
 };
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub enum Score {
     Centipawns(Player, isize),
     WinInN(Player, usize),
@@ -40,6 +40,12 @@ impl Display for Score {
             Score::WinInN(player, n) => write!(f, "{} wins +{} mate", player.to_fen(), n),
             Score::DrawInN(n) => write!(f, "draw +{}", n),
         }
+    }
+}
+
+impl std::fmt::Debug for Score {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self)
     }
 }
 
@@ -317,11 +323,17 @@ struct StaticEvaluationReturn {
 
 const PV_SIZE: usize = 4;
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Eq, PartialEq, Clone)]
 struct BestMoveReturn {
     best_move: Move,
     response_moves: Vec<Move>, // store a relatively short PV
     score: Score,
+}
+
+impl std::fmt::Debug for BestMoveReturn {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {} ({})", self.best_move, self.response_moves.join_vec(" "), self.score)
+    }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -392,6 +404,8 @@ pub struct SearchStack {
     pub done: bool,
     pub max_depth: usize,
 
+    pub skip_quiescence: bool,
+
     pub num_beta_cutoffs: usize,
     pub num_evaluations: usize,
     pub num_starting_moves_searched: usize,
@@ -399,9 +413,9 @@ pub struct SearchStack {
 
 impl SearchStack {
     pub fn default(game: Game) -> ErrorResult<Self> {
-        Self::with(game, 4)
+        Self::with(game, 4, false)
     }
-    pub fn with(game: Game, max_depth: usize) -> ErrorResult<Self> {
+    pub fn with(game: Game, max_depth: usize, skip_quiescence: bool) -> ErrorResult<Self> {
         Ok(Self {
             traversal: TraversalStack::<SearchFrameData>::new(
                 game,
@@ -410,6 +424,7 @@ impl SearchStack {
             best_move: None,
             max_depth,
             done: false,
+            skip_quiescence,
             num_beta_cutoffs: 0,
             num_evaluations: 0,
             num_starting_moves_searched: 0,
@@ -571,7 +586,9 @@ impl SearchStack {
 
                 if Score::compare(current_player, stand_pat, current_beta).is_better_or_equal() {
                     // The enemy will avoid this line
-                    return Ok(self.return_early(SearchResult::BetaCutoff(current_beta))?.as_result()?);
+                    return Ok(self
+                        .return_early(SearchResult::BetaCutoff(current_beta))?
+                        .as_result()?);
                 } else if Score::compare(current_player, stand_pat, current_alpha).is_better() {
                     // we should be able to find a move that is better than stand-pat
                     current.data.alpha = stand_pat;
@@ -590,15 +607,19 @@ impl SearchStack {
             if let Some(best_move) = current.data.best_move.clone() {
                 self.return_early(SearchResult::BestMove(best_move))
             } else {
-                let current_enemy = current.game.player().other();
-                if current.danger()?.check {
-                    self.return_early(SearchResult::StaticEvaluation(StaticEvaluationReturn {
-                        score: Score::WinInN(current_enemy, 0),
-                    }))
+                if !in_quiescence {
+                    let current_enemy = current.game.player().other();
+                    if current.danger()?.check {
+                        self.return_early(SearchResult::StaticEvaluation(StaticEvaluationReturn {
+                            score: Score::WinInN(current_enemy, 0),
+                        }))
+                    } else {
+                        self.return_early(SearchResult::StaticEvaluation(StaticEvaluationReturn {
+                            score: Score::DrawInN(0),
+                        }))
+                    }
                 } else {
-                    self.return_early(SearchResult::StaticEvaluation(StaticEvaluationReturn {
-                        score: Score::DrawInN(0),
-                    }))
+                    self.statically_evaluate_leaf()
                 }
             }
         }?;
@@ -656,7 +677,7 @@ impl InQuiescence {
 
 #[test]
 fn test_start_search() {
-    let mut search = SearchStack::with(Game::from_fen("startpos").unwrap(), 3).unwrap();
+    let mut search = SearchStack::with(Game::from_fen("startpos").unwrap(), 3, false).unwrap();
     loop {
         match search.iterate(null_move_sort).unwrap() {
             LoopResult::Continue => {}
@@ -682,7 +703,7 @@ fn test_start_search() {
 #[test]
 fn test_dont_capture() {
     let fen = "6k1/8/4p3/3r4/5n2/1Q6/1K1R4/8 w";
-    let mut search = SearchStack::with(Game::from_fen(fen).unwrap(), 3).unwrap();
+    let mut search = SearchStack::with(Game::from_fen(fen).unwrap(), 3, false).unwrap();
 
     loop {
         match search.iterate(null_move_sort).unwrap() {

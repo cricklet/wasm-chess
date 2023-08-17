@@ -117,13 +117,17 @@ impl Move {
 
 impl std::fmt::Display for Move {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {} {:?}", self.piece, self.to_uci(), self.move_type,)
+        write!(f, "{:?}", self,)
     }
 }
 
 impl std::fmt::Debug for Move {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {} {:?}", self.piece, self.to_uci(), self.move_type,)
+        match self.move_type {
+            MoveType::Quiet(_) => write!(f, "{}", self.to_uci()),
+            MoveType::Capture(_) => write!(f, "{}x{}", self.start_index, self.end_index,),
+            MoveType::Invalid => write!(f, "?"),
+        }
     }
 }
 

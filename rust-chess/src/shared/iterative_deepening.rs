@@ -81,7 +81,8 @@ pub struct IterativeSearch {
     best_variations_per_depth: Vec<Vec<Move>>,
     best_moves_cache: BestMovesCache,
 
-    use_cache_sort: bool,
+    skip_quiescence: bool,
+    skip_cache_sort: bool,
 
     no_moves_found: bool,
 }
@@ -89,13 +90,14 @@ pub struct IterativeSearch {
 impl IterativeSearch {
     pub fn new(game: Game) -> ErrorResult<Self> {
         let best_moves_cache = BestMovesCache::new();
-        let search = SearchStack::with(game, 1)?;
+        let search = SearchStack::with(game, 1, false)?;
         Ok(Self {
             search,
             start_game: game,
             best_variations_per_depth: vec![],
             best_moves_cache,
-            use_cache_sort: true,
+            skip_cache_sort: false,
+            skip_quiescence: false,
             no_moves_found: false,
         })
     }
@@ -118,14 +120,14 @@ impl IterativeSearch {
             return Ok(());
         }
 
-        let use_cache_sort = self.use_cache_sort;
+        let skip_cache_sort = self.skip_cache_sort;
         let best_moves_cache = &self.best_moves_cache;
 
         let sorter = move |game: &Game, moves: &mut Vec<Move>| -> ErrorResult<()> {
-            if use_cache_sort {
-                best_moves_cache.sort(game, moves)
-            } else {
+            if skip_cache_sort {
                 null_move_sort(game, moves)
+            } else {
+                best_moves_cache.sort(game, moves)
             }
         };
 
@@ -155,7 +157,7 @@ impl IterativeSearch {
                             .update(&self.start_game, &best_variation)?;
                         self.best_variations_per_depth.push(best_variation);
 
-                        self.search = SearchStack::with(self.start_game.clone(), depth + 1)?;
+                        self.search = SearchStack::with(self.start_game.clone(), depth + 1, self.skip_quiescence)?;
                     }
                 }
             }
@@ -168,30 +170,36 @@ impl IterativeSearch {
 
 #[test]
 fn test_start_iterative_deepening() {
-    let fen = "startpos";
-    for &use_cache_sort in [false, true].iter() {
-        let mut search = IterativeSearch::new(Game::from_fen(fen).unwrap()).unwrap();
-        search.use_cache_sort = use_cache_sort;
+    // let fen = "startpos";
 
-        let mut log = vec![];
+    // mid-game fen
+    let fen = "2rr2k1/1b1n1ppp/1p1pn3/pP2p3/4P2P/B1P3P1/P1BN1P1K/2R1R3 w - - 1 26";
 
-        for _ in 0..1_000_000 {
+    for &skip_quiescence in [false, true].iter() {
+        for &skip_cache_sort in [false, true].iter() {
+            let mut search = IterativeSearch::new(Game::from_fen(fen).unwrap()).unwrap();
+            search.skip_cache_sort = skip_cache_sort;
+            search.skip_quiescence = skip_quiescence;
+
+            let mut log = vec![];
+
+            for _ in 0..1_000_000 {
+                search.iterate(&mut log).unwrap();
+            }
+
+            log.push(format!(
+                "at depth {}: beta-cutoffs {}, evaluations {}, start moves searched {}",
+                search.search.max_depth,
+                search.search.num_beta_cutoffs,
+                search.search.num_evaluations,
+                search.search.num_starting_moves_searched,
+            ));
+
+            // Calling `iterate()` should be idempotent
             search.iterate(&mut log).unwrap();
+
+            println!("\nskip_cache_sort {}, skip_quiescence {}", skip_cache_sort, skip_quiescence);
+            println!("{:#?}", log);
         }
-
-        log.push(format!(
-            "at depth {}: beta-cutoffs {}, evaluations {}, start moves searched {}",
-            search.search.max_depth,
-            search.search.num_beta_cutoffs,
-            search.search.num_evaluations,
-            search.search.num_starting_moves_searched,
-        ));
-
-        // Calling `iterate()` should be idempotent
-        search.iterate(&mut log).unwrap();
-
-        println!("\nuse_cache_sort {}", use_cache_sort);
-        println!("{:#?}", log);
-        println!("{:#?}", search.bestmove());
     }
 }
