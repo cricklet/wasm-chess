@@ -492,7 +492,7 @@ impl SearchStack {
         Ok(Some(LoopResult::Continue))
     }
 
-    fn apply_next_move_or_return<S>(&mut self, sorter: S) -> ErrorResult<Option<LoopResult>>
+    fn traverse_next<S>(&mut self, sorter: S) -> ErrorResult<Option<LoopResult>>
     where
         S: Fn(&Game, &mut Vec<Move>) -> ErrorResult<()>,
     {
@@ -523,25 +523,9 @@ impl SearchStack {
 
             // Recurse into our newly applied move
             self.traversal.depth += 1;
-            return Ok(Some(LoopResult::Continue));
-        }
-
-        // We're out of moves to traverse, return the best move and pop up the stack.
-        let (current, _) = self.traversal.current_mut()?;
-
-        if let Some(best_move) = current.data.best_move.clone() {
-            self.return_early(SearchResult::BestMove(best_move))
+            Ok(Some(LoopResult::Continue))
         } else {
-            let current_enemy = current.game.player().other();
-            if current.danger()?.check {
-                self.return_early(SearchResult::StaticEvaluation(StaticEvaluationReturn {
-                    score: Score::WinInN(current_enemy, 0),
-                }))
-            } else {
-                self.return_early(SearchResult::StaticEvaluation(StaticEvaluationReturn {
-                    score: Score::DrawInN(0),
-                }))
-            }
+            Ok(None)
         }
     }
 
@@ -561,18 +545,39 @@ impl SearchStack {
         }
 
         // If we're at a leaf, statically evaluate
-        {
-            if let Some(result) = self.statically_evaluate_leaf()? {
-                return Ok(result);
-            }
-        }
-
-        // Otherwise, continue traversing or return the best move we've found so far
-        if let Some(result) = self.apply_next_move_or_return(sorter)? {
+        if let Some(result) = self.statically_evaluate_leaf()? {
             return Ok(result);
         }
 
-        return Ok(LoopResult::Continue);
+        // Apply some moves
+        if let Some(result) = self.traverse_next(sorter)? {
+            return Ok(result);
+        }
+
+        // If we're out of moves to traverse, evaluate and return.
+        let (current, _) = self.traversal.current_mut()?;
+        let result = {
+            if let Some(best_move) = current.data.best_move.clone() {
+                self.return_early(SearchResult::BestMove(best_move))
+            } else {
+                let current_enemy = current.game.player().other();
+                if current.danger()?.check {
+                    self.return_early(SearchResult::StaticEvaluation(StaticEvaluationReturn {
+                        score: Score::WinInN(current_enemy, 0),
+                    }))
+                } else {
+                    self.return_early(SearchResult::StaticEvaluation(StaticEvaluationReturn {
+                        score: Score::DrawInN(0),
+                    }))
+                }
+            }
+        }?;
+
+        if let Some(result) = result {
+            Ok(result)
+        } else {
+            Ok(LoopResult::Continue)
+        }
     }
 }
 
