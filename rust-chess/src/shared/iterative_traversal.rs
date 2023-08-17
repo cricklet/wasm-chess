@@ -1,6 +1,7 @@
 use std::fmt::Debug;
 use std::fmt::Formatter;
 
+use crate::danger::LazyDanger;
 use crate::helpers::indent;
 use crate::helpers::StableOption;
 
@@ -56,7 +57,7 @@ pub struct TraversalStackFrame<D> {
     pub game: Game,
 
     move_options: Option<MoveOptions>,
-    pub danger: Option<Danger>,
+    danger: LazyDanger,
     pub moves: StableOption<IndexedMoveBuffer>,
 
     pub history_move: Option<Move>,
@@ -65,6 +66,10 @@ pub struct TraversalStackFrame<D> {
 }
 
 impl<D: Debug> TraversalStackFrame<D> {
+    pub fn danger(&mut self) -> ErrorResult<&Danger> {
+        self.danger.get(self.game.player(), self.game.bitboards())
+    }
+
     pub fn setup_from_move(
         &mut self,
         previous: &mut TraversalStackFrame<D>,
@@ -74,15 +79,13 @@ impl<D: Debug> TraversalStackFrame<D> {
         self.game.make_move(*move_to_apply)?;
 
         self.move_options = None;
-        self.danger = None;
+        self.danger.reset();
         self.moves.clear();
         self.history_move = Some(move_to_apply.clone());
 
-        previous.lazily_generate_danger()?;
-
         if self
             .game
-            .move_legality(move_to_apply, previous.danger.as_ref().as_result()?)
+            .move_legality(move_to_apply, previous.danger()?)
             == Legal::No
         {
             return Ok(Legal::No);
@@ -95,10 +98,9 @@ impl<D: Debug> TraversalStackFrame<D> {
         self.game = game;
 
         self.move_options = None;
-        self.danger = None;
+        self.danger.reset();
         self.moves.clear();
 
-        self.lazily_generate_danger()?;
         Ok(())
     }
 
@@ -140,15 +142,6 @@ impl<D: Debug> TraversalStackFrame<D> {
         })?;
 
         Ok(self.moves.as_ref().unwrap())
-    }
-
-    pub fn lazily_generate_danger(&mut self) -> ErrorResult<&Danger> {
-        if self.danger.is_some() {
-            return Ok(self.danger.as_ref().unwrap());
-        }
-
-        self.danger = Some(Danger::from(self.game.player(), self.game.bitboards())?);
-        Ok(self.danger.as_ref().unwrap())
     }
 
     pub fn get_and_increment_move<S: Fn(&Game, &mut Vec<Move>) -> ErrorResult<()>>(
@@ -207,7 +200,7 @@ impl<D: Debug, const N: usize> TraversalStack<D, N> {
             stack: std::array::from_fn::<_, N, _>(|i| TraversalStackFrame::<D> {
                 game: Game::default(),
                 move_options: None,
-                danger: None,
+                danger: LazyDanger::default(),
                 moves: StableOption::default(),
                 history_move: None,
                 data: data_callback(i),

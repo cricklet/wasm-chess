@@ -1,9 +1,9 @@
 use enum_map::Enum;
 use strum::EnumIter;
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, EnumIter, Enum)]
+#[derive(Default, Copy, Clone, Debug, PartialEq, Eq, Hash, EnumIter, Enum)]
 pub enum Player {
-    White,
+    #[default] White,
     Black,
 }
 

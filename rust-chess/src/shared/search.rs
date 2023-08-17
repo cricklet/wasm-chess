@@ -555,9 +555,7 @@ impl SearchStack {
         if let Some(best_move) = &current.data.best_move {
             self.returned_evaluation = Some(SearchResult::BestMove(best_move.clone()));
         } else {
-            current.lazily_generate_danger()?;
-
-            if current.danger.unwrap().check {
+            if current.danger()?.check {
                 self.returned_evaluation =
                     Some(SearchResult::StaticEvaluation(StaticEvaluationReturn {
                         score: Score::WinInN(current.game.player().other(), 0),
@@ -602,10 +600,10 @@ impl SearchStack {
         // If we're at a leaf, statically evaluate
         {
             let (current, current_depth) = self.traversal.current_mut()?;
-            current.lazily_generate_danger()?;
-
             if current.data.in_quiescence == InQuiescence::No && current_depth >= self.max_depth {
-                if is_quiet_position(&current.danger.as_result()?, current.history_move.as_ref()) {
+                let current_history_move = current.history_move;
+                let current_danger = current.danger();
+                if is_quiet_position(current_danger?, current_history_move.as_ref()) {
                     let result = self.statically_evaluate_leaf()?;
                     return Ok(result);
                 } else {

@@ -1,3 +1,9 @@
+use crate::{
+    helpers::{OptionResult, StableOption},
+    lazy::Lazy,
+};
+use lazy_static::lazy_static;
+
 use super::{
     bitboard::{
         each_index_of_one, moves_bb_for_piece_and_blockers, single_bitboard, Bitboard, Bitboards,
@@ -75,6 +81,34 @@ impl Danger {
 
     pub fn piece_is_pinned(&self, index: BoardIndex) -> bool {
         self.pinned & single_bitboard(index) != 0
+    }
+}
+
+#[derive(Debug)]
+pub struct LazyDanger {
+    value: Option<Danger>,
+}
+
+lazy_static! {
+    static ref DEFAULT_BB: Bitboards = Bitboards::new();
+}
+
+impl Default for LazyDanger {
+    fn default() -> Self {
+        LazyDanger { value: None }
+    }
+}
+
+impl LazyDanger {
+    pub fn reset(&mut self) {
+        *self = LazyDanger { value: None }
+    }
+
+    pub fn get(&mut self, player: Player, bitboards: &Bitboards) -> ErrorResult<&Danger> {
+        if self.value.is_none() {
+            self.value = Some(Danger::from(player, bitboards)?);
+        }
+        self.value.as_ref().as_result()
     }
 }
 
