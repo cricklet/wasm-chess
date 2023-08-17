@@ -515,3 +515,29 @@ fn test_understanding_mutability_rules() {
     // println!("x2: {}", x2);
     println!("y: {}", y);
 }
+
+pub fn get_current_next<T>(
+    xs: &mut Vec<T>,
+    i: usize,
+) -> ErrorResult<(&mut T, &mut T)> {
+    if let Some((current, remainder)) = xs[i..].split_first_mut() {
+        Ok((current, remainder.first_mut().as_result()?))
+    } else {
+        err_result("current index invalid")
+    }
+}
+
+pub fn get_previous_current<T>(
+    xs: &mut Vec<T>,
+    i: usize,
+) -> ErrorResult<(Option<&mut T>, &mut T)> {
+    if i >= 1 {
+        if let Some((current, remainder)) = xs[i-1..].split_first_mut() {
+            Ok((Some(current), remainder.first_mut().as_result()?))
+        } else {
+            err_result("current index invalid")
+        }
+    } else {
+        Ok((None, xs.get_mut(i).as_result()?))
+    }
+}
