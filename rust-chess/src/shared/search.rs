@@ -386,7 +386,8 @@ pub enum LoopResult {
 
 #[derive(Debug)]
 pub struct SearchStack {
-    traversal: TraversalStack<SearchFrameData>,
+    traversal: TraversalStack,
+    search_frame_data: Vec<SearchFrameData>,
     best_move: Option<BestMoveReturn>,
 
     pub done: bool,
@@ -403,10 +404,8 @@ impl SearchStack {
     }
     pub fn with(game: Game, max_depth: usize) -> ErrorResult<Self> {
         Ok(Self {
-            traversal: TraversalStack::<SearchFrameData>::new(
-                game,
-                SearchFrameData::for_player(game.player()),
-            )?,
+            traversal: TraversalStack::new(game)?,
+            search_frame_data: vec![SearchFrameData::for_player(game.player())],
             best_move: None,
             max_depth,
             done: false,

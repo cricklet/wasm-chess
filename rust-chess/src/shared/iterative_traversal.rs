@@ -18,18 +18,16 @@ use super::moves::OnlyCaptures;
 use super::moves::OnlyQueenPromotion;
 
 #[derive(Default, Debug)]
-pub struct TraversalStackFrame<D> {
+pub struct TraversalStackFrame {
     pub game: Game,
 
     danger: LazyDanger,
     pub moves: LazyMoves,
 
     pub history_move: Option<Move>,
-
-    pub data: D,
 }
 
-impl<D: Debug> TraversalStackFrame<D> {
+impl TraversalStackFrame {
     pub fn danger(&mut self) -> ErrorResult<&Danger> {
         self.danger.get(self.game.player(), self.game.bitboards())
     }
@@ -40,7 +38,7 @@ impl<D: Debug> TraversalStackFrame<D> {
 
     pub fn setup(
         &mut self,
-        previous: &mut TraversalStackFrame<D>,
+        previous: &mut TraversalStackFrame,
         move_to_apply: &Move,
     ) -> ErrorResult<Legal> {
         self.game = previous.game;
@@ -59,12 +57,12 @@ impl<D: Debug> TraversalStackFrame<D> {
     }
 }
 
-pub struct TraversalStack<D: Debug + Default> {
-    stack: Vec<TraversalStackFrame<D>>,
+pub struct TraversalStack {
+    stack: Vec<TraversalStackFrame>,
     depth: usize,
 }
 
-impl<D: Debug + Default> Debug for TraversalStack<D> {
+impl Debug for TraversalStack {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut debug = f.debug_struct("TraversalStack");
         debug.field("depth", &self.depth);
@@ -79,16 +77,15 @@ impl<D: Debug + Default> Debug for TraversalStack<D> {
     }
 }
 
-impl<D: Debug + Default> TraversalStack<D> {
-    pub fn new(game: Game, data: D) -> ErrorResult<Self> {
+impl TraversalStack {
+    pub fn new(game: Game) -> ErrorResult<Self> {
         let data = Self {
             stack: vec![
-                TraversalStackFrame::<D> {
+                TraversalStackFrame{
                     game,
                     danger: LazyDanger::default(),
                     moves: LazyMoves::default(),
                     history_move: None,
-                    data,
                 },
                 Default::default(),
             ],
@@ -113,16 +110,16 @@ impl<D: Debug + Default> TraversalStack<D> {
         self.depth -= 1;
     }
 
-    pub fn root(&self) -> &TraversalStackFrame<D> {
+    pub fn root(&self) -> &TraversalStackFrame {
         self.stack.get(0).unwrap()
     }
 
-    pub fn current(&self) -> ErrorResult<(&TraversalStackFrame<D>, usize)> {
+    pub fn current(&self) -> ErrorResult<(&TraversalStackFrame, usize)> {
         let current_depth = self.depth;
         Ok((self.stack.get(current_depth).as_result()?, current_depth))
     }
 
-    pub fn current_mut(&mut self) -> ErrorResult<(&mut TraversalStackFrame<D>, usize)> {
+    pub fn current_mut(&mut self) -> ErrorResult<(&mut TraversalStackFrame, usize)> {
         let current_depth = self.depth;
         Ok((
             self.stack.get_mut(current_depth).as_result()?,
@@ -134,17 +131,17 @@ impl<D: Debug + Default> TraversalStack<D> {
         self.depth
     }
 
-    pub fn next(&self) -> ErrorResult<(&TraversalStackFrame<D>, usize)> {
+    pub fn next(&self) -> ErrorResult<(&TraversalStackFrame, usize)> {
         let next_depth = self.depth + 1;
         Ok((self.stack.get(next_depth).as_result()?, next_depth))
     }
 
-    pub fn next_mut(&mut self) -> ErrorResult<(&mut TraversalStackFrame<D>, usize)> {
+    pub fn next_mut(&mut self) -> ErrorResult<(&mut TraversalStackFrame, usize)> {
         let next_depth = self.depth + 1;
         Ok((self.stack.get_mut(next_depth).as_result()?, next_depth))
     }
 
-    fn previous(&self) -> ErrorResult<Option<(&TraversalStackFrame<D>, usize)>> {
+    fn previous(&self) -> ErrorResult<Option<(&TraversalStackFrame, usize)>> {
         if self.depth == 0 {
             return Ok(None);
         }
@@ -157,7 +154,7 @@ impl<D: Debug + Default> TraversalStack<D> {
 
     pub fn current_and_next_mut(
         &mut self,
-    ) -> ErrorResult<(&mut TraversalStackFrame<D>, &mut TraversalStackFrame<D>)> {
+    ) -> ErrorResult<(&mut TraversalStackFrame, &mut TraversalStackFrame)> {
         if let Some((current, remainder)) = self.stack[self.depth..].split_first_mut() {
             Ok((current, remainder.first_mut().as_result()?))
         } else {
