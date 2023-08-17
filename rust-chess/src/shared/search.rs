@@ -24,6 +24,12 @@ pub enum Score {
     DrawInN(usize),
 }
 
+impl Default for Score {
+    fn default() -> Self {
+        Score::Centipawns(Player::White, 0)
+    }
+}
+
 impl Display for Score {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -352,9 +358,7 @@ impl SearchResult {
 
 // ************************************************************************************************* //
 
-const MAX_ALPHA_BETA_DEPTH: usize = 40;
-
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Default, Debug, Eq, PartialEq)]
 struct SearchFrameData {
     alpha: Score,
     beta: Score,
@@ -382,7 +386,7 @@ pub enum LoopResult {
 
 #[derive(Debug)]
 pub struct SearchStack {
-    traversal: TraversalStack<SearchFrameData, MAX_ALPHA_BETA_DEPTH>,
+    traversal: TraversalStack<SearchFrameData>,
     best_move: Option<BestMoveReturn>,
 
     pub done: bool,
@@ -399,16 +403,10 @@ impl SearchStack {
     }
     pub fn with(game: Game, max_depth: usize) -> ErrorResult<Self> {
         Ok(Self {
-            traversal: TraversalStack::<SearchFrameData, MAX_ALPHA_BETA_DEPTH>::new(game, |i| {
-                let player = {
-                    if i % 2 == 0 {
-                        game.player()
-                    } else {
-                        game.player().other()
-                    }
-                };
-                SearchFrameData::for_player(player)
-            })?,
+            traversal: TraversalStack::<SearchFrameData>::new(
+                game,
+                SearchFrameData::for_player(game.player()),
+            )?,
             best_move: None,
             max_depth,
             done: false,
@@ -445,7 +443,7 @@ impl SearchStack {
     }
 
     fn return_early(&mut self, child_result: SearchResult) -> ErrorResult<Option<LoopResult>> {
-        if self.traversal.depth == 0 {
+        if self.traversal.depth() == 0 {
             self.best_move = match child_result {
                 SearchResult::BestMove(result) => Some(result),
                 _ => None,
@@ -454,7 +452,7 @@ impl SearchStack {
             return Ok(Some(LoopResult::Done));
         }
 
-        self.traversal.depth -= 1;
+        self.traversal.decrement_depth();
         let child_score = child_result.score().increment_turns();
 
         let (parent, _) = self.traversal.current_mut()?;
@@ -517,12 +515,12 @@ impl SearchStack {
             next.data.in_quiescence = current.data.in_quiescence;
             next.data.best_move = None;
 
-            if self.traversal.depth == 0 {
+            if self.traversal.depth() == 0 {
                 self.num_starting_moves_searched += 1;
             }
 
             // Recurse into our newly applied move
-            self.traversal.depth += 1;
+            self.traversal.increment_depth();
             Ok(Some(LoopResult::Continue))
         } else {
             Ok(None)

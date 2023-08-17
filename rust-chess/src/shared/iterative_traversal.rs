@@ -57,23 +57,14 @@ impl<D: Debug> TraversalStackFrame<D> {
 
         Ok(Legal::Yes)
     }
-
-    pub fn setup_from_scratch(&mut self, game: Game) -> ErrorResult<()> {
-        self.game = game;
-
-        self.danger.reset();
-        self.moves.reset();
-
-        Ok(())
-    }
 }
 
-pub struct TraversalStack<D: Debug, const N: usize> {
-    stack: [TraversalStackFrame<D>; N],
-    pub depth: usize,
+pub struct TraversalStack<D: Debug + Default> {
+    stack: Vec<TraversalStackFrame<D>>,
+    depth: usize,
 }
 
-impl<D: Debug, const N: usize> Debug for TraversalStack<D, N> {
+impl<D: Debug + Default> Debug for TraversalStack<D> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut debug = f.debug_struct("TraversalStack");
         debug.field("depth", &self.depth);
@@ -88,22 +79,38 @@ impl<D: Debug, const N: usize> Debug for TraversalStack<D, N> {
     }
 }
 
-impl<D: Debug, const N: usize> TraversalStack<D, N> {
-    pub fn new<F: Fn(usize) -> D>(game: Game, data_callback: F) -> ErrorResult<Self> {
-        let mut data = Self {
-            stack: std::array::from_fn::<_, N, _>(|i| TraversalStackFrame::<D> {
-                game: Game::default(),
-                danger: LazyDanger::default(),
-                moves: LazyMoves::default(),
-                history_move: None,
-                data: data_callback(i),
-            }),
+impl<D: Debug + Default> TraversalStack<D> {
+    pub fn new(game: Game, data: D) -> ErrorResult<Self> {
+        let data = Self {
+            stack: vec![
+                TraversalStackFrame::<D> {
+                    game,
+                    danger: LazyDanger::default(),
+                    moves: LazyMoves::default(),
+                    history_move: None,
+                    data,
+                },
+                Default::default(),
+            ],
             depth: 0,
         };
-        let start = &mut data.stack[0];
-        start.setup_from_scratch(game)?;
 
         Ok(data)
+    }
+
+    pub fn depth(&self) -> usize {
+        self.depth
+    }
+
+    pub fn increment_depth(&mut self) {
+        self.depth += 1;
+        if self.depth + 1 >= self.stack.len() {
+            self.stack.push(Default::default());
+        }
+    }
+
+    pub fn decrement_depth(&mut self) {
+        self.depth -= 1;
     }
 
     pub fn root(&self) -> &TraversalStackFrame<D> {
@@ -157,7 +164,6 @@ impl<D: Debug, const N: usize> TraversalStack<D, N> {
             err_result("current index invalid")
         }
     }
-
 }
 
 pub fn null_move_sort(_game: &Game, _moves: &mut Vec<Move>) -> ErrorResult<()> {

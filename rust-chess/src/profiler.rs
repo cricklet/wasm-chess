@@ -9,7 +9,7 @@ use pprof::protos::Message;
 pub mod shared;
 pub use shared::*;
 
-use crate::search::{LoopResult, SearchStack};
+use crate::{search::{LoopResult, SearchStack}, iterative_traversal::null_move_sort};
 
 use {game::Game, perft::run_perft_iteratively_to_depth, perft::run_perft_recursively};
 
@@ -64,7 +64,7 @@ fn main() {
         let start_time = std::time::Instant::now();
         let mut search = SearchStack::with(Game::from_fen("startpos").unwrap(), 5).unwrap();
         loop {
-            match search.iterate().unwrap() {
+            match search.iterate(null_move_sort).unwrap() {
                 LoopResult::Continue => {}
                 LoopResult::Done => break,
             }

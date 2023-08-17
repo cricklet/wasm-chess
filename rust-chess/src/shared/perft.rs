@@ -294,7 +294,7 @@ pub fn run_perft_recursively(game: Game, max_depth: usize) -> ErrorResult<usize>
 }
 
 pub fn run_perft_iteratively<const N: usize>(game: Game) -> ErrorResult<usize> {
-    let mut data = TraversalStack::<(), N>::new(game, |_| ())?;
+    let mut data = TraversalStack::<()>::new(game, ())?;
     let mut overall_count = 0;
 
     if N <= 1 {
@@ -303,9 +303,9 @@ pub fn run_perft_iteratively<const N: usize>(game: Game) -> ErrorResult<usize> {
 
     loop {
         // Leaf node case:
-        if data.depth + 1 >= N {
+        if data.depth() + 1 >= N {
             overall_count += 1;
-            data.depth -= 1;
+            data.decrement_depth();
         }
 
         // We have moves to traverse, dig deeper
@@ -320,16 +320,16 @@ pub fn run_perft_iteratively<const N: usize>(game: Game) -> ErrorResult<usize> {
             if result == Legal::No {
                 continue;
             } else {
-                data.depth += 1;
+                data.increment_depth();
                 continue;
             }
         }
 
         // We're out of moves to traverse, pop back up.
-        if data.depth == 0 {
+        if data.depth() == 0 {
             break;
         } else {
-            data.depth -= 1;
+            data.decrement_depth();
             continue;
         }
     }
@@ -415,8 +415,6 @@ fn test_perft_start_board_iteratively() {
     }
 }
 
-const MAX_PERFT_DEPTH: usize = 10;
-
 #[derive(Debug, PartialEq, Eq)]
 pub enum PerftLoopResult {
     Continue,
@@ -426,7 +424,7 @@ pub enum PerftLoopResult {
 
 #[derive(Debug)]
 pub struct PerftLoop {
-    pub stack: TraversalStack<(), MAX_PERFT_DEPTH>,
+    pub stack: TraversalStack<()>,
 
     pub count: usize,
     pub max_depth: usize,
@@ -438,12 +436,8 @@ const LOOP_COUNT: usize = 1_000_000;
 
 impl PerftLoop {
     pub fn new(fen: &str, max_depth: usize) -> Self {
-        if max_depth > MAX_PERFT_DEPTH {
-            panic!("max_depth must be <= {}", MAX_PERFT_DEPTH);
-        }
-
         let game = Game::from_fen(fen).unwrap();
-        let stack = TraversalStack::<(), MAX_PERFT_DEPTH>::new(game, |_| ()).unwrap();
+        let stack = TraversalStack::<()>::new(game, ()).unwrap();
 
         Self {
             stack,
@@ -458,9 +452,9 @@ impl PerftLoop {
         let ref mut traversal = self.stack;
 
         // Leaf node case:
-        if traversal.depth + 1 >= self.max_depth {
+        if traversal.depth() + 1 >= self.max_depth {
             self.count += 1;
-            traversal.depth -= 1;
+            traversal.decrement_depth();
 
             return PerftLoopResult::Continue;
         }
@@ -477,16 +471,16 @@ impl PerftLoop {
             if result == Legal::No {
                 return PerftLoopResult::Continue;
             } else {
-                traversal.depth += 1;
+                traversal.increment_depth();
                 return PerftLoopResult::Continue;
             }
         }
 
         // We're out of moves to traverse, pop back up.
-        if traversal.depth == 0 {
+        if traversal.depth() == 0 {
             return PerftLoopResult::Done;
         } else {
-            traversal.depth -= 1;
+            traversal.decrement_depth();
             return PerftLoopResult::Continue;
         }
     }
