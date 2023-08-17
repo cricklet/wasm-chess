@@ -533,9 +533,6 @@ impl SearchStack {
     where
         S: Fn(&Game, &mut Vec<Move>) -> ErrorResult<()>,
     {
-        // eg for the first move
-        //  previous (startpos) --> last_move (e2e4) --> current (startpos moves e2e4)
-
         if self.max_depth == 0 {
             return err_result("max_depth must be > 0");
         }
