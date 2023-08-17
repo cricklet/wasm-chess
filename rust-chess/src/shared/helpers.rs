@@ -515,3 +515,53 @@ fn test_understanding_mutability_rules() {
     // println!("x2: {}", x2);
     println!("y: {}", y);
 }
+
+pub struct AutoVec<T> {
+    vec: Vec<T>,
+    constructor: fn(usize) -> T,
+}
+
+impl<T> AutoVec<T> {
+    pub fn new(t: T, constructor: fn(usize) -> T) -> Self {
+        Self {
+            vec: vec![t],
+            constructor,
+        }
+    }
+
+    pub fn get_current(&mut self, i: usize) -> ErrorResult<&mut T> {
+        while self.vec.len() <= i {
+            self.vec.push((self.constructor)(self.vec.len()));
+        }
+
+        self.vec.get_mut(i).as_result()
+    }
+
+    pub fn get_current_next(&mut self, i: usize) -> ErrorResult<(&mut T, &mut T)> {
+        while self.vec.len() <= i + 1 {
+            self.vec.push((self.constructor)(self.vec.len()));
+        }
+
+        if let Some((current, remainder)) = self.vec[i..].split_first_mut() {
+            Ok((current, remainder.first_mut().as_result()?))
+        } else {
+            err_result("current index invalid")
+        }
+    }
+
+    pub fn get_previous_current(&mut self, i: usize) -> ErrorResult<(Option<&mut T>, &mut T)> {
+        while self.vec.len() <= i {
+            self.vec.push((self.constructor)(self.vec.len()));
+        }
+
+        if i >= 1 {
+            if let Some((current, remainder)) = self.vec[i - 1..].split_first_mut() {
+                Ok((Some(current), remainder.first_mut().as_result()?))
+            } else {
+                err_result("current index invalid")
+            }
+        } else {
+            Ok((None, self.vec.get_mut(i).as_result()?))
+        }
+    }
+}
