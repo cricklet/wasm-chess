@@ -1,8 +1,8 @@
 use std::fmt::Debug;
 use std::fmt::Formatter;
 
-use crate::helpers::StableOption;
 use crate::helpers::indent;
+use crate::helpers::StableOption;
 
 use super::danger::Danger;
 use super::game::Game;
@@ -112,7 +112,7 @@ impl<D: Debug> TraversalStackFrame<D> {
 
     pub fn last_future_move(&self) -> ErrorResult<Option<Move>> {
         if self.moves.is_some() {
-            let moves = self.moves.get_ref().unwrap();
+            let moves = self.moves.as_ref().unwrap();
             if moves.index == 0 {
                 return Ok(None);
             }
@@ -127,21 +127,19 @@ impl<D: Debug> TraversalStackFrame<D> {
         move_sorter: S,
     ) -> ErrorResult<&IndexedMoveBuffer> {
         if self.moves.is_some() {
-            return self.moves.get_ref().as_result();
+            return self.moves.as_ref().as_result();
         }
 
         self.moves.clear();
-        self.moves.prepare_update();
-        let buffer = &mut self.moves.get_mut().as_result()?.buffer;
+        self.moves.update(&mut |moves| -> ErrorResult<()> {
+            self.game
+                .fill_pseudo_move_buffer(&mut moves.buffer, self.move_options.as_result()?)?;
 
-        self.game.fill_pseudo_move_buffer(
-            buffer,
-            self.move_options.as_result()?,
-        )?;
+            move_sorter(&self.game, &mut moves.buffer)?;
+            Ok(())
+        })?;
 
-        move_sorter(&self.game, buffer)?;
-
-        Ok(self.moves.get_ref().unwrap())
+        Ok(self.moves.as_ref().unwrap())
     }
 
     pub fn lazily_generate_danger(&mut self) -> ErrorResult<&Danger> {
@@ -171,7 +169,7 @@ impl<D: Debug> TraversalStackFrame<D> {
 
         self.lazily_generate_moves(move_sorter)?;
 
-        let current_moves = self.moves.get_mut().as_result()?;
+        let current_moves = self.moves.as_mut().as_result()?;
         if current_moves.index >= current_moves.buffer.len() {
             return Ok(None);
         }

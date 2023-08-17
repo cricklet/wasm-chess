@@ -447,7 +447,7 @@ impl<T: Debug> Debug for StableOption<T> {
 }
 
 impl<T> StableOption<T> {
-    pub fn get_ref(&self) -> Option<&T> {
+    pub fn as_ref(&self) -> Option<&T> {
         if self.is_some {
             Some(&self.value)
         } else {
@@ -455,7 +455,7 @@ impl<T> StableOption<T> {
         }
     }
 
-    pub fn get_mut(&mut self) -> Option<&mut T> {
+    pub fn as_mut(&mut self) -> Option<&mut T> {
         if self.is_some {
             Some(&mut self.value)
         } else {
@@ -467,8 +467,16 @@ impl<T> StableOption<T> {
         self.is_some
     }
 
-    pub fn prepare_update(&mut self) {
+    pub fn is_none(&self) -> bool {
+        !self.is_some
+    }
+
+    pub fn update<F: Fn(&mut T) -> ErrorResult<()>>(
+        &mut self,
+        callback: &mut F,
+    ) -> ErrorResult<()> {
         self.is_some = true;
+        callback(&mut self.value)
     }
 }
 
