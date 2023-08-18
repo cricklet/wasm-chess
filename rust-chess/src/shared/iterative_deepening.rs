@@ -9,12 +9,12 @@ the best line at each frame.
 use std::iter;
 
 use crate::{
+    alphabeta::{LoopResult, AlphaBetaStack},
     bitboard::{warm_magic_cache, BoardIndex},
     game::Game,
     helpers::{ErrorResult, Joinable, OptionResult},
     iterative_traversal::null_move_sort,
     moves::Move,
-    search::{LoopResult, SearchStack},
 };
 
 pub struct BestMovesCache {
@@ -81,7 +81,7 @@ pub struct IterativeSearchOptions {
 }
 
 pub struct IterativeSearch {
-    search: SearchStack,
+    search: AlphaBetaStack,
     start_game: Game,
 
     best_variations_per_depth: Vec<Vec<Move>>,
@@ -95,7 +95,7 @@ pub struct IterativeSearch {
 impl IterativeSearch {
     pub fn new(game: Game, options: IterativeSearchOptions) -> ErrorResult<Self> {
         let best_moves_cache = BestMovesCache::new();
-        let search = SearchStack::with(game, 1, options.skip_quiescence)?;
+        let search = AlphaBetaStack::with(game, 1, options.skip_quiescence)?;
         Ok(Self {
             search,
             start_game: game,
@@ -119,7 +119,7 @@ impl IterativeSearch {
         }
     }
 
-    pub fn iterate(&mut self, log: &mut Vec<String>) -> ErrorResult<()> {
+    pub fn iterate<F: FnMut(&str)>(&mut self, log: &mut F) -> ErrorResult<()> {
         if self.no_moves_found {
             return Ok(());
         }
@@ -145,7 +145,7 @@ impl IterativeSearch {
                     }
                     Some((bestmove, response, score)) => {
                         let depth = self.search.max_depth;
-                        log.push(format!(
+                        log(&format!(
                             "at depth {}: bestmove {} ponder {} ({}), beta-cutoffs {}, evaluations {}, start moves searched {}",
                             depth,
                             bestmove.to_uci(),
@@ -161,7 +161,7 @@ impl IterativeSearch {
                             .update(&self.start_game, &best_variation)?;
                         self.best_variations_per_depth.push(best_variation);
 
-                        self.search = SearchStack::with(
+                        self.search = AlphaBetaStack::with(
                             self.start_game.clone(),
                             depth + 1,
                             self.options.skip_quiescence,
@@ -177,123 +177,61 @@ impl IterativeSearch {
 }
 
 #[test]
-fn test_iterative_deepening_for_count() {
+fn test_iterative_deepening_for_depth() {
     // let fen = "startpos";
 
     // mid-game fen
-    let fen = "r3k2r/1bq1bppp/pp2p3/2p1n3/P3PP2/2PBN3/1P1BQ1PP/R4RK1 b kq - 0 16";
+    // let fen = "r3k2r/1bq1bppp/pp2p3/2p1n3/P3PP2/2PBN3/1P1BQ1PP/R4RK1 b kq - 0 16";
 
     // late-game fen
-    // let fen = "6k1/8/4p3/3r4/5n2/1Q6/1K1R4/8 w";
+    let fen = "6k1/8/4p3/3r4/5n2/1Q6/1K1R4/8 w";
 
+    // make sure any lazy-statics are generated
     IterativeSearch::new(
         Game::from_fen(fen).unwrap(),
         IterativeSearchOptions::default(),
     )
     .unwrap()
-    .iterate(&mut vec![])
+    .iterate(&mut |_| {})
     .unwrap();
 
-    for &skip_quiescence in [false, true].iter() {
-        for &skip_cache_sort in [false, true].iter() {
-            let options = IterativeSearchOptions {
-                skip_cache_sort,
-                skip_quiescence,
-            };
-            let mut search = IterativeSearch::new(Game::from_fen(fen).unwrap(), options).unwrap();
+    let skip_quiescence = false;
 
-            let mut log = vec![];
+    // for &skip_quiescence in [false, true].iter() {
+    for &skip_cache_sort in [false, true].iter() {
+        let options = IterativeSearchOptions {
+            skip_cache_sort,
+            skip_quiescence,
+        };
+        let mut search = IterativeSearch::new(Game::from_fen(fen).unwrap(), options).unwrap();
 
-            for _ in 0..1_000_000 {
-                search.iterate(&mut log).unwrap();
-            }
+        let start_time = std::time::Instant::now();
 
+        let mut log: Vec<String> = vec![];
+        let mut last_log_time = std::time::Instant::now();
+        let mut log_callback = |line: &str| {
             log.push(format!(
-                "at depth {}: beta-cutoffs {}, evaluations {}, start moves searched {}",
-                search.search.max_depth,
-                search.search.num_beta_cutoffs,
-                search.search.num_evaluations,
-                search.search.num_starting_moves_searched,
+                "{} ms {}",
+                last_log_time.elapsed().as_millis(),
+                line.to_string()
             ));
+            last_log_time = std::time::Instant::now();
+        };
 
-            // Calling `iterate()` should be idempotent
-            search.iterate(&mut log).unwrap();
-
-            println!(
-                "\nskip_cache_sort {}, skip_quiescence {}",
-                skip_cache_sort, skip_quiescence
-            );
-            println!("{:#?}", log);
-        }
-    }
-}
-
-#[test]
-fn test_iterative_deepening_for_depth() {
-    // let fen = "startpos";
-
-    // mid-game fen
-    let fen = "r3k2r/1bq1bppp/pp2p3/2p1n3/P3PP2/2PBN3/1P1BQ1PP/R4RK1 b kq - 0 16";
-
-    // late-game fen
-    // let fen = "6k1/8/4p3/3r4/5n2/1Q6/1K1R4/8 w";
-
-    // make sure any lazy-statics are generated
-    IterativeSearch::new(Game::from_fen(fen).unwrap(), IterativeSearchOptions::default())
-        .unwrap()
-        .iterate(&mut vec![])
-        .unwrap();
-
-    for &skip_quiescence in [false, true].iter() {
-        for &skip_cache_sort in [false, true].iter() {
-            let options = IterativeSearchOptions {
-                skip_cache_sort,
-                skip_quiescence,
-            };
-            let mut search = IterativeSearch::new(Game::from_fen(fen).unwrap(), options).unwrap();
-
-            let mut log = vec![];
-
-            let start_time = std::time::Instant::now();
-
-            let mut start_time_for_depth = std::time::Instant::now();
-            let mut last_depth = 0;
-
-            loop {
-                search.iterate(&mut log).unwrap();
-
-                let depth = search.search.max_depth;
-                if depth > last_depth {
-                    println!(
-                        "{} ms at depth {}",
-                        start_time_for_depth.elapsed().as_millis(),
-                        depth - 1
-                    );
-                    last_depth = depth;
-                    start_time_for_depth = std::time::Instant::now();
-                }
-                if depth >= 6 {
-                    break;
-                }
+        loop {
+            search.iterate(&mut log_callback).unwrap();
+            if search.search.max_depth >= 7 {
+                break;
             }
-
-            log.push(format!(
-                "{} ms, at depth {}: beta-cutoffs {}, evaluations {}, start moves searched {}",
-                start_time.elapsed().as_millis(),
-                search.search.max_depth,
-                search.search.num_beta_cutoffs,
-                search.search.num_evaluations,
-                search.search.num_starting_moves_searched,
-            ));
-
-            // Calling `iterate()` should be idempotent
-            search.iterate(&mut log).unwrap();
-
-            println!(
-                "skip_cache_sort {}, skip_quiescence {}",
-                skip_cache_sort, skip_quiescence
-            );
-            println!("{:#?}\n", log);
         }
+
+        log.push(format!("{} ms total", start_time.elapsed().as_millis(),));
+
+        println!(
+            "skip_cache_sort {}, skip_quiescence {}",
+            skip_cache_sort, skip_quiescence
+        );
+        println!("{:#?}\n", log);
     }
+    // }
 }

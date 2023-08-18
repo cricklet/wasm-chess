@@ -2,8 +2,9 @@ use itertools::Itertools;
 use std::{iter, sync::Mutex};
 
 use crate::{
+    alphabeta::{LoopResult, AlphaBetaStack},
     bitboard::warm_magic_cache,
-    search::{LoopResult, SearchStack}, iterative_deepening::{IterativeSearch, IterativeSearchOptions},
+    iterative_deepening::{IterativeSearch, IterativeSearchOptions},
 };
 
 use super::{
@@ -94,7 +95,7 @@ impl Uci {
         let mut output: Vec<String> = vec![];
         for _ in 0..100_000 {
             if let Some(search) = &mut self.search {
-                search.iterate(&mut output)?;
+                search.iterate(&mut |line| output.push(line.to_string()))?;
             }
         }
 

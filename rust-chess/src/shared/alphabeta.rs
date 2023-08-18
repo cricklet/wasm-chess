@@ -4,7 +4,7 @@ use itertools::Itertools;
 
 use crate::{
     defer,
-    helpers::{err_result, OptionResult, Joinable},
+    helpers::{err_result, Joinable, OptionResult},
     iterative_traversal::{null_move_sort, TraversalStack},
 };
 
@@ -332,7 +332,13 @@ struct BestMoveReturn {
 
 impl std::fmt::Debug for BestMoveReturn {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {} ({})", self.best_move, self.response_moves.join_vec(" "), self.score)
+        write!(
+            f,
+            "{} {} ({})",
+            self.best_move,
+            self.response_moves.join_vec(" "),
+            self.score
+        )
     }
 }
 
@@ -371,7 +377,7 @@ impl SearchResult {
 // ************************************************************************************************* //
 
 #[derive(Default, Debug, Eq, PartialEq)]
-struct SearchFrameData {
+struct AlphaBetaFrame {
     alpha: Score,
     beta: Score,
     in_quiescence: InQuiescence,
@@ -379,7 +385,7 @@ struct SearchFrameData {
     best_move: Option<BestMoveReturn>,
 }
 
-impl SearchFrameData {
+impl AlphaBetaFrame {
     pub fn for_player(player: Player) -> Self {
         Self {
             alpha: Score::WinInN(player.other(), 0),
@@ -397,8 +403,8 @@ pub enum LoopResult {
 }
 
 #[derive(Debug)]
-pub struct SearchStack {
-    traversal: TraversalStack<SearchFrameData>,
+pub struct AlphaBetaStack {
+    traversal: TraversalStack<AlphaBetaFrame>,
     best_move: Option<BestMoveReturn>,
 
     pub done: bool,
@@ -412,15 +418,15 @@ pub struct SearchStack {
     pub num_starting_moves_searched: usize,
 }
 
-impl SearchStack {
+impl AlphaBetaStack {
     pub fn default(game: Game) -> ErrorResult<Self> {
         Self::with(game, 4, false)
     }
     pub fn with(game: Game, max_depth: usize, skip_quiescence: bool) -> ErrorResult<Self> {
         Ok(Self {
-            traversal: TraversalStack::<SearchFrameData>::new(
+            traversal: TraversalStack::<AlphaBetaFrame>::new(
                 game,
-                SearchFrameData::for_player(game.player()),
+                AlphaBetaFrame::for_player(game.player()),
             )?,
             best_move: None,
             max_depth,
@@ -688,7 +694,7 @@ impl InQuiescence {
 
 #[test]
 fn test_start_search() {
-    let mut search = SearchStack::with(Game::from_fen("startpos").unwrap(), 3, false).unwrap();
+    let mut search = AlphaBetaStack::with(Game::from_fen("startpos").unwrap(), 3, false).unwrap();
     loop {
         match search.iterate(null_move_sort).unwrap() {
             LoopResult::Continue => {}
@@ -714,7 +720,7 @@ fn test_start_search() {
 #[test]
 fn test_dont_capture() {
     let fen = "6k1/8/4p3/3r4/5n2/1Q6/1K1R4/8 w";
-    let mut search = SearchStack::with(Game::from_fen(fen).unwrap(), 3, false).unwrap();
+    let mut search = AlphaBetaStack::with(Game::from_fen(fen).unwrap(), 3, false).unwrap();
     search.log_state_at_history = Some("b3g3 g8f7 d2xd5".to_string());
 
     loop {
