@@ -31,7 +31,9 @@ pub struct TraversalStackFrame<D> {
 
 impl<D: Debug> TraversalStackFrame<D> {
     pub fn danger(&mut self) -> ErrorResult<Danger> {
-        self.danger.get(self.game.player(), self.game.bitboards()).cloned()
+        self.danger
+            .get(self.game.player(), self.game.bitboards())
+            .cloned()
     }
 
     pub fn recent_move(&self) -> ErrorResult<Option<&Move>> {
@@ -163,6 +165,16 @@ impl<D: Debug + Default> TraversalStack<D> {
         } else {
             err_result("current index invalid")
         }
+    }
+
+    pub fn history_string(&self) -> ErrorResult<String> {
+        let mut result = "".to_string();
+        for i in 1..=self.depth {
+            let frame = self.stack.get(i).as_result()?;
+            let history_move = frame.history_move.as_ref().as_result()?;
+            result += &format!("{} ", history_move);
+        }
+        Ok(result.trim().to_string())
     }
 }
 

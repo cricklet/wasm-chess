@@ -106,6 +106,13 @@ impl Move {
         let promo = promo.unwrap_or(&"");
         format!("{}{}{}", self.start_index, self.end_index, promo)
     }
+    pub fn to_pretty_str(&self) -> String {
+        match self.move_type {
+            MoveType::Quiet(_) => format!("{}", self.to_uci()),
+            MoveType::Capture(_) => format!("{}x{}", self.start_index, self.end_index,),
+            MoveType::Invalid => format!("?"),
+        }
+    }
 
     pub fn is_quiet(&self) -> bool {
         match self.move_type {
@@ -123,11 +130,7 @@ impl std::fmt::Display for Move {
 
 impl std::fmt::Debug for Move {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.move_type {
-            MoveType::Quiet(_) => write!(f, "{}", self.to_uci()),
-            MoveType::Capture(_) => write!(f, "{}x{}", self.start_index, self.end_index,),
-            MoveType::Invalid => write!(f, "?"),
-        }
+        write!(f, "{}", self.to_pretty_str())
     }
 }
 
@@ -664,18 +667,15 @@ impl Debug for LazyMoves {
         if self.buffer.is_none() {
             write!(f, "LazyMoves(None)")
         } else {
-            let mut lines = self
-                .buffer
-                .as_ref()
-                .iter()
-                .map(|m| format!("{:?}", m))
-                .collect::<Vec<_>>();
+            let moves = self.buffer.as_ref().unwrap();
+            let move_strs = moves.iter().map(|m| m.to_pretty_str());
+            let mut move_strs: Vec<String> = move_strs.collect();
 
-            if self.index < lines.len() {
-                lines[self.index] = format!("{} <=========", lines[self.index]);
+            if self.index < moves.len() {
+                move_strs[self.index] = format!(" --> {} <-- ", move_strs[self.index]);
             }
 
-            write!(f, "\n{}", &indent(&lines.join("\n"), 2))
+            write!(f, "{:?}", move_strs)
         }
     }
 }

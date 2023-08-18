@@ -405,6 +405,7 @@ pub struct SearchStack {
     pub max_depth: usize,
 
     pub skip_quiescence: bool,
+    pub log_state_at_history: Option<String>,
 
     pub num_beta_cutoffs: usize,
     pub num_evaluations: usize,
@@ -425,6 +426,7 @@ impl SearchStack {
             max_depth,
             done: false,
             skip_quiescence,
+            log_state_at_history: None,
             num_beta_cutoffs: 0,
             num_evaluations: 0,
             num_starting_moves_searched: 0,
@@ -554,6 +556,15 @@ impl SearchStack {
             return Ok(LoopResult::Done);
         }
 
+        if let Some(log_state_at_history) = &self.log_state_at_history {
+            if &self.traversal.history_string()? == log_state_at_history {
+                let (current, _) = self.traversal.current()?;
+                println!("logging state for: {}", log_state_at_history);
+                println!("{:#?}", current.game);
+                println!("{:#?}", self.traversal);
+            }
+        }
+
         let in_quiescence = {
             let (current, _) = self.traversal.current()?;
             current.data.in_quiescence == InQuiescence::Yes
@@ -563,7 +574,7 @@ impl SearchStack {
             let (current, current_depth) = self.traversal.current_mut()?;
             if current_depth >= self.max_depth {
                 let current_danger = current.danger()?;
-                let current_recent_move = current.recent_move()?;
+                let current_recent_move = current.history_move.as_ref();
                 if is_quiet_position(&current_danger, current_recent_move) {
                     return Ok(self.statically_evaluate_leaf()?.as_result()?);
                 } else {
@@ -590,7 +601,7 @@ impl SearchStack {
                         .return_early(SearchResult::BetaCutoff(current_beta))?
                         .as_result()?);
                 } else if Score::compare(current_player, stand_pat, current_alpha).is_better() {
-                    // we should be able to find a move that is better than stand-pat
+                    // We should be able to find a move that is better than stand-pat
                     current.data.alpha = stand_pat;
                 }
             }
@@ -701,9 +712,10 @@ fn test_start_search() {
 }
 
 #[test]
-fn test_dont_capture() {
+fn test_dont_capture_asdf() {
     let fen = "6k1/8/4p3/3r4/5n2/1Q6/1K1R4/8 w";
     let mut search = SearchStack::with(Game::from_fen(fen).unwrap(), 3, false).unwrap();
+    search.log_state_at_history = Some("b3g3 g8f7 d2xd5".to_string());
 
     loop {
         match search.iterate(null_move_sort).unwrap() {

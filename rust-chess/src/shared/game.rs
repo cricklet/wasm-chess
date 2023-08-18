@@ -115,10 +115,16 @@ impl std::fmt::Debug for Game {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{} ({})\n{}",
-            self.to_fen(),
-            self.board.zobrist(),
-            self.board.bitboards()
+            "Game {{\n{}}}",
+            indent(
+                &format!(
+                    "{} ({})\n{}",
+                    self.to_fen(),
+                    self.board.zobrist(),
+                    self.board.bitboards()
+                ),
+                2
+            ),
         )
     }
 }
