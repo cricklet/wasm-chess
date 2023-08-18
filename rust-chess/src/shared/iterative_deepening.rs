@@ -9,12 +9,12 @@ the best line at each frame.
 use std::iter;
 
 use crate::{
-    alphabeta::{LoopResult, AlphaBetaStack},
+    alphabeta::{AlphaBetaStack, LoopResult},
     bitboard::{warm_magic_cache, BoardIndex},
     game::Game,
     helpers::{ErrorResult, Joinable, OptionResult},
-    iterative_traversal::null_move_sort,
     moves::Move,
+    traversal::null_move_sort,
 };
 
 pub struct BestMovesCache {

@@ -5,7 +5,7 @@ use itertools::Itertools;
 use crate::{
     defer,
     helpers::{err_result, Joinable, OptionResult},
-    iterative_traversal::{null_move_sort, TraversalStack},
+    traversal::{null_move_sort, TraversalStack},
 };
 
 use super::{

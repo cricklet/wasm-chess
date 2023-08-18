@@ -1,13 +1,13 @@
 use std::{collections::HashMap, default};
 
-use crate::{bitboard::warm_magic_cache, iterative_traversal::null_move_sort, moves::all_moves};
+use crate::{bitboard::warm_magic_cache, moves::all_moves, traversal::null_move_sort};
 
 use super::{
     danger::Danger,
     game::{Game, Legal},
     helpers::{err_result, indent, ErrorResult},
-    iterative_traversal::TraversalStack,
     moves::{Move, MoveOptions},
+    traversal::TraversalStack,
 };
 
 fn assert_fen_matches(expected_fen: &str) {
@@ -463,7 +463,9 @@ impl PerftLoop {
         let (current, _) = traversal.current_mut().unwrap();
         let current_moves = &mut current.moves;
         let current_game = &current.game;
-        let next_move = current_moves.next(current_game, MoveOptions::default(), null_move_sort).unwrap();
+        let next_move = current_moves
+            .next(current_game, MoveOptions::default(), null_move_sort)
+            .unwrap();
         if let Some(next_move) = next_move {
             let (current, next) = traversal.current_and_next_mut().unwrap();
 
