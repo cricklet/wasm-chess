@@ -50,6 +50,24 @@ impl std::fmt::Debug for Score {
 }
 
 impl Score {
+    pub fn aspiration_window(self, for_player: Player) -> (Self, Self) {
+        match self {
+            Score::Centipawns(player, score) => {
+                let offset = if player == for_player {
+                    50
+                } else {
+                    -50
+                };
+                (
+                    Score::Centipawns(player, score - offset),
+                    Score::Centipawns(player, score + offset),
+                )
+            }
+            Score::WinInN(_player, _n) => todo!(),
+            Score::DrawInN(_n) => todo!(),
+        }
+    }
+
     pub fn increment_turns(self) -> Self {
         let mut new_score = self;
         match new_score {
@@ -385,21 +403,17 @@ struct AlphaBetaFrame {
     best_move: Option<BestMoveReturn>,
 }
 
-impl AlphaBetaFrame {
-    pub fn for_player(player: Player) -> Self {
-        Self {
-            alpha: Score::WinInN(player.other(), 0),
-            beta: Score::WinInN(player, 0),
-            in_quiescence: InQuiescence::No,
-            best_move: None,
-        }
-    }
-}
-
 #[derive(Debug, PartialEq, Eq)]
 pub enum LoopResult {
     Continue,
     Done,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct AlphaBetaOptions {
+    pub skip_quiescence: bool,
+    pub aspiration_window: Option<(Score, Score)>,
+    pub log_state_at_history: Option<String>,
 }
 
 #[derive(Debug)]
@@ -410,8 +424,7 @@ pub struct AlphaBetaStack {
     pub done: bool,
     pub max_depth: usize,
 
-    pub skip_quiescence: bool,
-    pub log_state_at_history: Option<String>,
+    pub options: AlphaBetaOptions,
 
     pub num_beta_cutoffs: usize,
     pub num_evaluations: usize,
@@ -420,19 +433,32 @@ pub struct AlphaBetaStack {
 
 impl AlphaBetaStack {
     pub fn default(game: Game) -> ErrorResult<Self> {
-        Self::with(game, 4, false)
+        Self::with(game, 4, AlphaBetaOptions::default())
     }
-    pub fn with(game: Game, max_depth: usize, skip_quiescence: bool) -> ErrorResult<Self> {
+    pub fn with(game: Game, max_depth: usize, options: AlphaBetaOptions) -> ErrorResult<Self> {
+        let (alpha, beta) = if let Some((alpha, beta)) = options.aspiration_window {
+            (alpha, beta)
+        } else {
+            (
+                Score::WinInN(game.player().other(), 0),
+                Score::WinInN(game.player(), 0),
+            )
+        };
+
         Ok(Self {
             traversal: TraversalStack::<AlphaBetaFrame>::new(
                 game,
-                AlphaBetaFrame::for_player(game.player()),
+                AlphaBetaFrame {
+                    alpha,
+                    beta,
+                    in_quiescence: InQuiescence::No,
+                    best_move: None,
+                },
             )?,
             best_move: None,
             max_depth,
             done: false,
-            skip_quiescence,
-            log_state_at_history: None,
+            options,
             num_beta_cutoffs: 0,
             num_evaluations: 0,
             num_starting_moves_searched: 0,
@@ -562,7 +588,7 @@ impl AlphaBetaStack {
             return Ok(LoopResult::Done);
         }
 
-        if let Some(log_state_at_history) = &self.log_state_at_history {
+        if let Some(log_state_at_history) = &self.options.log_state_at_history {
             if &self.traversal.history_string()? == log_state_at_history {
                 let (current, _) = self.traversal.current()?;
                 println!("logging state for: {}", log_state_at_history);
@@ -581,7 +607,9 @@ impl AlphaBetaStack {
             if current_depth >= self.max_depth {
                 let current_danger = current.danger()?;
                 let current_recent_move = current.history_move.as_ref();
-                if self.skip_quiescence || is_quiet_position(&current_danger, current_recent_move) {
+                if self.options.skip_quiescence
+                    || is_quiet_position(&current_danger, current_recent_move)
+                {
                     return Ok(self.statically_evaluate_leaf()?.as_result()?);
                 } else {
                     current.data.in_quiescence = InQuiescence::Yes;
@@ -694,7 +722,12 @@ impl InQuiescence {
 
 #[test]
 fn test_start_search() {
-    let mut search = AlphaBetaStack::with(Game::from_fen("startpos").unwrap(), 3, false).unwrap();
+    let mut search = AlphaBetaStack::with(
+        Game::from_fen("startpos").unwrap(),
+        3,
+        AlphaBetaOptions::default(),
+    )
+    .unwrap();
     loop {
         match search.iterate(null_move_sort).unwrap() {
             LoopResult::Continue => {}
@@ -720,8 +753,9 @@ fn test_start_search() {
 #[test]
 fn test_dont_capture() {
     let fen = "6k1/8/4p3/3r4/5n2/1Q6/1K1R4/8 w";
-    let mut search = AlphaBetaStack::with(Game::from_fen(fen).unwrap(), 3, false).unwrap();
-    search.log_state_at_history = Some("b3g3 g8f7 d2xd5".to_string());
+    let mut options = AlphaBetaOptions::default();
+    options.log_state_at_history = Some("b3g3 g8f7 d2xd5".to_string());
+    let mut search = AlphaBetaStack::with(Game::from_fen(fen).unwrap(), 3, options).unwrap();
 
     loop {
         match search.iterate(null_move_sort).unwrap() {

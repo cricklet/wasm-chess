@@ -9,22 +9,24 @@ the best line at each frame.
 use std::iter;
 
 use crate::{
-    alphabeta::{AlphaBetaStack, LoopResult},
+    alphabeta::{AlphaBetaOptions, AlphaBetaStack, LoopResult},
     bitboard::{warm_magic_cache, BoardIndex},
     game::Game,
     helpers::{ErrorResult, Joinable, OptionResult},
     moves::Move,
-    traversal::null_move_sort, zobrist::BestMovesCache,
+    traversal::null_move_sort,
+    zobrist::BestMovesCache,
 };
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone)]
 pub struct IterativeSearchOptions {
     skip_quiescence: bool,
     skip_cache_sort: bool,
+    skip_aspiration_window: bool,
 }
 
 pub struct IterativeSearch {
-    search: AlphaBetaStack,
+    alpha_beta: AlphaBetaStack,
     start_game: Game,
 
     best_variations_per_depth: Vec<Vec<Move>>,
@@ -38,9 +40,14 @@ pub struct IterativeSearch {
 impl IterativeSearch {
     pub fn new(game: Game, options: IterativeSearchOptions) -> ErrorResult<Self> {
         let best_moves_cache = BestMovesCache::new();
-        let search = AlphaBetaStack::with(game, 1, options.skip_quiescence)?;
+        let search_options = AlphaBetaOptions {
+            skip_quiescence: options.skip_quiescence,
+            aspiration_window: None,
+            log_state_at_history: None,
+        };
+        let search = AlphaBetaStack::with(game, 1, search_options)?;
         Ok(Self {
-            search,
+            alpha_beta: search,
             start_game: game,
             best_variations_per_depth: vec![],
             best_moves_cache,
@@ -78,25 +85,42 @@ impl IterativeSearch {
             }
         };
 
-        match self.search.iterate(sorter)? {
+        match self.alpha_beta.iterate(sorter)? {
             LoopResult::Done => {
-                let result = self.search.bestmove();
+                let result = self.alpha_beta.bestmove();
                 match result {
                     None => {
-                        self.no_moves_found = true;
-                        return Ok(());
+                        if self.alpha_beta.options.aspiration_window.is_some() {
+                            log(&format!(
+                                "no moves found at depth {} with aspiration window {:?}: trying again without aspiration window",
+                                self.alpha_beta.max_depth,
+                                self.alpha_beta.options.aspiration_window,
+                            ));
+                            let mut alpha_beta_options = self.alpha_beta.options.clone();
+                            alpha_beta_options.aspiration_window = None;
+
+                            self.alpha_beta = AlphaBetaStack::with(
+                                self.start_game.clone(),
+                                self.alpha_beta.max_depth,
+                                alpha_beta_options,
+                            )?;
+                            return Ok(());
+                        } else {
+                            self.no_moves_found = true;
+                            return Ok(());
+                        }
                     }
                     Some((bestmove, response, score)) => {
-                        let depth = self.search.max_depth;
+                        let depth = self.alpha_beta.max_depth;
                         log(&format!(
                             "at depth {}: bestmove {} ponder {} ({}), beta-cutoffs {}, evaluations {}, start moves searched {}",
                             depth,
                             bestmove.to_uci(),
                             response.iter().map(|m| m.to_uci()).collect::<Vec<_>>().join_vec(" "),
                             score,
-                            self.search.num_beta_cutoffs,
-                            self.search.num_evaluations,
-                            self.search.num_starting_moves_searched,
+                            self.alpha_beta.num_beta_cutoffs,
+                            self.alpha_beta.num_evaluations,
+                            self.alpha_beta.num_starting_moves_searched,
                         ));
 
                         let best_variation = iter::once(bestmove).chain(response).collect();
@@ -104,10 +128,18 @@ impl IterativeSearch {
                             .update(&self.start_game, &best_variation)?;
                         self.best_variations_per_depth.push(best_variation);
 
-                        self.search = AlphaBetaStack::with(
+                        let mut alpha_beta_options = self.alpha_beta.options.clone();
+                        alpha_beta_options.aspiration_window =
+                            if self.options.skip_aspiration_window {
+                                None
+                            } else {
+                                Some(score.aspiration_window(self.start_game.player()))
+                            };
+
+                        self.alpha_beta = AlphaBetaStack::with(
                             self.start_game.clone(),
                             depth + 1,
-                            self.options.skip_quiescence,
+                            alpha_beta_options,
                         )?;
                     }
                 }
@@ -140,41 +172,40 @@ fn test_iterative_deepening_for_depth() {
 
     let skip_quiescence = false;
 
-    // for &skip_quiescence in [false, true].iter() {
-    for &skip_cache_sort in [false, true].iter() {
-        let options = IterativeSearchOptions {
-            skip_cache_sort,
-            skip_quiescence,
-        };
-        let mut search = IterativeSearch::new(Game::from_fen(fen).unwrap(), options).unwrap();
+    for &skip_aspiration_window in [false, true].iter() {
+        for &skip_cache_sort in [false, true].iter() {
+            let options = IterativeSearchOptions {
+                skip_cache_sort,
+                skip_quiescence,
+                skip_aspiration_window,
+            };
+            let mut search =
+                IterativeSearch::new(Game::from_fen(fen).unwrap(), options.clone()).unwrap();
 
-        let start_time = std::time::Instant::now();
+            let start_time = std::time::Instant::now();
 
-        let mut log: Vec<String> = vec![];
-        let mut last_log_time = std::time::Instant::now();
-        let mut log_callback = |line: &str| {
-            log.push(format!(
-                "{} ms {}",
-                last_log_time.elapsed().as_millis(),
-                line.to_string()
-            ));
-            last_log_time = std::time::Instant::now();
-        };
+            let mut log: Vec<String> = vec![];
+            let mut last_log_time = std::time::Instant::now();
+            let mut log_callback = |line: &str| {
+                log.push(format!(
+                    "{} ms {}",
+                    last_log_time.elapsed().as_millis(),
+                    line.to_string()
+                ));
+                last_log_time = std::time::Instant::now();
+            };
 
-        loop {
-            search.iterate(&mut log_callback).unwrap();
-            if search.search.max_depth >= 7 {
-                break;
+            loop {
+                search.iterate(&mut log_callback).unwrap();
+                if search.alpha_beta.max_depth >= 7 {
+                    break;
+                }
             }
+
+            log.push(format!("{} ms total", start_time.elapsed().as_millis(),));
+
+            println!("{:?}", options);
+            println!("{:#?}\n", log);
         }
-
-        log.push(format!("{} ms total", start_time.elapsed().as_millis(),));
-
-        println!(
-            "skip_cache_sort {}, skip_quiescence {}",
-            skip_cache_sort, skip_quiescence
-        );
-        println!("{:#?}\n", log);
     }
-    // }
 }
