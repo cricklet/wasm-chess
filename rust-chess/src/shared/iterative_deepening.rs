@@ -14,65 +14,8 @@ use crate::{
     game::Game,
     helpers::{ErrorResult, Joinable, OptionResult},
     moves::Move,
-    traversal::null_move_sort,
+    traversal::null_move_sort, zobrist::BestMovesCache,
 };
-
-pub struct BestMovesCache {
-    best_moves: Vec<Option<(BoardIndex, BoardIndex)>>,
-    bits: usize,
-    mask: u64,
-}
-
-impl BestMovesCache {
-    pub fn new() -> Self {
-        Self {
-            best_moves: vec![None; (2 as usize).pow(20)],
-            bits: 20, // 1 mb
-            mask: (2 as u64).pow(20) - 1,
-        }
-    }
-
-    pub fn add(&mut self, game: &Game, m: Move) {
-        let hash = game.zobrist().value();
-        let masked = hash & self.mask;
-
-        self.best_moves[masked as usize] = Some((m.start_index, m.end_index));
-    }
-
-    pub fn update(&mut self, game: &Game, moves: &Vec<Move>) -> ErrorResult<()> {
-        let mut game = game.clone();
-
-        for m in moves {
-            self.add(&game, *m);
-            game.make_move(*m)?;
-        }
-
-        Ok(())
-    }
-
-    pub fn get(&self, game: &Game) -> Option<(BoardIndex, BoardIndex)> {
-        let hash = game.zobrist().value();
-        let masked = hash & self.mask;
-
-        self.best_moves[masked as usize]
-    }
-
-    pub fn sort(&self, game: &Game, moves: &mut Vec<Move>) -> ErrorResult<()> {
-        let hash = game.zobrist().value();
-        let masked = hash & self.mask;
-
-        if let Some((start, end)) = self.best_moves[masked as usize] {
-            let i = moves
-                .iter()
-                .position(|m| m.start_index == start && m.end_index == end);
-            if let Some(i) = i {
-                moves.swap(0, i);
-            }
-        }
-
-        Ok(())
-    }
-}
 
 #[derive(Default)]
 pub struct IterativeSearchOptions {
