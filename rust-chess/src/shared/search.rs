@@ -575,7 +575,7 @@ impl SearchStack {
             if current_depth >= self.max_depth {
                 let current_danger = current.danger()?;
                 let current_recent_move = current.history_move.as_ref();
-                if is_quiet_position(&current_danger, current_recent_move) {
+                if self.skip_quiescence || is_quiet_position(&current_danger, current_recent_move) {
                     return Ok(self.statically_evaluate_leaf()?.as_result()?);
                 } else {
                     current.data.in_quiescence = InQuiescence::Yes;

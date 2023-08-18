@@ -441,10 +441,6 @@ pub fn find_magic_value(piece_index: BoardIndex, piece: WalkType) -> Option<Magi
         let magic_move_table = generate_magic_moves(piece_index, piece, &magic_value);
 
         if magic_move_table.is_some() {
-            println!(
-                "magic for {:?}, {:?}, {:?}",
-                piece_index, piece, magic_value
-            );
             return Some(magic_value);
         }
     }

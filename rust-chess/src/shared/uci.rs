@@ -3,7 +3,7 @@ use std::{iter, sync::Mutex};
 
 use crate::{
     bitboard::warm_magic_cache,
-    search::{LoopResult, SearchStack}, iterative_deepening::IterativeSearch,
+    search::{LoopResult, SearchStack}, iterative_deepening::{IterativeSearch, IterativeSearchOptions},
 };
 
 use super::{
@@ -62,7 +62,7 @@ impl Uci {
             let debug_str = format!("{}\nFen: {}", self.game, self.game.to_fen());
             Ok(debug_str)
         } else if line == "go" {
-            let search = IterativeSearch::new(self.game)?;
+            let search = IterativeSearch::new(self.game, IterativeSearchOptions::default())?;
             self.search = Some(search);
             Ok("".to_string())
         } else if line == "stop" {
