@@ -9,6 +9,7 @@ pub mod fen;
 pub mod game;
 pub mod helpers;
 pub mod iterative_deepening;
+pub mod move_ordering;
 pub mod moves;
 pub mod perft;
 pub mod traversal;

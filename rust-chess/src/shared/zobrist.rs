@@ -164,7 +164,7 @@ impl BestMovesCache {
         self.best_moves[masked as usize]
     }
 
-    pub fn sort(&self, game: &Game, moves: &mut Vec<Move>) -> ErrorResult<()> {
+    pub fn sort<'a>(&self, game: &Game, moves: &'a mut Vec<Move>) -> ErrorResult<&'a mut [Move]> {
         let hash = game.zobrist().value();
         let masked = hash & self.mask;
 
@@ -174,9 +174,10 @@ impl BestMovesCache {
                 .position(|m| m.start_index == start && m.end_index == end);
             if let Some(i) = i {
                 moves.swap(0, i);
+                return Ok(&mut moves[1..]);
             }
         }
 
-        Ok(())
+        Ok(&mut moves[..])
     }
 }

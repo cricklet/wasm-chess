@@ -15,7 +15,7 @@ use crate::{
     helpers::{ErrorResult, Joinable, OptionResult},
     moves::Move,
     traversal::null_move_sort,
-    zobrist::BestMovesCache,
+    zobrist::BestMovesCache, move_ordering::sort_moves,
 };
 
 #[derive(Default, Debug, Clone)]
@@ -79,10 +79,13 @@ impl IterativeSearch {
 
         let sorter = move |game: &Game, moves: &mut Vec<Move>| -> ErrorResult<()> {
             if skip_cache_sort {
-                null_move_sort(game, moves)
+                sort_moves(game, moves)?;
             } else {
-                best_moves_cache.sort(game, moves)
+                let unsorted = best_moves_cache.sort(game, moves)?;
+                sort_moves(game, unsorted)?;
             }
+
+            Ok(())
         };
 
         match self.alpha_beta.iterate(sorter)? {
