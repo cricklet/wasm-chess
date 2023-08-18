@@ -712,7 +712,7 @@ fn test_start_search() {
 }
 
 #[test]
-fn test_dont_capture_asdf() {
+fn test_dont_capture() {
     let fen = "6k1/8/4p3/3r4/5n2/1Q6/1K1R4/8 w";
     let mut search = SearchStack::with(Game::from_fen(fen).unwrap(), 3, false).unwrap();
     search.log_state_at_history = Some("b3g3 g8f7 d2xd5".to_string());

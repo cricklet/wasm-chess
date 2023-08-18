@@ -173,7 +173,10 @@ fn test_start_iterative_deepening() {
     // let fen = "startpos";
 
     // mid-game fen
-    let fen = "2rr2k1/1b1n1ppp/1p1pn3/pP2p3/4P2P/B1P3P1/P1BN1P1K/2R1R3 w - - 1 26";
+    let fen = "r3k2r/1bq1bppp/pp2p3/2p1n3/P3PP2/2PBN3/1P1BQ1PP/R4RK1 b kq - 0 16";
+
+    // late-game fen
+    // let fen = "6k1/8/4p3/3r4/5n2/1Q6/1K1R4/8 w";
 
     for &skip_quiescence in [false, true].iter() {
         for &skip_cache_sort in [false, true].iter() {
