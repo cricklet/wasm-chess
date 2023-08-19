@@ -563,3 +563,13 @@ impl<T: Default> AutoVec<T> {
         }
     }
 }
+
+pub fn pad_left(input: &str, pad: &str, length: usize) -> String {
+    let mut output = String::new();
+    let mut input = input.to_string();
+    while input.len() < length {
+        input = pad.to_string() + &input;
+    }
+    output += &input;
+    output
+}

@@ -167,12 +167,22 @@ impl<D: Debug + Default> TraversalStack<D> {
         }
     }
 
-    pub fn history_string(&self) -> ErrorResult<String> {
+    pub fn history_display_string(&self) -> ErrorResult<String> {
         let mut result = "".to_string();
         for i in 1..=self.depth {
             let frame = self.stack.get(i).as_result()?;
             let history_move = frame.history_move.as_ref().as_result()?;
             result += &format!("{} ", history_move);
+        }
+        Ok(result.trim().to_string())
+    }
+
+    pub fn history_uci_string(&self) -> ErrorResult<String> {
+        let mut result = "".to_string();
+        for i in 1..=self.depth {
+            let frame = self.stack.get(i).as_result()?;
+            let history_move = frame.history_move.as_ref().as_result()?;
+            result += &format!("{} ", history_move.to_uci());
         }
         Ok(result.trim().to_string())
     }

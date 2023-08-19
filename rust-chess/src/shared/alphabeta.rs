@@ -4,7 +4,7 @@ use itertools::Itertools;
 
 use crate::{
     defer,
-    helpers::{err_result, Joinable, OptionResult},
+    helpers::{err_result, Joinable, OptionResult, pad_left},
     traversal::{null_move_sort, TraversalStack},
 };
 
@@ -53,11 +53,7 @@ impl Score {
     pub fn aspiration_window(self, for_player: Player) -> (Self, Self) {
         match self {
             Score::Centipawns(player, score) => {
-                let offset = if player == for_player {
-                    50
-                } else {
-                    -50
-                };
+                let offset = if player == for_player { 50 } else { -50 };
                 (
                     Score::Centipawns(player, score - offset),
                     Score::Centipawns(player, score + offset),
@@ -362,9 +358,34 @@ impl std::fmt::Debug for BestMoveReturn {
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 enum SearchResult {
+    // Returned if we pass both beta/alpha cut-offs
     BestMove(BestMoveReturn),
+
+    // Leaf nodes
     StaticEvaluation(StaticEvaluationReturn),
+
+    // Returned if we fail beta cut-off
     BetaCutoff(Score),
+
+    // Returned if we fail to improve alpha
+    AlphaMiss(Score),
+}
+
+impl Display for SearchResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SearchResult::BestMove(result) => write!(
+                f,
+                "({}) best {} {}",
+                result.score,
+                result.best_move,
+                result.response_moves.join_vec(" ")
+            ),
+            SearchResult::StaticEvaluation(result) => write!(f, "({}) static", result.score),
+            SearchResult::BetaCutoff(e) => write!(f, "({}) beta cutoff", e),
+            SearchResult::AlphaMiss(e) => write!(f, "({}) alpha miss", e),
+        }
+    }
 }
 
 impl SearchResult {
@@ -373,6 +394,7 @@ impl SearchResult {
             SearchResult::BestMove(result) => result.score,
             SearchResult::StaticEvaluation(result) => result.score,
             SearchResult::BetaCutoff(e) => *e,
+            SearchResult::AlphaMiss(e) => *e,
         }
     }
 
@@ -387,6 +409,7 @@ impl SearchResult {
             }
             SearchResult::StaticEvaluation(_) => {}
             SearchResult::BetaCutoff(_) => {}
+            SearchResult::AlphaMiss(_) => {}
         }
         variation
     }
@@ -400,7 +423,8 @@ struct AlphaBetaFrame {
     beta: Score,
     in_quiescence: InQuiescence,
 
-    best_move: Option<BestMoveReturn>,
+    alpha_move: Option<BestMoveReturn>,
+    found_legal_moves: bool,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -422,7 +446,7 @@ pub struct AlphaBetaStack {
     best_move: Option<BestMoveReturn>,
 
     pub done: bool,
-    pub max_depth: usize,
+    pub evaluate_at_depth: usize,
 
     pub options: AlphaBetaOptions,
 
@@ -435,7 +459,11 @@ impl AlphaBetaStack {
     pub fn default(game: Game) -> ErrorResult<Self> {
         Self::with(game, 4, AlphaBetaOptions::default())
     }
-    pub fn with(game: Game, max_depth: usize, options: AlphaBetaOptions) -> ErrorResult<Self> {
+    pub fn with(
+        game: Game,
+        evaluate_at_depth: usize,
+        options: AlphaBetaOptions,
+    ) -> ErrorResult<Self> {
         let (alpha, beta) = if let Some((alpha, beta)) = options.aspiration_window {
             (alpha, beta)
         } else {
@@ -452,11 +480,12 @@ impl AlphaBetaStack {
                     alpha,
                     beta,
                     in_quiescence: InQuiescence::No,
-                    best_move: None,
+                    alpha_move: None,
+                    found_legal_moves: false,
                 },
             )?,
             best_move: None,
-            max_depth,
+            evaluate_at_depth,
             done: false,
             options,
             num_beta_cutoffs: 0,
@@ -479,7 +508,7 @@ impl AlphaBetaStack {
     fn statically_evaluate_leaf(&mut self) -> ErrorResult<Option<LoopResult>> {
         let (current, current_depth) = self.traversal.current()?;
 
-        if current_depth < self.max_depth {
+        if current_depth < self.evaluate_at_depth {
             return Ok(None);
         }
 
@@ -492,7 +521,12 @@ impl AlphaBetaStack {
     }
 
     fn return_early(&mut self, child_result: SearchResult) -> ErrorResult<Option<LoopResult>> {
+        {
+            self.log_if_history_matches(|| format!("{}", child_result))?;
+        }
+
         if self.traversal.depth() == 0 {
+            // The root node is trying to return -- we're done
             self.best_move = match child_result {
                 SearchResult::BestMove(result) => Some(result),
                 _ => None,
@@ -516,24 +550,13 @@ impl AlphaBetaStack {
             return self.return_early(SearchResult::BetaCutoff(child_score));
         }
 
-        if parent.data.best_move.is_none()
-            || Score::compare(
-                parent.game.player(),
-                child_score,
-                parent.data.best_move.as_ref().unwrap().score,
-            )
-            .is_better()
-        {
-            parent.data.best_move = Some(BestMoveReturn {
+        if Score::compare(parent.game.player(), child_score, parent.data.alpha).is_better() {
+            parent.data.alpha_move = Some(BestMoveReturn {
                 best_move: *parent_to_child_move,
                 score: child_score,
                 response_moves: child_result.variation(),
             });
-
-            if Score::compare(parent.game.player(), child_score, parent.data.alpha).is_better() {
-                // Enemy won't prevent us from making this move. Keep searching
-                parent.data.alpha = child_score;
-            }
+            parent.data.alpha = child_score;
         }
 
         Ok(Some(LoopResult::Continue))
@@ -558,11 +581,14 @@ impl AlphaBetaStack {
                 return Ok(Some(LoopResult::Continue));
             }
 
+            current.data.found_legal_moves = true;
+
             // Finish setting up the new data
             next.data.alpha = current.data.beta;
             next.data.beta = current.data.alpha;
             next.data.in_quiescence = current.data.in_quiescence;
-            next.data.best_move = None;
+            next.data.alpha_move = None;
+            next.data.found_legal_moves = false;
 
             if self.traversal.depth() == 0 {
                 self.num_starting_moves_searched += 1;
@@ -576,11 +602,39 @@ impl AlphaBetaStack {
         }
     }
 
+    fn should_log_history(&self) -> ErrorResult<Option<String>> {
+        if let Some(log_state_at_history) = &self.options.log_state_at_history {
+            let history = self.traversal.history_display_string()?;
+            if history.starts_with(log_state_at_history) {
+                return Ok(Some(history));
+            }
+            let history = self.traversal.history_uci_string()?;
+            if history.starts_with(log_state_at_history) {
+                return Ok(Some(history));
+            }
+        }
+        Ok(None)
+    }
+
+    fn log_if_history_matches<S: FnOnce() -> String>(&self, suffix: S) -> ErrorResult<()> {
+        if let Some(history) = &self.should_log_history()? {
+            let (current, _) = self.traversal.current()?;
+            println!(
+                "<{}, {}>   {}   {}",
+                pad_left(&current.data.alpha.to_string(), " ", 5),
+                pad_left(&current.data.beta.to_string(), " ", 5),
+                history,
+                suffix(),
+            );
+        }
+        Ok(())
+    }
+
     pub fn iterate<S>(&mut self, sorter: S) -> ErrorResult<LoopResult>
     where
         S: Fn(&Game, &mut Vec<Move>) -> ErrorResult<()>,
     {
-        if self.max_depth == 0 {
+        if self.evaluate_at_depth == 0 {
             return err_result("max_depth must be > 0");
         }
 
@@ -588,13 +642,8 @@ impl AlphaBetaStack {
             return Ok(LoopResult::Done);
         }
 
-        if let Some(log_state_at_history) = &self.options.log_state_at_history {
-            if &self.traversal.history_string()? == log_state_at_history {
-                let (current, _) = self.traversal.current()?;
-                println!("logging state for: {}", log_state_at_history);
-                println!("{:#?}", current.game);
-                println!("{:#?}", self.traversal);
-            }
+        {
+            self.log_if_history_matches(|| "".to_string())?;
         }
 
         let in_quiescence = {
@@ -604,7 +653,7 @@ impl AlphaBetaStack {
 
         if !in_quiescence {
             let (current, current_depth) = self.traversal.current_mut()?;
-            if current_depth >= self.max_depth {
+            if current_depth >= self.evaluate_at_depth {
                 let current_danger = current.danger()?;
                 let current_recent_move = current.history_move.as_ref();
                 if self.options.skip_quiescence
@@ -647,25 +696,28 @@ impl AlphaBetaStack {
         }
 
         // If we're out of moves to traverse, evaluate and return.
-        let (current, _) = self.traversal.current_mut()?;
+        let (current, _) = self.traversal.current()?;
         let result = {
-            if let Some(best_move) = current.data.best_move.clone() {
-                self.return_early(SearchResult::BestMove(best_move))
-            } else {
-                if !in_quiescence {
-                    let current_enemy = current.game.player().other();
-                    if current.danger()?.check {
-                        self.return_early(SearchResult::StaticEvaluation(StaticEvaluationReturn {
-                            score: Score::WinInN(current_enemy, 0),
-                        }))
-                    } else {
-                        self.return_early(SearchResult::StaticEvaluation(StaticEvaluationReturn {
-                            score: Score::DrawInN(0),
-                        }))
-                    }
+            if current.data.found_legal_moves {
+                if let Some(alpha_move) = current.data.alpha_move.clone() {
+                    self.return_early(SearchResult::BestMove(alpha_move))
                 } else {
-                    self.statically_evaluate_leaf()
+                    self.return_early(SearchResult::AlphaMiss(current.data.alpha))
                 }
+            } else if !in_quiescence {
+                let current_enemy = current.game.player().other();
+                let (current, _) = self.traversal.current_mut()?;
+                if current.danger()?.check {
+                    self.return_early(SearchResult::StaticEvaluation(StaticEvaluationReturn {
+                        score: Score::WinInN(current_enemy, 0),
+                    }))
+                } else {
+                    self.return_early(SearchResult::StaticEvaluation(StaticEvaluationReturn {
+                        score: Score::DrawInN(0),
+                    }))
+                }
+            } else {
+                self.statically_evaluate_leaf()
             }
         }?;
 
@@ -754,7 +806,7 @@ fn test_start_search() {
 fn test_dont_capture() {
     let fen = "6k1/8/4p3/3r4/5n2/1Q6/1K1R4/8 w";
     let mut options = AlphaBetaOptions::default();
-    options.log_state_at_history = Some("b3g3 g8f7 d2xd5".to_string());
+    options.log_state_at_history = Some("b3g3 g8f7 d2d5".to_string());
     let mut search = AlphaBetaStack::with(Game::from_fen(fen).unwrap(), 3, options).unwrap();
 
     loop {
@@ -767,4 +819,36 @@ fn test_dont_capture() {
     // Calling `iterate()` should be idempotent
     search.iterate(null_move_sort).unwrap();
     println!("{:#?}", search.best_move);
+}
+
+#[test]
+fn test_alpha_beta_weird() {
+    let fen = "r3k2r/1bq1bppp/pp2p3/2p1n3/P3PP2/2PBN3/1P1BQ1PP/R4RK1 b kq - 0 16";
+
+    let options = AlphaBetaOptions {
+        log_state_at_history: Some("nxB-e5d3 Qxn-e2d3".to_string()),
+        ..Default::default()
+    };
+    {
+        let mut search =
+            AlphaBetaStack::with(Game::from_fen(fen).unwrap(), 2, options.clone()).unwrap();
+        loop {
+            match search.iterate(null_move_sort).unwrap() {
+                LoopResult::Continue => {}
+                LoopResult::Done => break,
+            }
+        }
+        println!("{:#?}", search.best_move);
+    }
+    {
+        let mut search =
+            AlphaBetaStack::with(Game::from_fen(fen).unwrap(), 3, options.clone()).unwrap();
+        loop {
+            match search.iterate(null_move_sort).unwrap() {
+                LoopResult::Continue => {}
+                LoopResult::Done => break,
+            }
+        }
+        println!("{:#?}", search.best_move);
+    }
 }

@@ -99,7 +99,7 @@ impl IterativeSearch {
                         if self.alpha_beta.options.aspiration_window.is_some() {
                             log(&format!(
                                 "no moves found at depth {} with aspiration window {:?}: trying again without aspiration window",
-                                self.alpha_beta.max_depth,
+                                self.alpha_beta.evaluate_at_depth,
                                 self.alpha_beta.options.aspiration_window,
                             ));
                             let mut alpha_beta_options = self.alpha_beta.options.clone();
@@ -107,7 +107,7 @@ impl IterativeSearch {
 
                             self.alpha_beta = AlphaBetaStack::with(
                                 self.start_game.clone(),
-                                self.alpha_beta.max_depth,
+                                self.alpha_beta.evaluate_at_depth,
                                 alpha_beta_options,
                             )?;
                             return Ok(());
@@ -117,7 +117,7 @@ impl IterativeSearch {
                         }
                     }
                     Some((bestmove, response, score)) => {
-                        let depth = self.alpha_beta.max_depth;
+                        let depth = self.alpha_beta.evaluate_at_depth;
                         log(&format!(
                             "at depth {}: bestmove {} ponder {} ({}), beta-cutoffs {}, evaluations {}, start moves searched {}",
                             depth,
@@ -210,7 +210,7 @@ fn test_iterative_deepening_for_depth() {
 
                 loop {
                     search.iterate(&mut log_callback).unwrap();
-                    if search.alpha_beta.max_depth >= max_depth {
+                    if search.alpha_beta.evaluate_at_depth >= max_depth {
                         break;
                     }
                 }

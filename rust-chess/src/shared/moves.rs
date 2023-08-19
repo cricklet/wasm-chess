@@ -556,7 +556,9 @@ pub fn all_moves<'game>(
         state.bitboards(),
         options.only_captures,
     )?;
-    castling_moves(buffer, player, state)?;
+    if options.only_captures == OnlyCaptures::No {
+        castling_moves(buffer, player, state)?;
+    }
 
     en_passant_move(buffer, player, state.bitboards(), state.en_passant())?;
 
