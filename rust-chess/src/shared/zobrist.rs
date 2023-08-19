@@ -125,7 +125,7 @@ impl ZobristHash {
 }
 
 pub struct BestMovesCache {
-    best_moves: Vec<Option<(BoardIndex, BoardIndex)>>,
+    best_moves: Vec<Option<(u64, BoardIndex, BoardIndex)>>,
     bits: usize,
     mask: u64,
 }
@@ -133,9 +133,9 @@ pub struct BestMovesCache {
 impl BestMovesCache {
     pub fn new() -> Self {
         Self {
-            best_moves: vec![None; (2 as usize).pow(20)],
-            bits: 20, // 1 mb
-            mask: (2 as u64).pow(20) - 1,
+            best_moves: vec![None; (2 as usize).pow(22)],
+            bits: 22, // 1 mb
+            mask: (2 as u64).pow(22) - 1,
         }
     }
 
@@ -143,7 +143,7 @@ impl BestMovesCache {
         let hash = game.zobrist().value();
         let masked = hash & self.mask;
 
-        self.best_moves[masked as usize] = Some((m.start_index, m.end_index));
+        self.best_moves[masked as usize] = Some((hash, m.start_index, m.end_index));
     }
 
     pub fn update(&mut self, game: &Game, moves: &Vec<Move>) -> ErrorResult<()> {
@@ -157,7 +157,7 @@ impl BestMovesCache {
         Ok(())
     }
 
-    pub fn get(&self, game: &Game) -> Option<(BoardIndex, BoardIndex)> {
+    pub fn get(&self, game: &Game) -> Option<(u64, BoardIndex, BoardIndex)> {
         let hash = game.zobrist().value();
         let masked = hash & self.mask;
 
@@ -168,7 +168,10 @@ impl BestMovesCache {
         let hash = game.zobrist().value();
         let masked = hash & self.mask;
 
-        if let Some((start, end)) = self.best_moves[masked as usize] {
+        if let Some((long_hash, start, end)) = self.best_moves[masked as usize] {
+            if long_hash != hash {
+                return Ok(&mut moves[..]);
+            }
             let i = moves
                 .iter()
                 .position(|m| m.start_index == start && m.end_index == end);

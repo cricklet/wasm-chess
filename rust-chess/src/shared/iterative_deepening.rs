@@ -6,7 +6,7 @@ the best line at each frame.
 * Then, we need some way to sort the moves to prioritize PV moves
 */
 
-use std::iter;
+use std::{fmt::Display, iter};
 
 use crate::{
     alphabeta::{AlphaBetaOptions, AlphaBetaStack, LoopResult},
@@ -25,6 +25,25 @@ pub struct IterativeSearchOptions {
     skip_cache_sort: bool,
     skip_capture_sort: bool,
     skip_aspiration_window: bool,
+}
+
+impl Display for IterativeSearchOptions {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut options: Vec<String> = vec![];
+        if self.skip_quiescence {
+            options.push("skip_quiescence".to_string());
+        }
+        if self.skip_cache_sort {
+            options.push("skip_cache_sort".to_string());
+        }
+        if self.skip_capture_sort {
+            options.push("skip_capture_sort".to_string());
+        }
+        if self.skip_aspiration_window {
+            options.push("skip_aspiration_window".to_string());
+        }
+        write!(f, "{{ {} }}", options.join_vec(", "))
+    }
 }
 
 pub struct IterativeSearch {
@@ -121,8 +140,8 @@ impl IterativeSearch {
                         log(&format!(
                             "at depth {}: bestmove {} ponder {} ({}), beta-cutoffs {}, evaluations {}, start moves searched {}",
                             depth,
-                            bestmove.to_uci(),
-                            response.iter().map(|m| m.to_uci()).collect::<Vec<_>>().join_vec(" "),
+                            bestmove,
+                            response.iter().map(|m| format!("{}", m)).collect::<Vec<_>>().join_vec(" "),
                             score,
                             self.alpha_beta.num_beta_cutoffs,
                             self.alpha_beta.num_evaluations,
@@ -134,17 +153,19 @@ impl IterativeSearch {
                             .update(&self.start_game, &best_variation)?;
                         self.best_variations_per_depth.push(best_variation);
 
+                        let new_depth = depth + 2;
+
                         let mut alpha_beta_options = self.alpha_beta.options.clone();
                         alpha_beta_options.aspiration_window =
                             if self.options.skip_aspiration_window {
                                 None
                             } else {
-                                Some(score.aspiration_window(self.start_game.player()))
+                                Some(score.aspiration_window(self.start_game.player(), new_depth))
                             };
 
                         self.alpha_beta = AlphaBetaStack::with(
                             self.start_game.clone(),
-                            depth + 1,
+                            new_depth,
                             alpha_beta_options,
                         )?;
                     }
@@ -162,13 +183,13 @@ fn test_iterative_deepening_for_depth() {
     // let fen = "startpos";
     // let max_depth = 7;
 
-    // // mid-game fen
-    // let fen = "r3k2r/1bq1bppp/pp2p3/2p1n3/P3PP2/2PBN3/1P1BQ1PP/R4RK1 b kq - 0 16";
-    // let max_depth = 6;
+    // mid-game fen
+    let fen = "r3k2r/1bq1bppp/pp2p3/2p1n3/P3PP2/2PBN3/1P1BQ1PP/R4RK1 b kq - 0 16";
+    let max_depth = 6;
 
-    // late-game fen
-    let fen = "6k1/8/4p3/3r4/5n2/1Q6/1K1R4/8 w";
-    let max_depth = 8;
+    // // late-game fen
+    // let fen = "6k1/8/4p3/3r4/5n2/1Q6/1K1R4/8 w";
+    // let max_depth = 8;
 
     // make sure any lazy-statics are generated
     IterativeSearch::new(
@@ -179,52 +200,105 @@ fn test_iterative_deepening_for_depth() {
     .iterate(&mut |_| {})
     .unwrap();
 
-    let skip_quiescence = false;
-
     let mut results: Vec<String> = vec![];
 
-    for &skip_capture_sort in [false, true].iter() {
-        for &skip_aspiration_window in [false, true].iter() {
-            for &skip_cache_sort in [false, true].iter() {
-                let options = IterativeSearchOptions {
-                    skip_cache_sort,
-                    skip_quiescence,
-                    skip_aspiration_window,
-                    skip_capture_sort,
-                };
-                let mut search =
-                    IterativeSearch::new(Game::from_fen(fen).unwrap(), options.clone()).unwrap();
+    let options_to_try = vec![
+        { IterativeSearchOptions::default() },
+        {
+            IterativeSearchOptions {
+                skip_capture_sort: true,
+                ..IterativeSearchOptions::default()
+            }
+        },
+        {
+            IterativeSearchOptions {
+                skip_cache_sort: true,
+                ..IterativeSearchOptions::default()
+            }
+        },
+        {
+            IterativeSearchOptions {
+                skip_aspiration_window: true,
+                ..IterativeSearchOptions::default()
+            }
+        },
+        {
+            IterativeSearchOptions {
+                skip_aspiration_window: true,
+                skip_cache_sort: true,
+                skip_capture_sort: true,
+                ..IterativeSearchOptions::default()
+            }
+        },
+    ];
 
-                let start_time = std::time::Instant::now();
+    for options in options_to_try.iter() {
+        let mut search =
+            IterativeSearch::new(Game::from_fen(fen).unwrap(), options.clone()).unwrap();
 
-                let mut log: Vec<String> = vec![];
-                let mut last_log_time = std::time::Instant::now();
-                let mut log_callback = |line: &str| {
-                    log.push(format!(
-                        "{} ms {}",
-                        last_log_time.elapsed().as_millis(),
-                        line.to_string()
-                    ));
-                    last_log_time = std::time::Instant::now();
-                };
+        let start_time = std::time::Instant::now();
 
-                loop {
-                    search.iterate(&mut log_callback).unwrap();
-                    if search.alpha_beta.max_depth >= max_depth {
-                        break;
-                    }
-                }
+        println!("{}", options);
 
-                let total_time = start_time.elapsed();
-                log.push(format!("{} ms total", total_time.as_millis(),));
+        let mut log: Vec<String> = vec![];
+        let mut last_log_time = std::time::Instant::now();
+        let mut log_callback = |line: &str| {
+            println!(
+                "{} ms {}",
+                last_log_time.elapsed().as_millis(),
+                line.to_string()
+            );
+            last_log_time = std::time::Instant::now();
+        };
 
-                println!("{:?}", options);
-                println!("{:#?}\n", log);
-
-                results.push(format!("{:?} => {} ms", options, total_time.as_millis()));
+        loop {
+            search.iterate(&mut log_callback).unwrap();
+            if search.alpha_beta.max_depth >= max_depth {
+                break;
             }
         }
+
+        let total_time = start_time.elapsed();
+        log.push(format!("{} ms total\n", total_time.as_millis(),));
+
+        results.push(format!("{} => {} ms", options, total_time.as_millis()));
     }
 
     println!("{:#?}", results);
+}
+
+#[test]
+fn test_aspiration_window_deepening_should_give_pv() {
+    let fen = "r3k2r/1bq1bppp/pp2p3/2p1n3/P3PP2/2PBN3/1P1BQ1PP/R4RK1 b kq - 0 16";
+
+    let options = IterativeSearchOptions {
+        skip_aspiration_window: false,
+        ..IterativeSearchOptions::default()
+    };
+
+    let mut search = IterativeSearch::new(Game::from_fen(fen).unwrap(), options.clone()).unwrap();
+
+    let start_time = std::time::Instant::now();
+    println!("{}", options);
+
+    let mut log: Vec<String> = vec![];
+    let mut last_log_time = std::time::Instant::now();
+    let mut log_callback = |line: &str| {
+        println!(
+            "{} ms {}",
+            last_log_time.elapsed().as_millis(),
+            line.to_string()
+        );
+        last_log_time = std::time::Instant::now();
+    };
+
+    loop {
+        search.iterate(&mut log_callback).unwrap();
+        if search.alpha_beta.max_depth >= 4 {
+            break;
+        }
+    }
+
+    let total_time = start_time.elapsed();
+    log.push(format!("{} ms total\n", total_time.as_millis(),));
 }
