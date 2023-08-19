@@ -140,7 +140,7 @@ impl Piece {
             Piece::Knight => 300,
             Piece::Bishop => 300,
             Piece::Queen => 900,
-            Piece::King => 0,
+            Piece::King => 2000,
         }
     }
 }

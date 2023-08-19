@@ -13,15 +13,17 @@ use crate::{
     bitboard::{warm_magic_cache, BoardIndex},
     game::Game,
     helpers::{ErrorResult, Joinable, OptionResult},
+    move_ordering::capture_sort,
     moves::Move,
     traversal::null_move_sort,
-    zobrist::BestMovesCache, move_ordering::sort_moves,
+    zobrist::BestMovesCache,
 };
 
 #[derive(Default, Debug, Clone)]
 pub struct IterativeSearchOptions {
     skip_quiescence: bool,
     skip_cache_sort: bool,
+    skip_capture_sort: bool,
     skip_aspiration_window: bool,
 }
 
@@ -75,16 +77,17 @@ impl IterativeSearch {
         }
 
         let skip_cache_sort = self.options.skip_cache_sort;
+        let skip_capture_sort = self.options.skip_capture_sort;
         let best_moves_cache = &self.best_moves_cache;
 
         let sorter = move |game: &Game, moves: &mut Vec<Move>| -> ErrorResult<()> {
-            if skip_cache_sort {
-                sort_moves(game, moves)?;
-            } else {
-                let unsorted = best_moves_cache.sort(game, moves)?;
-                sort_moves(game, unsorted)?;
+            let mut unsorted: &mut [Move] = moves;
+            if !skip_cache_sort {
+                unsorted = best_moves_cache.sort(game, moves)?;
             }
-
+            if !skip_capture_sort {
+                capture_sort(unsorted)?;
+            }
             Ok(())
         };
 
@@ -157,12 +160,15 @@ impl IterativeSearch {
 #[test]
 fn test_iterative_deepening_for_depth() {
     // let fen = "startpos";
+    // let max_depth = 7;
 
-    // mid-game fen
+    // // mid-game fen
     // let fen = "r3k2r/1bq1bppp/pp2p3/2p1n3/P3PP2/2PBN3/1P1BQ1PP/R4RK1 b kq - 0 16";
+    // let max_depth = 6;
 
     // late-game fen
     let fen = "6k1/8/4p3/3r4/5n2/1Q6/1K1R4/8 w";
+    let max_depth = 8;
 
     // make sure any lazy-statics are generated
     IterativeSearch::new(
@@ -175,40 +181,50 @@ fn test_iterative_deepening_for_depth() {
 
     let skip_quiescence = false;
 
-    for &skip_aspiration_window in [false, true].iter() {
-        for &skip_cache_sort in [false, true].iter() {
-            let options = IterativeSearchOptions {
-                skip_cache_sort,
-                skip_quiescence,
-                skip_aspiration_window,
-            };
-            let mut search =
-                IterativeSearch::new(Game::from_fen(fen).unwrap(), options.clone()).unwrap();
+    let mut results: Vec<String> = vec![];
 
-            let start_time = std::time::Instant::now();
+    for &skip_capture_sort in [false, true].iter() {
+        for &skip_aspiration_window in [false, true].iter() {
+            for &skip_cache_sort in [false, true].iter() {
+                let options = IterativeSearchOptions {
+                    skip_cache_sort,
+                    skip_quiescence,
+                    skip_aspiration_window,
+                    skip_capture_sort,
+                };
+                let mut search =
+                    IterativeSearch::new(Game::from_fen(fen).unwrap(), options.clone()).unwrap();
 
-            let mut log: Vec<String> = vec![];
-            let mut last_log_time = std::time::Instant::now();
-            let mut log_callback = |line: &str| {
-                log.push(format!(
-                    "{} ms {}",
-                    last_log_time.elapsed().as_millis(),
-                    line.to_string()
-                ));
-                last_log_time = std::time::Instant::now();
-            };
+                let start_time = std::time::Instant::now();
 
-            loop {
-                search.iterate(&mut log_callback).unwrap();
-                if search.alpha_beta.max_depth >= 7 {
-                    break;
+                let mut log: Vec<String> = vec![];
+                let mut last_log_time = std::time::Instant::now();
+                let mut log_callback = |line: &str| {
+                    log.push(format!(
+                        "{} ms {}",
+                        last_log_time.elapsed().as_millis(),
+                        line.to_string()
+                    ));
+                    last_log_time = std::time::Instant::now();
+                };
+
+                loop {
+                    search.iterate(&mut log_callback).unwrap();
+                    if search.alpha_beta.max_depth >= max_depth {
+                        break;
+                    }
                 }
+
+                let total_time = start_time.elapsed();
+                log.push(format!("{} ms total", total_time.as_millis(),));
+
+                println!("{:?}", options);
+                println!("{:#?}\n", log);
+
+                results.push(format!("{:?} => {} ms", options, total_time.as_millis()));
             }
-
-            log.push(format!("{} ms total", start_time.elapsed().as_millis(),));
-
-            println!("{:?}", options);
-            println!("{:#?}\n", log);
         }
     }
+
+    println!("{:#?}", results);
 }

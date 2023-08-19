@@ -106,10 +106,17 @@ impl Move {
         let promo = promo.unwrap_or(&"");
         format!("{}{}{}", self.start_index, self.end_index, promo)
     }
+
     pub fn to_pretty_str(&self) -> String {
         match self.move_type {
-            MoveType::Quiet(_) => format!("{}", self.to_uci()),
-            MoveType::Capture(_) => format!("{}x{}", self.start_index, self.end_index,),
+            MoveType::Quiet(_) => format!("{}-{}", self.piece.to_fen_char(), self.to_uci()),
+            MoveType::Capture(_) => format!(
+                "{}x{}-{}{}",
+                self.piece.to_fen_char(),
+                self.target().unwrap().to_fen_char(),
+                self.start_index,
+                self.end_index,
+            ),
             MoveType::Invalid => format!("?"),
         }
     }
@@ -118,6 +125,25 @@ impl Move {
         match self.move_type {
             MoveType::Quiet(_) => true,
             _ => false,
+        }
+    }
+
+    pub fn target_piece(&self) -> Option<Piece> {
+        match self.move_type {
+            MoveType::Capture(Capture::EnPassant { .. }) => Some(Piece::Pawn),
+            MoveType::Capture(Capture::Take { taken_piece }) => Some(taken_piece.piece),
+            _ => None,
+        }
+    }
+
+    pub fn target(&self) -> Option<PlayerPiece> {
+        match self.move_type {
+            MoveType::Capture(Capture::EnPassant { .. }) => {
+                let player = self.piece.player;
+                Some(PlayerPiece::new(player.other(), Piece::Pawn))
+            }
+            MoveType::Capture(Capture::Take { taken_piece }) => Some(taken_piece),
+            _ => None,
         }
     }
 }
