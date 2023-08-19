@@ -50,18 +50,14 @@ impl std::fmt::Debug for Score {
 }
 
 impl Score {
-    pub fn aspiration_window(self, for_player: Player, depth: usize) -> (Self, Self) {
-        let scale = if depth <= 3 {
-            400
-        } else if depth <= 5 {
-            200
-        } else {
-            100
-        };
-
+    pub fn aspiration_window(self, for_player: Player) -> (Self, Self) {
         match self {
             Score::Centipawns(player, score) => {
-                let offset = if player == for_player { scale } else { -scale };
+                let offset = if player == for_player {
+                    50
+                } else {
+                    -50
+                };
                 (
                     Score::Centipawns(player, score - offset),
                     Score::Centipawns(player, score + offset),
@@ -495,25 +491,7 @@ impl AlphaBetaStack {
         }));
     }
 
-    fn should_log_for_history(&self) -> ErrorResult<Option<String>> {
-        if let Some(log_state_at_history) = &self.options.log_state_at_history {
-            if self
-                .traversal
-                .history_string()?
-                .starts_with(log_state_at_history)
-            {
-                Ok(Some(self.traversal.history_string()?))
-            } else {
-                Ok(None)
-            }
-        } else {
-            Ok(None)
-        }
-    }
-
     fn return_early(&mut self, child_result: SearchResult) -> ErrorResult<Option<LoopResult>> {
-        let log_history = self.should_log_for_history()?;
-
         if self.traversal.depth() == 0 {
             self.best_move = match child_result {
                 SearchResult::BestMove(result) => Some(result),
@@ -535,13 +513,6 @@ impl AlphaBetaStack {
             // Beta is the lower bound for the score we can get at this board state.
             self.num_beta_cutoffs += 1;
 
-            if let Some(history) = log_history {
-                println!(
-                    "{} {} vs {} beta cutoff",
-                    history, child_score, parent.data.beta
-                );
-            }
-
             return self.return_early(SearchResult::BetaCutoff(child_score));
         }
 
@@ -553,12 +524,6 @@ impl AlphaBetaStack {
             )
             .is_better()
         {
-            if let Some(history) = &log_history {
-                println!(
-                    "{} {} best move for line",
-                    history, child_score
-                );
-            }
             parent.data.best_move = Some(BestMoveReturn {
                 best_move: *parent_to_child_move,
                 score: child_score,
@@ -568,13 +533,6 @@ impl AlphaBetaStack {
             if Score::compare(parent.game.player(), child_score, parent.data.alpha).is_better() {
                 // Enemy won't prevent us from making this move. Keep searching
                 parent.data.alpha = child_score;
-
-                if let Some(history) = log_history {
-                    println!(
-                        "{} {} vs {} alpha improvement",
-                        history, child_score, parent.data.alpha
-                    );
-                }
             }
         }
 
@@ -631,16 +589,13 @@ impl AlphaBetaStack {
         }
 
         if let Some(log_state_at_history) = &self.options.log_state_at_history {
-            if self
-                .traversal
-                .history_string()?
-                .starts_with(log_state_at_history)
-            {
-                println!("{}", self.traversal.history_string()?);
+            if &self.traversal.history_string()? == log_state_at_history {
+                let (current, _) = self.traversal.current()?;
+                println!("logging state for: {}", log_state_at_history);
+                println!("{:#?}", current.game);
+                println!("{:#?}", self.traversal);
             }
         }
-
-        let log_history = self.should_log_for_history()?;
 
         let in_quiescence = {
             let (current, _) = self.traversal.current()?;
@@ -675,25 +630,11 @@ impl AlphaBetaStack {
                 let stand_pat = Score::Centipawns(current_player, evaluate(current_game));
 
                 if Score::compare(current_player, stand_pat, current_beta).is_better_or_equal() {
-                    if let Some(history) = log_history {
-                        println!(
-                            "{} {} vs {} stand-pat beta cutoff",
-                            history, stand_pat, current_beta
-                        );
-                    }
-
                     // The enemy will avoid this line
                     return Ok(self
                         .return_early(SearchResult::BetaCutoff(current_beta))?
                         .as_result()?);
                 } else if Score::compare(current_player, stand_pat, current_alpha).is_better() {
-                    if let Some(history) = log_history {
-                        println!(
-                            "{} {} vs {} stand-pat alpha improvement",
-                            history, stand_pat, current_alpha
-                        );
-                    }
-
                     // We should be able to find a move that is better than stand-pat
                     current.data.alpha = stand_pat;
                 }
@@ -825,46 +766,5 @@ fn test_dont_capture() {
 
     // Calling `iterate()` should be idempotent
     search.iterate(null_move_sort).unwrap();
-    println!("{:#?}", search.best_move);
-}
-
-// #[test]
-// fn test_aspiration_window_missing_pv() {
-//     let fen = "r3k2r/1bq1bppp/pp2p3/2p1n3/P3PP2/2PBN3/1P1BQ1PP/R4RK1 b kq - 0 16";
-
-//     let options = AlphaBetaOptions {
-//         aspiration_window: Some(Score::Centipawns(Player::White, -398).aspiration_window(Player::Black)),
-//         .. AlphaBetaOptions::default()
-//     };
-//     println!("{:#?}", options);
-//     let mut search = AlphaBetaStack::with(Game::from_fen(fen).unwrap(), 3, options).unwrap();
-
-//     loop {
-//         match search.iterate(null_move_sort).unwrap() {
-//             LoopResult::Continue => {}
-//             LoopResult::Done => break,
-//         }
-//     }
-
-//     println!("{:#?}", search.best_move);
-// }
-
-#[test]
-fn test_alpha_beta_weird() {
-    let fen = "r3k2r/1bq1bppp/pp2p3/2p1n3/P3PP2/2PBN3/1P1BQ1PP/R4RK1 b kq - 0 16";
-
-    let options = AlphaBetaOptions {
-        log_state_at_history: Some("nxB-e5d3 Qxn-e2d3".to_string()),
-        ..Default::default()
-    };
-    let mut search = AlphaBetaStack::with(Game::from_fen(fen).unwrap(), 2, options).unwrap();
-
-    loop {
-        match search.iterate(null_move_sort).unwrap() {
-            LoopResult::Continue => {}
-            LoopResult::Done => break,
-        }
-    }
-
     println!("{:#?}", search.best_move);
 }
