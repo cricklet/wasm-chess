@@ -139,8 +139,8 @@ impl IterativeSearch {
                         log(&format!(
                             "at depth {}: bestmove {} ponder {} ({}), beta-cutoffs {}, evaluations {}, start moves searched {}",
                             depth,
-                            bestmove.to_uci(),
-                            response.iter().map(|m| m.to_uci()).collect::<Vec<_>>().join_vec(" "),
+                            bestmove.to_string(),
+                            response.iter().map(|m| m.to_string()).collect::<Vec<_>>().join_vec(" "),
                             score,
                             self.alpha_beta.num_beta_cutoffs,
                             self.alpha_beta.num_evaluations,
@@ -263,4 +263,40 @@ fn test_iterative_deepening_for_depth() {
     }
 
     println!("{:#?}", results);
+}
+
+#[test]
+fn test_aspiration_window_deepening_should_give_pv() {
+    let fen = "r3k2r/1bq1bppp/pp2p3/2p1n3/P3PP2/2PBN3/1P1BQ1PP/R4RK1 b kq - 0 16";
+
+    let options = IterativeSearchOptions {
+        skip_aspiration_window: false,
+        ..IterativeSearchOptions::default()
+    };
+
+    let mut search = IterativeSearch::new(Game::from_fen(fen).unwrap(), options.clone()).unwrap();
+
+    let start_time = std::time::Instant::now();
+    println!("{}", options);
+
+    let mut log: Vec<String> = vec![];
+    let mut last_log_time = std::time::Instant::now();
+    let mut log_callback = |line: &str| {
+        println!(
+            "{} ms {}",
+            last_log_time.elapsed().as_millis(),
+            line.to_string()
+        );
+        last_log_time = std::time::Instant::now();
+    };
+
+    loop {
+        search.iterate(&mut log_callback).unwrap();
+        if search.alpha_beta.evaluate_at_depth >= 4 {
+            break;
+        }
+    }
+
+    let total_time = start_time.elapsed();
+    log.push(format!("{} ms total\n", total_time.as_millis(),));
 }

@@ -53,7 +53,7 @@ impl Score {
     pub fn aspiration_window(self, for_player: Player) -> (Self, Self) {
         match self {
             Score::Centipawns(player, score) => {
-                let offset = if player == for_player { 50 } else { -50 };
+                let offset = if player == for_player { 110 } else { -110 };
                 (
                     Score::Centipawns(player, score - offset),
                     Score::Centipawns(player, score + offset),
