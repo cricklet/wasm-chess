@@ -12,6 +12,7 @@ pub mod iterative_deepening;
 pub mod move_ordering;
 pub mod moves;
 pub mod perft;
+pub mod transposition_table;
 pub mod traversal;
 pub mod types;
 pub mod uci;

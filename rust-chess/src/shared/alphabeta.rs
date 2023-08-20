@@ -1,11 +1,11 @@
-use std::{collections::HashSet, fmt::Display, ptr::null};
+use std::{collections::HashSet, fmt::Display, ptr::null, rc::Rc};
 
 use itertools::Itertools;
 
 use crate::{
     defer,
     helpers::{err_result, pad_left, Joinable, OptionResult},
-    traversal::{null_move_sort, TraversalStack},
+    traversal::{null_move_sort, TraversalStack}, transposition_table::TranspositionTable,
 };
 
 use super::{
@@ -476,6 +476,7 @@ pub struct AlphaBetaOptions {
     pub skip_killer_move_sort: bool,
     pub skip_null_move_pruning: bool,
     pub aspiration_window: Option<(Score, Score)>,
+    pub transposition_table: Option<Rc<TranspositionTable>>,
     pub log_state_at_history: Option<String>,
 }
 
@@ -679,6 +680,10 @@ impl AlphaBetaStack {
             );
         }
         Ok(())
+    }
+
+    pub fn depth_remaining(&self, current_depth: usize) -> usize {
+        self.evaluate_at_depth - current_depth
     }
 
     pub fn iterate<S>(&mut self, sorter: S) -> ErrorResult<LoopResult>

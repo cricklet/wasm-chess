@@ -1,4 +1,7 @@
-use std::{sync::Mutex, fmt::{Display, Formatter}};
+use std::{
+    fmt::{Display, Formatter},
+    sync::Mutex,
+};
 
 use lazy_static::lazy_static;
 use rand::{Rng, SeedableRng};
@@ -6,9 +9,12 @@ use rand_chacha::ChaCha8Rng;
 use strum::IntoEnumIterator;
 
 use crate::{
-    bitboard::{BoardIndex, self, Bitboards, ForPlayer},
-    game::{Game, CanCastleOnSide},
-    types::{CastlingSide, Player, PlayerPiece, Piece}, moves::Move, helpers::ErrorResult,
+    alphabeta::Score,
+    bitboard::{self, Bitboards, BoardIndex, ForPlayer},
+    game::{CanCastleOnSide, Game},
+    helpers::ErrorResult,
+    moves::Move,
+    types::{CastlingSide, Piece, Player, PlayerPiece},
 };
 
 lazy_static! {
@@ -69,7 +75,6 @@ impl Display for ZobristHash {
     }
 }
 
-
 impl ZobristHash {
     pub fn value(self) -> u64 {
         self.value
@@ -79,7 +84,7 @@ impl ZobristHash {
         bitboards: &Bitboards,
         player: Player,
         can_castle: ForPlayer<CanCastleOnSide>,
-        en_passant: Option<BoardIndex>
+        en_passant: Option<BoardIndex>,
     ) -> Self {
         let mut hash = 0;
         for board_index in 0..64 {
@@ -136,7 +141,7 @@ impl BestMovesCache {
     pub fn new() -> Self {
         Self {
             best_moves: vec![None; (2 as usize).pow(22)],
-            bits: 22, // 1 mb
+            bits: 22,
             mask: (2 as u64).pow(22) - 1,
         }
     }

@@ -8,6 +8,8 @@ the best line at each frame.
 
 use std::{fmt::Display, iter};
 
+use num_format::{Locale, ToFormattedString};
+
 use crate::{
     alphabeta::{AlphaBetaOptions, AlphaBetaStack, LoopResult},
     bitboard::{warm_magic_cache, BoardIndex},
@@ -74,6 +76,7 @@ impl IterativeSearch {
             skip_null_move_pruning: options.skip_null_move_pruning,
 
             aspiration_window: None,
+            transposition_table: None,
             log_state_at_history: None,
         };
         let search = AlphaBetaStack::with(game, 1, search_options)?;
@@ -193,7 +196,7 @@ fn test_iterative_deepening_for_depth() {
 
     // mid-game fen
     let fen = "r3k2r/1bq1bppp/pp2p3/2p1n3/P3PP2/2PBN3/1P1BQ1PP/R4RK1 b kq - 0 16";
-    let max_depth = 7;
+    let max_depth = 6;
 
     // // late-game fen
     // let fen = "6k1/8/4p3/3r4/5n2/1Q6/1K1R4/8 w";
@@ -244,7 +247,7 @@ fn test_iterative_deepening_for_depth() {
         skip_all.clone(),
     ];
 
-        println!("");
+    println!("");
 
     for options in options_to_try.iter() {
         let mut search =
@@ -257,8 +260,11 @@ fn test_iterative_deepening_for_depth() {
         let mut last_log_time = std::time::Instant::now();
         let mut log_callback = |line: &str| {
             println!(
-                "{} ms {}",
-                last_log_time.elapsed().as_millis(),
+                "{:>5} ms {}",
+                last_log_time
+                    .elapsed()
+                    .as_millis()
+                    .to_formatted_string(&Locale::en),
                 line.to_string()
             );
             last_log_time = std::time::Instant::now();
@@ -275,7 +281,10 @@ fn test_iterative_deepening_for_depth() {
         }
 
         let total_time = start_time.elapsed();
-        println!("{} ms total", total_time.as_millis(),);
+        println!(
+            "{:>5} ms total",
+            total_time.as_millis().to_formatted_string(&Locale::en)
+        );
         println!("");
 
         results.push((total_time.as_millis(), options.to_string()));
@@ -283,7 +292,11 @@ fn test_iterative_deepening_for_depth() {
 
     results.sort_by(|a, b| a.0.cmp(&b.0));
     for (time, options) in results {
-        println!("{:<6} ms {}", time, options);
+        println!(
+            "{:>5} ms {}",
+            time.to_formatted_string(&Locale::en),
+            options
+        );
     }
 }
 
