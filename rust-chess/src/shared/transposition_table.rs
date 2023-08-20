@@ -43,14 +43,14 @@ impl TranspositionTable {
         }
     }
 
-    pub fn get(&self, game: &Game) -> Option<CacheEntry> {
+    pub fn get(&self, game: &Game) -> Option<&CacheEntry> {
         let hash = game.zobrist().value();
         let mask = hash & self.mask;
 
-        let entry = self.table[mask as usize];
-        if let Some(entry) = entry {
+        let entry = &self.table[mask as usize];
+        if let Some(entry) = &entry {
             if entry.hash == hash {
-                return Some(entry);
+                return Some(&entry);
             }
         }
         None

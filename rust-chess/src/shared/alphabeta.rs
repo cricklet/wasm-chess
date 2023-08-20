@@ -547,6 +547,16 @@ impl AlphaBetaStack {
         }
     }
 
+    fn transposition_table_entry(&self) -> ErrorResult<Option<CachedValue>> {
+        let (current, _) = self.traversal.current()?;
+        if let Some(tt) = self.options.transposition_table.as_ref() {
+            if let Some(entry) = tt.borrow().get(&current.game) {
+                return Ok(Some(entry.value));
+            }
+        }
+        Ok(None)
+    }
+
     fn statically_evaluate_leaf(&mut self) -> ErrorResult<Option<LoopResult>> {
         let (current, current_depth) = self.traversal.current()?;
 
@@ -554,13 +564,10 @@ impl AlphaBetaStack {
             return Ok(None);
         }
 
-        if let Some(tt) = self.options.transposition_table.clone() {
-            if let Some(entry) = tt.borrow().get(&current.game) {
-                if let CachedValue::Static(score) = entry.value {
-                    return self.return_early(SearchResult::StaticEvaluation(
-                        StaticEvaluationReturn { score },
-                    ));
-                }
+        if let Some(entry) = self.transposition_table_entry()? {
+            if let CachedValue::Static(score) = entry {
+                let result = SearchResult::StaticEvaluation(StaticEvaluationReturn { score });
+                return self.return_early(result);
             }
         }
 
