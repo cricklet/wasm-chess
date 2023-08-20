@@ -188,6 +188,6 @@ impl<D: Debug + Default> TraversalStack<D> {
     }
 }
 
-pub fn null_move_sort(_game: &Game, _moves: &mut Vec<Move>) -> ErrorResult<()> {
+pub fn null_move_sort(_game: &Game, _moves: &mut [Move]) -> ErrorResult<()> {
     Ok(())
 }

@@ -6,7 +6,7 @@ the best line at each frame.
 * Then, we need some way to sort the moves to prioritize PV moves
 */
 
-use std::{iter, fmt::Display};
+use std::{fmt::Display, iter};
 
 use crate::{
     alphabeta::{AlphaBetaOptions, AlphaBetaStack, LoopResult},
@@ -24,23 +24,27 @@ pub struct IterativeSearchOptions {
     skip_quiescence: bool,
     skip_cache_sort: bool,
     skip_capture_sort: bool,
+    skip_killer_move_sort: bool,
     skip_aspiration_window: bool,
 }
 
 impl Display for IterativeSearchOptions {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut options: Vec<String> = vec![];
-        if self.skip_quiescence {
-            options.push("skip_quiescence".to_string());
+        if !self.skip_quiescence {
+            options.push("quiescence".to_string());
         }
-        if self.skip_cache_sort {
-            options.push("skip_cache_sort".to_string());
+        if !self.skip_cache_sort {
+            options.push("cache_sort".to_string());
         }
-        if self.skip_capture_sort {
-            options.push("skip_capture_sort".to_string());
+        if !self.skip_capture_sort {
+            options.push("capture_sort".to_string());
         }
-        if self.skip_aspiration_window {
-            options.push("skip_aspiration_window".to_string());
+        if !self.skip_killer_move_sort {
+            options.push("killer_move_sort".to_string());
+        }
+        if !self.skip_aspiration_window {
+            options.push("aspiration_window".to_string());
         }
         write!(f, "{{ {} }}", options.join_vec(", "))
     }
@@ -62,6 +66,7 @@ impl IterativeSearch {
         let best_moves_cache = BestMovesCache::new();
         let search_options = AlphaBetaOptions {
             skip_quiescence: options.skip_quiescence,
+            skip_killer_move_sort: options.skip_killer_move_sort,
             aspiration_window: None,
             log_state_at_history: None,
         };
@@ -98,7 +103,7 @@ impl IterativeSearch {
         let skip_capture_sort = self.options.skip_capture_sort;
         let best_moves_cache = &self.best_moves_cache;
 
-        let sorter = move |game: &Game, moves: &mut Vec<Move>| -> ErrorResult<()> {
+        let sorter = move |game: &Game, moves: &mut [Move]| -> ErrorResult<()> {
             let mut unsorted: &mut [Move] = moves;
             if !skip_cache_sort {
                 unsorted = best_moves_cache.sort(game, moves)?;
@@ -200,32 +205,41 @@ fn test_iterative_deepening_for_depth() {
     let mut results: Vec<String> = vec![];
 
     let options_to_try = vec![
-        { IterativeSearchOptions::default() },
-        {
-            IterativeSearchOptions {
-                skip_capture_sort: true,
-                ..IterativeSearchOptions::default()
-            }
+        IterativeSearchOptions::default(),
+        IterativeSearchOptions {
+            skip_aspiration_window: false,
+            skip_cache_sort: true,
+            skip_capture_sort: true,
+            skip_killer_move_sort: true,
+            ..IterativeSearchOptions::default()
         },
-        {
-            IterativeSearchOptions {
-                skip_cache_sort: true,
-                ..IterativeSearchOptions::default()
-            }
+        IterativeSearchOptions {
+            skip_aspiration_window: true,
+            skip_cache_sort: false,
+            skip_capture_sort: true,
+            skip_killer_move_sort: true,
+            ..IterativeSearchOptions::default()
         },
-        {
-            IterativeSearchOptions {
-                skip_aspiration_window: true,
-                ..IterativeSearchOptions::default()
-            }
+        IterativeSearchOptions {
+            skip_aspiration_window: true,
+            skip_cache_sort: true,
+            skip_capture_sort: false,
+            skip_killer_move_sort: true,
+            ..IterativeSearchOptions::default()
         },
-        {
-            IterativeSearchOptions {
-                skip_aspiration_window: true,
-                skip_cache_sort: true,
-                skip_capture_sort: true,
-                ..IterativeSearchOptions::default()
-            }
+        IterativeSearchOptions {
+            skip_aspiration_window: true,
+            skip_cache_sort: true,
+            skip_capture_sort: true,
+            skip_killer_move_sort: false,
+            ..IterativeSearchOptions::default()
+        },
+        IterativeSearchOptions {
+            skip_aspiration_window: true,
+            skip_cache_sort: true,
+            skip_capture_sort: true,
+            skip_killer_move_sort: true,
+            ..IterativeSearchOptions::default()
         },
     ];
 

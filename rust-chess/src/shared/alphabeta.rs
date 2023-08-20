@@ -4,7 +4,7 @@ use itertools::Itertools;
 
 use crate::{
     defer,
-    helpers::{err_result, Joinable, OptionResult, pad_left},
+    helpers::{err_result, pad_left, Joinable, OptionResult},
     traversal::{null_move_sort, TraversalStack},
 };
 
@@ -15,6 +15,7 @@ use super::{
     helpers::ErrorResult,
     moves::*,
     types::*,
+    zobrist::SimpleMove,
 };
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -418,6 +419,40 @@ impl SearchResult {
 // ************************************************************************************************* //
 
 #[derive(Default, Debug, Eq, PartialEq)]
+struct CachedKillerMoves {
+    moves: [Option<SimpleMove>; 2],
+}
+
+impl CachedKillerMoves {
+    pub fn add(&mut self, m: Move) {
+        let m = Some((m.start_index, m.end_index));
+        if self.moves[0] == m || self.moves[1] == m {
+            return;
+        }
+
+        self.moves[1] = self.moves[0];
+        self.moves[0] = m;
+    }
+
+    pub fn sort<'a>(&self, moves: &'a mut [Move]) -> &'a mut [Move] {
+        let mut sorted_index = 0;
+
+        for m in self.moves {
+            if let Some((start, end)) = m {
+                let matches = |m: &Move| -> bool { m.start_index == start && m.end_index == end };
+
+                if let Some(i) = moves.iter().position(matches) {
+                    moves.swap(sorted_index, i);
+                    sorted_index += 1;
+                }
+            }
+        }
+
+        &mut moves[sorted_index..]
+    }
+}
+
+#[derive(Default, Debug, Eq, PartialEq)]
 struct AlphaBetaFrame {
     alpha: Score,
     beta: Score,
@@ -425,6 +460,8 @@ struct AlphaBetaFrame {
 
     alpha_move: Option<BestMoveReturn>,
     found_legal_moves: bool,
+
+    cached_killer_moves: CachedKillerMoves,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -436,6 +473,7 @@ pub enum LoopResult {
 #[derive(Debug, Default, Clone)]
 pub struct AlphaBetaOptions {
     pub skip_quiescence: bool,
+    pub skip_killer_move_sort: bool,
     pub aspiration_window: Option<(Score, Score)>,
     pub log_state_at_history: Option<String>,
 }
@@ -482,6 +520,7 @@ impl AlphaBetaStack {
                     in_quiescence: InQuiescence::No,
                     alpha_move: None,
                     found_legal_moves: false,
+                    cached_killer_moves: CachedKillerMoves::default(),
                 },
             )?,
             best_move: None,
@@ -547,6 +586,7 @@ impl AlphaBetaStack {
             // Beta is the lower bound for the score we can get at this board state.
             self.num_beta_cutoffs += 1;
 
+            parent.data.cached_killer_moves.add(*parent_to_child_move);
             return self.return_early(SearchResult::BetaCutoff(child_score));
         }
 
@@ -564,13 +604,23 @@ impl AlphaBetaStack {
 
     fn traverse_next<S>(&mut self, sorter: S) -> ErrorResult<Option<LoopResult>>
     where
-        S: Fn(&Game, &mut Vec<Move>) -> ErrorResult<()>,
+        S: Fn(&Game, &mut [Move]) -> ErrorResult<()>,
     {
+        let skip_killer_move_sort = self.options.skip_killer_move_sort;
+
         let (current, _) = self.traversal.current_mut()?;
         let current_options = current.data.in_quiescence.move_options();
         let current_game = &current.game;
         let current_moves = &mut current.moves;
-        let next_move = current_moves.next(current_game, current_options, sorter)?;
+        let current_killer_moves = &current.data.cached_killer_moves;
+        let next_move = current_moves.next(current_game, current_options, |game, moves| {
+            let moves = if skip_killer_move_sort {
+                moves
+            } else {
+                current_killer_moves.sort(moves)
+            };
+            sorter(game, moves)
+        })?;
 
         if let Some(next_move) = next_move {
             // If there are moves left at 'current', apply the move
@@ -632,7 +682,7 @@ impl AlphaBetaStack {
 
     pub fn iterate<S>(&mut self, sorter: S) -> ErrorResult<LoopResult>
     where
-        S: Fn(&Game, &mut Vec<Move>) -> ErrorResult<()>,
+        S: Fn(&Game, &mut [Move]) -> ErrorResult<()>,
     {
         if self.evaluate_at_depth == 0 {
             return err_result("max_depth must be > 0");

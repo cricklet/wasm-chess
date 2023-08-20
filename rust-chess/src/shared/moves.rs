@@ -725,7 +725,7 @@ impl LazyMoves {
         sorter: S,
     ) -> ErrorResult<&Vec<Move>>
     where
-        S: Fn(&Game, &mut Vec<Move>) -> ErrorResult<()>,
+        S: Fn(&Game, &mut [Move]) -> ErrorResult<()>,
     {
         if self.buffer.is_none() {
             self.buffer.update(&mut |buffer| -> ErrorResult<()> {
@@ -750,7 +750,7 @@ impl LazyMoves {
         sorter: S,
     ) -> ErrorResult<Option<Move>>
     where
-        S: Fn(&Game, &mut Vec<Move>) -> ErrorResult<()>,
+        S: Fn(&Game, &mut [Move]) -> ErrorResult<()>,
     {
         // lazily generate buffer
         self.get(state, options, sorter)?;
