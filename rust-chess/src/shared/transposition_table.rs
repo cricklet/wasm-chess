@@ -1,5 +1,5 @@
 use core::fmt;
-use std::fmt::Formatter;
+use std::{cell::RefCell, fmt::Formatter};
 
 use crate::{alphabeta::Score, game::Game, helpers::ErrorResult, moves::Move, zobrist::SimpleMove};
 
@@ -18,11 +18,20 @@ pub struct CacheEntry {
     pub value: CachedValue,
 }
 
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct TranspositionStats {
+    pub hits: usize,
+    pub misses: usize,
+    pub collisions: usize,
+    pub updates: usize,
+}
+
 #[derive(Clone)]
 pub struct TranspositionTable {
     table: Vec<Option<CacheEntry>>,
     bits: usize,
     mask: u64,
+    pub stats: RefCell<TranspositionStats>,
 }
 
 impl fmt::Debug for TranspositionTable {
@@ -34,12 +43,15 @@ impl fmt::Debug for TranspositionTable {
     }
 }
 
+const DEFAULT_BITS: u32 = 24;
+
 impl TranspositionTable {
     pub fn new() -> Self {
         Self {
-            table: vec![None; (2 as usize).pow(20)],
-            bits: 20,
-            mask: (2 as u64).pow(20) - 1,
+            table: vec![None; (2 as usize).pow(DEFAULT_BITS)],
+            bits: DEFAULT_BITS as usize,
+            mask: (2 as u64).pow(DEFAULT_BITS) - 1,
+            stats: RefCell::new(TranspositionStats::default()),
         }
     }
 
@@ -50,20 +62,21 @@ impl TranspositionTable {
         let entry = &self.table[mask as usize];
         if let Some(entry) = &entry {
             if entry.hash == hash {
+                self.stats.borrow_mut().hits += 1;
                 return Some(&entry);
+            } else {
+                self.stats.borrow_mut().collisions += 1;
             }
         }
+        self.stats.borrow_mut().misses += 1;
         None
     }
 
-    pub fn update(
-        &mut self,
-        game: &Game,
-        value: CachedValue,
-        depth: usize,
-    ) -> ErrorResult<()> {
+    pub fn update(&mut self, game: &Game, value: CachedValue, depth: usize) -> ErrorResult<()> {
         let hash = game.zobrist().value();
         let mask = hash & self.mask;
+
+        self.stats.borrow_mut().updates += 1;
 
         let entry = &mut self.table[mask as usize];
 

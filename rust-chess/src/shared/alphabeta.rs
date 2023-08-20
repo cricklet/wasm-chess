@@ -477,7 +477,7 @@ pub struct AlphaBetaOptions {
     pub skip_killer_move_sort: bool,
     pub skip_null_move_pruning: bool,
     pub aspiration_window: Option<(Score, Score)>,
-    pub transposition_table: Option<RefCell<TranspositionTable>>,
+    pub transposition_table: Option<Rc<RefCell<TranspositionTable>>>,
     pub log_state_at_history: Option<String>,
 }
 

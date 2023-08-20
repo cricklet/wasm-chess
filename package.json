@@ -6,7 +6,6 @@
         "profile": "xctrace record --target-stdout - --template 'Time Profiler' --launch --",
 
         "test": "cargo test --release --bin main",
-        "test-debug": "cargo test --bin main -- --nocapture",
         "build-test": "cargo test --release --bin main --no-run",
 
         "build-wasm": "wasm-pack build --release --target=no-modules wasm-chess/",

@@ -30,7 +30,7 @@ pub struct IterativeSearchOptions {
     pub skip_killer_move_sort: bool,
     pub skip_aspiration_window: bool,
     pub skip_null_move_pruning: bool,
-    pub transposition_table: Option<RefCell<TranspositionTable>>,
+    pub transposition_table: Option<Rc<RefCell<TranspositionTable>>>,
 }
 
 impl Default for IterativeSearchOptions {
@@ -219,7 +219,7 @@ fn test_iterative_deepening_for_depth() {
 
     // mid-game fen
     let fen = "r3k2r/1bq1bppp/pp2p3/2p1n3/P3PP2/2PBN3/1P1BQ1PP/R4RK1 b kq - 0 16";
-    let max_depth = 6;
+    let max_depth = 7;
 
     // // late-game fen
     // let fen = "6k1/8/4p3/3r4/5n2/1Q6/1K1R4/8 w";
@@ -246,12 +246,18 @@ fn test_iterative_deepening_for_depth() {
         ..IterativeSearchOptions::default()
     };
 
+    let transposition_table = Some(Rc::new(RefCell::new(TranspositionTable::new())));
+
     let options_to_try = vec![
         IterativeSearchOptions::default(),
-        // IterativeSearchOptions {
-        //     transposition_table: Some(RefCell::new(TranspositionTable::new())),
-        //     ..skip_all.clone()
-        // },
+        IterativeSearchOptions {
+            transposition_table: transposition_table.clone(),
+            ..IterativeSearchOptions::default()
+        },
+        IterativeSearchOptions {
+            transposition_table: transposition_table.clone(),
+            ..IterativeSearchOptions::default()
+        },
         IterativeSearchOptions {
             skip_aspiration_window: false,
             ..skip_all.clone()
@@ -313,6 +319,19 @@ fn test_iterative_deepening_for_depth() {
             "{:>5} ms total",
             total_time.as_millis().to_formatted_string(&Locale::en)
         );
+
+        if options.transposition_table.is_some() {
+            let tt = options.transposition_table.as_ref().unwrap().borrow();
+            let stats = tt.stats.borrow();
+            println!(
+                "hits: {}, misses: {}, collisions: {}, updates: {}",
+                stats.hits.to_formatted_string(&Locale::en),
+                stats.misses.to_formatted_string(&Locale::en),
+                stats.collisions.to_formatted_string(&Locale::en),
+                stats.updates.to_formatted_string(&Locale::en)
+            );
+        }
+
         println!("");
 
         results.push((total_time.as_millis(), options.to_string()));
@@ -348,7 +367,7 @@ fn test_iterative_deepening_transposition_table() {
     warmup();
 
     let options = IterativeSearchOptions {
-        transposition_table: Some(RefCell::new(TranspositionTable::new())),
+        transposition_table: Some(Rc::new(RefCell::new(TranspositionTable::new()))),
         ..IterativeSearchOptions::default()
     };
 
