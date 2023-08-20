@@ -474,6 +474,7 @@ pub enum LoopResult {
 pub struct AlphaBetaOptions {
     pub skip_quiescence: bool,
     pub skip_killer_move_sort: bool,
+    pub skip_null_move_pruning: bool,
     pub aspiration_window: Option<(Score, Score)>,
     pub log_state_at_history: Option<String>,
 }
@@ -715,6 +716,25 @@ impl AlphaBetaStack {
                     return Ok(LoopResult::Continue);
                 }
             }
+
+            if !self.options.skip_null_move_pruning {
+                let (current, _) = self.traversal.current_mut()?;
+                let current_danger = current.danger()?;
+                let current_game = &current.game;
+                let current_player = current_game.player();
+                let current_beta = current.data.beta;
+                if !current_danger.check {
+                    // If the null evaluation is much better than beta, cutoff early
+                    let null_move_score = Score::Centipawns(current_player, evaluate(current_game) - 300);
+
+                    if Score::compare(current_player, null_move_score, current_beta).is_better_or_equal()
+                    {
+                        return Ok(self
+                            .return_early(SearchResult::BetaCutoff(current_beta))?
+                            .as_result()?);
+                    }
+                }
+            }
         }
 
         if in_quiescence {
@@ -734,7 +754,8 @@ impl AlphaBetaStack {
                         .return_early(SearchResult::BetaCutoff(current_beta))?
                         .as_result()?);
                 } else if Score::compare(current_player, stand_pat, current_alpha).is_better() {
-                    // We should be able to find a move that is better than stand-pat
+                    // If no capture is better than stand-pat, we should probably not capture in this situation!
+                    // If this were not during quiescence, we would probably find a quiet move that is much better
                     current.data.alpha = stand_pat;
                 }
             }

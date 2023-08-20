@@ -26,6 +26,7 @@ pub struct IterativeSearchOptions {
     skip_capture_sort: bool,
     skip_killer_move_sort: bool,
     skip_aspiration_window: bool,
+    skip_null_move_pruning: bool,
 }
 
 impl Display for IterativeSearchOptions {
@@ -42,6 +43,9 @@ impl Display for IterativeSearchOptions {
         }
         if !self.skip_killer_move_sort {
             options.push("killer_move_sort".to_string());
+        }
+        if !self.skip_null_move_pruning {
+            options.push("null_move_pruning".to_string());
         }
         if !self.skip_aspiration_window {
             options.push("aspiration_window".to_string());
@@ -67,6 +71,8 @@ impl IterativeSearch {
         let search_options = AlphaBetaOptions {
             skip_quiescence: options.skip_quiescence,
             skip_killer_move_sort: options.skip_killer_move_sort,
+            skip_null_move_pruning: options.skip_null_move_pruning,
+
             aspiration_window: None,
             log_state_at_history: None,
         };
@@ -187,7 +193,7 @@ fn test_iterative_deepening_for_depth() {
 
     // mid-game fen
     let fen = "r3k2r/1bq1bppp/pp2p3/2p1n3/P3PP2/2PBN3/1P1BQ1PP/R4RK1 b kq - 0 16";
-    let max_depth = 6;
+    let max_depth = 7;
 
     // // late-game fen
     // let fen = "6k1/8/4p3/3r4/5n2/1Q6/1K1R4/8 w";
@@ -202,61 +208,59 @@ fn test_iterative_deepening_for_depth() {
     .iterate(&mut |_| {})
     .unwrap();
 
-    let mut results: Vec<String> = vec![];
+    let mut results: Vec<(u128, String)> = vec![];
+
+    let skip_all = IterativeSearchOptions {
+        skip_aspiration_window: true,
+        skip_cache_sort: true,
+        skip_capture_sort: true,
+        skip_killer_move_sort: true,
+        skip_null_move_pruning: true,
+        ..IterativeSearchOptions::default()
+    };
 
     let options_to_try = vec![
         IterativeSearchOptions::default(),
         IterativeSearchOptions {
             skip_aspiration_window: false,
-            skip_cache_sort: true,
-            skip_capture_sort: true,
-            skip_killer_move_sort: true,
-            ..IterativeSearchOptions::default()
+            ..skip_all.clone()
         },
         IterativeSearchOptions {
-            skip_aspiration_window: true,
             skip_cache_sort: false,
-            skip_capture_sort: true,
-            skip_killer_move_sort: true,
-            ..IterativeSearchOptions::default()
+            ..skip_all.clone()
         },
         IterativeSearchOptions {
-            skip_aspiration_window: true,
-            skip_cache_sort: true,
             skip_capture_sort: false,
-            skip_killer_move_sort: true,
-            ..IterativeSearchOptions::default()
+            ..skip_all.clone()
         },
         IterativeSearchOptions {
-            skip_aspiration_window: true,
-            skip_cache_sort: true,
-            skip_capture_sort: true,
             skip_killer_move_sort: false,
-            ..IterativeSearchOptions::default()
+            ..skip_all.clone()
         },
         IterativeSearchOptions {
-            skip_aspiration_window: true,
-            skip_cache_sort: true,
-            skip_capture_sort: true,
-            skip_killer_move_sort: true,
-            ..IterativeSearchOptions::default()
+            skip_null_move_pruning: false,
+            ..skip_all.clone()
         },
+        skip_all.clone(),
     ];
+
+        println!("");
 
     for options in options_to_try.iter() {
         let mut search =
             IterativeSearch::new(Game::from_fen(fen).unwrap(), options.clone()).unwrap();
 
+        println!("{}", options);
+
         let start_time = std::time::Instant::now();
 
-        let mut log: Vec<String> = vec![];
         let mut last_log_time = std::time::Instant::now();
         let mut log_callback = |line: &str| {
-            log.push(format!(
+            println!(
                 "{} ms {}",
                 last_log_time.elapsed().as_millis(),
                 line.to_string()
-            ));
+            );
             last_log_time = std::time::Instant::now();
         };
 
@@ -265,18 +269,22 @@ fn test_iterative_deepening_for_depth() {
             if search.alpha_beta.evaluate_at_depth >= max_depth {
                 break;
             }
+            // if start_time.elapsed() > std::time::Duration::from_secs(5) {
+            //     break;
+            // }
         }
 
         let total_time = start_time.elapsed();
-        log.push(format!("{} ms total", total_time.as_millis(),));
+        println!("{} ms total", total_time.as_millis(),);
+        println!("");
 
-        println!("{}", options);
-        println!("{:#?}\n", log);
-
-        results.push(format!("{} => {} ms", options, total_time.as_millis()));
+        results.push((total_time.as_millis(), options.to_string()));
     }
 
-    println!("{:#?}", results);
+    results.sort_by(|a, b| a.0.cmp(&b.0));
+    for (time, options) in results {
+        println!("{:<6} ms {}", time, options);
+    }
 }
 
 #[test]
