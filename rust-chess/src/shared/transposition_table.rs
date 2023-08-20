@@ -4,20 +4,21 @@ use std::fmt::Formatter;
 use crate::{alphabeta::Score, game::Game, helpers::ErrorResult, moves::Move, zobrist::SimpleMove};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CachedScore {
-    Exact(Score),
-    BetaCutoff(Score), // lower bound
-    AlphaMiss(Score),  // upper bound
+pub enum CachedValue {
+    Static(Score),
+    Exact(Score, SimpleMove),
+    BetaCutoff(Score, SimpleMove), // lower bound
+    AlphaMiss(Score, SimpleMove),  // upper bound
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CacheEntry {
     hash: u64,
     pub depth: usize,
-    pub score: CachedScore,
-    pub best_move: SimpleMove,
+    pub value: CachedValue,
 }
 
+#[derive(Clone)]
 pub struct TranspositionTable {
     table: Vec<Option<CacheEntry>>,
     bits: usize,
@@ -58,8 +59,7 @@ impl TranspositionTable {
     pub fn update(
         &mut self,
         game: &Game,
-        m: &Move,
-        score: CachedScore,
+        value: CachedValue,
         depth: usize,
     ) -> ErrorResult<()> {
         let hash = game.zobrist().value();
@@ -68,12 +68,7 @@ impl TranspositionTable {
         let entry = &mut self.table[mask as usize];
 
         // Always replace for now
-        *entry = Some(CacheEntry {
-            hash,
-            depth,
-            score,
-            best_move: (m.start_index, m.end_index),
-        });
+        *entry = Some(CacheEntry { hash, depth, value });
 
         Ok(())
     }

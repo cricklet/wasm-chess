@@ -6,7 +6,7 @@ the best line at each frame.
 * Then, we need some way to sort the moves to prioritize PV moves
 */
 
-use std::{fmt::Display, iter};
+use std::{cell::RefCell, fmt::Display, iter, rc::Rc};
 
 use num_format::{Locale, ToFormattedString};
 
@@ -17,18 +17,34 @@ use crate::{
     helpers::{ErrorResult, Joinable, OptionResult},
     move_ordering::capture_sort,
     moves::Move,
+    transposition_table::TranspositionTable,
     traversal::null_move_sort,
     zobrist::BestMovesCache,
 };
 
-#[derive(Default, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct IterativeSearchOptions {
-    skip_quiescence: bool,
-    skip_cache_sort: bool,
-    skip_capture_sort: bool,
-    skip_killer_move_sort: bool,
-    skip_aspiration_window: bool,
-    skip_null_move_pruning: bool,
+    pub skip_quiescence: bool,
+    pub skip_cache_sort: bool,
+    pub skip_capture_sort: bool,
+    pub skip_killer_move_sort: bool,
+    pub skip_aspiration_window: bool,
+    pub skip_null_move_pruning: bool,
+    pub transposition_table: Option<RefCell<TranspositionTable>>,
+}
+
+impl Default for IterativeSearchOptions {
+    fn default() -> Self {
+        Self {
+            skip_quiescence: false,
+            skip_cache_sort: false,
+            skip_capture_sort: false,
+            skip_killer_move_sort: false,
+            skip_aspiration_window: false,
+            skip_null_move_pruning: false,
+            transposition_table: None,
+        }
+    }
 }
 
 impl Display for IterativeSearchOptions {
@@ -52,6 +68,9 @@ impl Display for IterativeSearchOptions {
         if !self.skip_aspiration_window {
             options.push("aspiration_window".to_string());
         }
+        if self.transposition_table.is_some() {
+            options.push("transposition_table".to_string());
+        }
         write!(f, "{{ {} }}", options.join_vec(", "))
     }
 }
@@ -74,9 +93,9 @@ impl IterativeSearch {
             skip_quiescence: options.skip_quiescence,
             skip_killer_move_sort: options.skip_killer_move_sort,
             skip_null_move_pruning: options.skip_null_move_pruning,
+            transposition_table: options.transposition_table.clone(),
 
             aspiration_window: None,
-            transposition_table: None,
             log_state_at_history: None,
         };
         let search = AlphaBetaStack::with(game, 1, search_options)?;
@@ -88,6 +107,10 @@ impl IterativeSearch {
             options,
             no_moves_found: false,
         })
+    }
+
+    pub fn max_depth(&self) -> usize {
+        self.alpha_beta.evaluate_at_depth
     }
 
     pub fn bestmove(&self) -> Option<(Move, Vec<Move>)> {
@@ -219,11 +242,16 @@ fn test_iterative_deepening_for_depth() {
         skip_capture_sort: true,
         skip_killer_move_sort: true,
         skip_null_move_pruning: true,
+        transposition_table: None,
         ..IterativeSearchOptions::default()
     };
 
     let options_to_try = vec![
         IterativeSearchOptions::default(),
+        IterativeSearchOptions {
+            transposition_table: Some(RefCell::new(TranspositionTable::new())),
+            ..skip_all.clone()
+        },
         IterativeSearchOptions {
             skip_aspiration_window: false,
             ..skip_all.clone()
@@ -298,40 +326,4 @@ fn test_iterative_deepening_for_depth() {
             options
         );
     }
-}
-
-#[test]
-fn test_aspiration_window_deepening_should_give_pv() {
-    let fen = "r3k2r/1bq1bppp/pp2p3/2p1n3/P3PP2/2PBN3/1P1BQ1PP/R4RK1 b kq - 0 16";
-
-    let options = IterativeSearchOptions {
-        skip_aspiration_window: false,
-        ..IterativeSearchOptions::default()
-    };
-
-    let mut search = IterativeSearch::new(Game::from_fen(fen).unwrap(), options.clone()).unwrap();
-
-    let start_time = std::time::Instant::now();
-    println!("{}", options);
-
-    let mut log: Vec<String> = vec![];
-    let mut last_log_time = std::time::Instant::now();
-    let mut log_callback = |line: &str| {
-        println!(
-            "{} ms {}",
-            last_log_time.elapsed().as_millis(),
-            line.to_string()
-        );
-        last_log_time = std::time::Instant::now();
-    };
-
-    loop {
-        search.iterate(&mut log_callback).unwrap();
-        if search.alpha_beta.evaluate_at_depth >= 4 {
-            break;
-        }
-    }
-
-    let total_time = start_time.elapsed();
-    log.push(format!("{} ms total\n", total_time.as_millis(),));
 }

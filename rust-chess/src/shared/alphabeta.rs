@@ -1,11 +1,12 @@
-use std::{collections::HashSet, fmt::Display, ptr::null, rc::Rc};
+use std::{cell::RefCell, collections::HashSet, fmt::Display, ptr::null, rc::Rc};
 
 use itertools::Itertools;
 
 use crate::{
     defer,
     helpers::{err_result, pad_left, Joinable, OptionResult},
-    traversal::{null_move_sort, TraversalStack}, transposition_table::TranspositionTable,
+    transposition_table::{CachedValue, TranspositionTable},
+    traversal::{null_move_sort, TraversalStack},
 };
 
 use super::{
@@ -476,7 +477,7 @@ pub struct AlphaBetaOptions {
     pub skip_killer_move_sort: bool,
     pub skip_null_move_pruning: bool,
     pub aspiration_window: Option<(Score, Score)>,
-    pub transposition_table: Option<Rc<TranspositionTable>>,
+    pub transposition_table: Option<RefCell<TranspositionTable>>,
     pub log_state_at_history: Option<String>,
 }
 
@@ -553,7 +554,22 @@ impl AlphaBetaStack {
             return Ok(None);
         }
 
+        if let Some(tt) = self.options.transposition_table.clone() {
+            if let Some(entry) = tt.borrow().get(&current.game) {
+                if let CachedValue::Static(score) = entry.value {
+                    return self.return_early(SearchResult::StaticEvaluation(
+                        StaticEvaluationReturn { score },
+                    ));
+                }
+            }
+        }
+
         let score = Score::Centipawns(current.game.player(), evaluate(&current.game));
+
+        if let Some(tt) = &mut self.options.transposition_table {
+            let mut tt = tt.borrow_mut();
+            tt.update(&current.game, CachedValue::Static(score), current_depth)?;
+        }
 
         self.num_evaluations += 1;
         return self.return_early(SearchResult::StaticEvaluation(StaticEvaluationReturn {
@@ -730,9 +746,11 @@ impl AlphaBetaStack {
                 let current_beta = current.data.beta;
                 if !current_danger.check {
                     // If the null evaluation is much better than beta, cutoff early
-                    let null_move_score = Score::Centipawns(current_player, evaluate(current_game) - 300);
+                    let null_move_score =
+                        Score::Centipawns(current_player, evaluate(current_game) - 300);
 
-                    if Score::compare(current_player, null_move_score, current_beta).is_better_or_equal()
+                    if Score::compare(current_player, null_move_score, current_beta)
+                        .is_better_or_equal()
                     {
                         return Ok(self
                             .return_early(SearchResult::BetaCutoff(current_beta))?

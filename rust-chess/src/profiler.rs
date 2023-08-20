@@ -1,7 +1,10 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
+#![cfg(feature = "profiling")]
 
-use std::{fs::File, future::Future, io::Write, pin::Pin, sync::Arc, time::Duration};
+use std::{
+    cell::RefCell, fs::File, future::Future, io::Write, pin::Pin, sync::Arc, time::Duration,
+};
 
 use num_format::{Locale, ToFormattedString};
 use pprof::protos::Message;
@@ -9,9 +12,15 @@ use pprof::protos::Message;
 pub mod shared;
 pub use shared::*;
 
-use crate::{search::{LoopResult, SearchStack}, iterative_traversal::null_move_sort};
-
-use {game::Game, perft::run_perft_iteratively_to_depth, perft::run_perft_recursively};
+use crate::{
+    alphabeta::{AlphaBetaOptions, AlphaBetaStack, LoopResult},
+    game::Game,
+    iterative_deepening::{IterativeSearch, IterativeSearchOptions},
+    perft::run_perft_iteratively_to_depth,
+    perft::run_perft_recursively,
+    transposition_table::TranspositionTable,
+    traversal::null_move_sort,
+};
 
 pub struct Profiler<'a> {
     name: String,
@@ -46,6 +55,72 @@ impl<'a> Profiler<'a> {
     }
 }
 
+pub fn profile_transposition_table() {
+    // let fen = "startpos";
+    // let max_depth = 7;
+
+    // mid-game fen
+    let fen = "r3k2r/1bq1bppp/pp2p3/2p1n3/P3PP2/2PBN3/1P1BQ1PP/R4RK1 b kq - 0 16";
+    let max_depth = 6;
+
+    // // late-game fen
+    // let fen = "6k1/8/4p3/3r4/5n2/1Q6/1K1R4/8 w";
+    // let max_depth = 8;
+
+    // make sure any lazy-statics are generated
+    IterativeSearch::new(
+        Game::from_fen(fen).unwrap(),
+        IterativeSearchOptions::default(),
+    )
+    .unwrap()
+    .iterate(&mut |_| {})
+    .unwrap();
+
+    let options = IterativeSearchOptions {
+        transposition_table: Some(RefCell::new(TranspositionTable::new())),
+        ..IterativeSearchOptions::default()
+    };
+
+    let mut search = IterativeSearch::new(Game::from_fen(fen).unwrap(), options.clone()).unwrap();
+
+    println!("{}", options);
+
+    let start_time = std::time::Instant::now();
+
+    let mut last_log_time = std::time::Instant::now();
+    let mut log_callback = |line: &str| {
+        println!(
+            "{:>5} ms {}",
+            last_log_time
+                .elapsed()
+                .as_millis()
+                .to_formatted_string(&Locale::en),
+            line.to_string()
+        );
+        last_log_time = std::time::Instant::now();
+    };
+
+    let p = Profiler::new("transposition_table".to_string());
+
+    loop {
+        search.iterate(&mut log_callback).unwrap();
+        if search.max_depth() >= max_depth {
+            break;
+        }
+        if start_time.elapsed() > std::time::Duration::from_secs(5) {
+            break;
+        }
+    }
+
+    p.flush();
+
+    let total_time = start_time.elapsed();
+    println!(
+        "{:>5} ms total",
+        total_time.as_millis().to_formatted_string(&Locale::en)
+    );
+}
+
 fn main() {
     let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -57,12 +132,22 @@ fn main() {
     // setup magics
     run_perft_recursively(Game::from_fen(fen).unwrap(), 2).unwrap();
 
+    println!("\ntransposition-table");
+    {
+        profile_transposition_table();
+    }
+
     println!("\nalpha-beta");
     {
         let p = Profiler::new("alpha_beta".to_string());
 
         let start_time = std::time::Instant::now();
-        let mut search = SearchStack::with(Game::from_fen("startpos").unwrap(), 5).unwrap();
+        let mut search = AlphaBetaStack::with(
+            Game::from_fen("startpos").unwrap(),
+            5,
+            AlphaBetaOptions::default(),
+        )
+        .unwrap();
         loop {
             match search.iterate(null_move_sort).unwrap() {
                 LoopResult::Continue => {}
