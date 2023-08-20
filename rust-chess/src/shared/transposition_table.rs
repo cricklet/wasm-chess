@@ -37,9 +37,9 @@ impl fmt::Debug for TranspositionTable {
 impl TranspositionTable {
     pub fn new() -> Self {
         Self {
-            table: vec![None; (2 as usize).pow(22)],
-            bits: 22,
-            mask: (2 as u64).pow(22) - 1,
+            table: vec![None; (2 as usize).pow(20)],
+            bits: 20,
+            mask: (2 as u64).pow(20) - 1,
         }
     }
 

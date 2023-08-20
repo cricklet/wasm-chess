@@ -12,7 +12,7 @@ use num_format::{Locale, ToFormattedString};
 
 use crate::{
     alphabeta::{AlphaBetaOptions, AlphaBetaStack, LoopResult},
-    bitboard::{warm_magic_cache, BoardIndex},
+    bitboard::BoardIndex,
     game::Game,
     helpers::{ErrorResult, Joinable, OptionResult},
     move_ordering::capture_sort,
@@ -248,10 +248,10 @@ fn test_iterative_deepening_for_depth() {
 
     let options_to_try = vec![
         IterativeSearchOptions::default(),
-        IterativeSearchOptions {
-            transposition_table: Some(RefCell::new(TranspositionTable::new())),
-            ..skip_all.clone()
-        },
+        // IterativeSearchOptions {
+        //     transposition_table: Some(RefCell::new(TranspositionTable::new())),
+        //     ..skip_all.clone()
+        // },
         IterativeSearchOptions {
             skip_aspiration_window: false,
             ..skip_all.clone()
@@ -326,4 +326,64 @@ fn test_iterative_deepening_for_depth() {
             options
         );
     }
+}
+
+fn warmup() {
+    // make sure any lazy-statics are generated
+    IterativeSearch::new(
+        Game::from_fen("startpos").unwrap(),
+        IterativeSearchOptions::default(),
+    )
+    .unwrap()
+    .iterate(&mut |_| {})
+    .unwrap();
+}
+
+#[test]
+fn test_iterative_deepening_transposition_table() {
+    // mid-game fen
+    let fen = "r3k2r/1bq1bppp/pp2p3/2p1n3/P3PP2/2PBN3/1P1BQ1PP/R4RK1 b kq - 0 16";
+    let max_depth = 6;
+
+    warmup();
+
+    let options = IterativeSearchOptions {
+        transposition_table: Some(RefCell::new(TranspositionTable::new())),
+        ..IterativeSearchOptions::default()
+    };
+
+    let mut search = IterativeSearch::new(Game::from_fen(fen).unwrap(), options.clone()).unwrap();
+
+    println!("{}", options);
+
+    let start_time = std::time::Instant::now();
+
+    let mut last_log_time = std::time::Instant::now();
+    let mut log_callback = |line: &str| {
+        println!(
+            "{:>5} ms {}",
+            last_log_time
+                .elapsed()
+                .as_millis()
+                .to_formatted_string(&Locale::en),
+            line.to_string()
+        );
+        last_log_time = std::time::Instant::now();
+    };
+
+    (move || loop {
+        search.iterate(&mut log_callback).unwrap();
+        if search.max_depth() >= max_depth {
+            break;
+        }
+        if start_time.elapsed() > std::time::Duration::from_secs(2) {
+            break;
+        }
+    })();
+
+    let total_time = start_time.elapsed();
+    println!(
+        "{:>5} ms total",
+        total_time.as_millis().to_formatted_string(&Locale::en)
+    );
 }

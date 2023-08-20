@@ -7,21 +7,13 @@ edition = "2021"
 name = "main"
 path = "src/main.rs"
 
-[[bin]]
-name = "perft"
-path = "src/profiler.rs"
-required-features = ["profiling"]
-
 [lib]
 name = "rust_chess"
 path = "src/lib.rs"
 crate-type = ["cdylib", "rlib"]
 
-[features]
-profiling = ["pprof"]
-
 [dev-dependencies]
-rust-chess= { path = ".", features = [] }
+rust-chess = { path = ".", features = [] }
 
 [dependencies]
 array-init = "2.1.0"
@@ -35,11 +27,5 @@ strum = { version = "0.25.0", features = ["derive"] }
 getrandom = { version = "0.2", features = ["js"] }
 itertools = "0.11.0"
 num-format = "0.4.4"
-
-pprof = { version = "0.12.0", features = [
-    "flamegraph",
-    "prost-codec",
-    "protobuf-codec",
-], optional = true }
 rand_chacha = "0.3.1"
 derive-getters = "0.3.0"
