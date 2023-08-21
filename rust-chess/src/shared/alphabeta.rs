@@ -332,11 +332,6 @@ fn test_evaluation_increment() {
 }
 // ************************************************************************************************* //
 
-#[derive(Debug, Eq, PartialEq, Clone)]
-struct StaticEvaluationReturn {
-    score: Score,
-}
-
 #[derive(Eq, PartialEq, Clone)]
 struct BestMoveReturn {
     best_move: SimpleMove,
@@ -362,7 +357,7 @@ enum SearchResult {
     BestMove(BestMoveReturn),
 
     // Leaf nodes
-    StaticEvaluation(StaticEvaluationReturn),
+    StaticEvaluation(Score),
 
     // Returned if we fail beta cut-off
     BetaCutoff(Score),
@@ -381,7 +376,7 @@ impl Display for SearchResult {
                 result.best_move,
                 result.response_moves.join_vec(" ")
             ),
-            SearchResult::StaticEvaluation(result) => write!(f, "({}) static", result.score),
+            SearchResult::StaticEvaluation(e) => write!(f, "({}) static", e),
             SearchResult::BetaCutoff(e) => write!(f, "({}) beta cutoff", e),
             SearchResult::AlphaMiss(e) => write!(f, "({}) alpha miss", e),
         }
@@ -392,7 +387,7 @@ impl SearchResult {
     fn score(&self) -> Score {
         match self {
             SearchResult::BestMove(result) => result.score,
-            SearchResult::StaticEvaluation(result) => result.score,
+            SearchResult::StaticEvaluation(e) => *e,
             SearchResult::BetaCutoff(e) => *e,
             SearchResult::AlphaMiss(e) => *e,
         }
@@ -564,7 +559,7 @@ impl AlphaBetaStack {
 
         if let Some(entry) = self.transposition_table_entry()? {
             if let CachedValue::Static(score) = entry {
-                let result = SearchResult::StaticEvaluation(StaticEvaluationReturn { score });
+                let result = SearchResult::StaticEvaluation(score);
                 return self.return_early(result);
             }
         }
@@ -577,9 +572,7 @@ impl AlphaBetaStack {
         }
 
         self.num_evaluations += 1;
-        return self.return_early(SearchResult::StaticEvaluation(StaticEvaluationReturn {
-            score,
-        }));
+        return self.return_early(SearchResult::StaticEvaluation(score));
     }
 
     fn return_early(&mut self, child_result: SearchResult) -> ErrorResult<Option<LoopResult>> {
@@ -807,13 +800,12 @@ impl AlphaBetaStack {
                 let current_enemy = current.game.player().other();
                 let (current, _) = self.traversal.current_mut()?;
                 if current.danger()?.check {
-                    self.return_early(SearchResult::StaticEvaluation(StaticEvaluationReturn {
-                        score: Score::WinInN(current_enemy, 0),
-                    }))
+                    self.return_early(SearchResult::StaticEvaluation(Score::WinInN(
+                        current_enemy,
+                        0,
+                    )))
                 } else {
-                    self.return_early(SearchResult::StaticEvaluation(StaticEvaluationReturn {
-                        score: Score::DrawInN(0),
-                    }))
+                    self.return_early(SearchResult::StaticEvaluation(Score::DrawInN(0)))
                 }
             } else {
                 self.statically_evaluate_leaf()
