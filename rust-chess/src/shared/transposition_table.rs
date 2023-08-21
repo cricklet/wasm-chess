@@ -7,8 +7,8 @@ use crate::{alphabeta::Score, game::Game, helpers::ErrorResult, moves::Move, zob
 pub enum CachedValue {
     Static(Score),
     Exact(Score, SimpleMove),
-    BetaCutoff(Score, SimpleMove), // lower bound
-    AlphaMiss(Score, SimpleMove),  // upper bound
+    BetaCutoff(Score), // lower bound
+    AlphaMiss(Score),  // upper bound
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

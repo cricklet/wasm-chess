@@ -5,7 +5,7 @@ use itertools::Itertools;
 use crate::{
     defer,
     helpers::{err_result, pad_left, Joinable, OptionResult},
-    transposition_table::{CachedValue, TranspositionTable},
+    transposition_table::{CachedValue, TranspositionTable, CacheEntry},
     traversal::{null_move_sort, TraversalStack},
 };
 
@@ -408,6 +408,39 @@ impl SearchResult {
         }
         variation
     }
+
+    fn to_cache_value(&self) -> CachedValue {
+        match self {
+            SearchResult::BestMove(BestMoveReturn {
+                best_move, score, ..
+            }) => CachedValue::Exact(*score, *best_move),
+            SearchResult::StaticEvaluation(score) => CachedValue::Static(*score),
+            SearchResult::BetaCutoff(score) => CachedValue::BetaCutoff(*score),
+            SearchResult::AlphaMiss(score) => CachedValue::AlphaMiss(*score),
+        }
+    }
+
+    // fn from_cache_entry(entry: &CacheEntry, player: Player, alpha: Score, beta: Score, depth_remaining: usize) -> Self {
+    //     match entry.value {
+    //         CacheValue::Static(score) => if depth_remaining == 0 {},
+    //         CacheValue::Exact(score, best_move) => {
+    //             if Score::compare(player, score, beta).is_better_or_equal() {
+    //                 Self::BetaCutoff(score)
+    //             } else if Score::compare(current_player, score, alpha).is_better() {
+    //                 Self::BestMove(BestMove {
+    //                     best_move: Move::new(best_move.start, best_move.1),
+    //                     score,
+    //                     response_moves: vec![],
+    //                 })
+    //                 CacheValue::Exact(score, best_move)
+    //             } else {
+    //                 CacheValue::AlphaMiss(score)
+    //             }
+    //         }
+    //         CacheValue::BetaCutoff(score) => score,
+    //         CacheValue::AlphaMiss(score) => score,
+    //     }
+    // }
 }
 
 // ************************************************************************************************* //
@@ -540,11 +573,11 @@ impl AlphaBetaStack {
         }
     }
 
-    fn transposition_table_entry(&self) -> ErrorResult<Option<CachedValue>> {
+    fn transposition_table_entry(&self) -> ErrorResult<Option<CacheEntry>> {
         let (current, _) = self.traversal.current()?;
         if let Some(tt) = self.options.transposition_table.as_ref() {
             if let Some(entry) = tt.borrow().get(&current.game) {
-                return Ok(Some(entry.value));
+                return Ok(Some(*entry));
             }
         }
         Ok(None)
@@ -558,18 +591,17 @@ impl AlphaBetaStack {
         }
 
         if let Some(entry) = self.transposition_table_entry()? {
-            if let CachedValue::Static(score) = entry {
+            if let CacheEntry {
+                value: CachedValue::Static(score),
+                ..
+            } = entry
+            {
                 let result = SearchResult::StaticEvaluation(score);
                 return self.return_early(result);
             }
         }
 
         let score = Score::Centipawns(current.game.player(), evaluate(&current.game));
-
-        if let Some(tt) = &mut self.options.transposition_table {
-            let mut tt = tt.borrow_mut();
-            tt.update(&current.game, CachedValue::Static(score), current_depth)?;
-        }
 
         self.num_evaluations += 1;
         return self.return_early(SearchResult::StaticEvaluation(score));
@@ -578,6 +610,12 @@ impl AlphaBetaStack {
     fn return_early(&mut self, child_result: SearchResult) -> ErrorResult<Option<LoopResult>> {
         {
             self.log_if_history_matches(|| format!("{}", child_result))?;
+        }
+
+        if let Some(tt) = &mut self.options.transposition_table {
+            let mut tt = tt.borrow_mut();
+            let (current, current_depth) = self.traversal.current()?;
+            tt.update(&current.game, child_result.to_cache_value(), current_depth)?;
         }
 
         if self.traversal.depth() == 0 {
