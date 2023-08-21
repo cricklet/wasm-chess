@@ -337,12 +337,10 @@ struct StaticEvaluationReturn {
     score: Score,
 }
 
-const PV_SIZE: usize = 4;
-
 #[derive(Eq, PartialEq, Clone)]
 struct BestMoveReturn {
-    best_move: Move,
-    response_moves: Vec<Move>, // store a relatively short PV
+    best_move: SimpleMove,
+    response_moves: Vec<SimpleMove>, // store a relatively short PV
     score: Score,
 }
 
@@ -400,7 +398,7 @@ impl SearchResult {
         }
     }
 
-    fn variation(&self) -> Vec<Move> {
+    fn variation(&self) -> Vec<SimpleMove> {
         let mut variation = vec![];
         match self {
             SearchResult::BestMove(result) => {
@@ -426,7 +424,7 @@ struct CachedKillerMoves {
 
 impl CachedKillerMoves {
     pub fn add(&mut self, m: Move) {
-        let m = Some((m.start_index, m.end_index));
+        let m = Some(SimpleMove::from(&m));
         if self.moves[0] == m || self.moves[1] == m {
             return;
         }
@@ -439,7 +437,7 @@ impl CachedKillerMoves {
         let mut sorted_index = 0;
 
         for m in self.moves {
-            if let Some((start, end)) = m {
+            if let Some(SimpleMove { start, end, .. }) = m {
                 let matches = |m: &Move| -> bool { m.start_index == start && m.end_index == end };
 
                 if let Some(i) = moves.iter().position(matches) {
@@ -536,7 +534,7 @@ impl AlphaBetaStack {
         })
     }
 
-    pub fn bestmove(&self) -> Option<(Move, Vec<Move>, Score)> {
+    pub fn bestmove(&self) -> Option<(SimpleMove, Vec<SimpleMove>, Score)> {
         match self.best_move.as_ref() {
             Some(result) => Some((
                 result.best_move,
@@ -617,7 +615,7 @@ impl AlphaBetaStack {
 
         if Score::compare(parent.game.player(), child_score, parent.data.alpha).is_better() {
             parent.data.alpha_move = Some(BestMoveReturn {
-                best_move: *parent_to_child_move,
+                best_move: SimpleMove::from(parent_to_child_move),
                 score: child_score,
                 response_moves: child_result.variation(),
             });
@@ -900,7 +898,7 @@ fn test_start_search() {
     );
 
     let best_move = search.best_move.as_ref().unwrap();
-    assert!(potential_first_moves.contains(&best_move.best_move.to_uci()));
+    assert!(potential_first_moves.contains(&best_move.best_move.to_string()));
 }
 
 #[test]

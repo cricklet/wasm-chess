@@ -2,7 +2,7 @@ use itertools::Itertools;
 use std::{iter, sync::Mutex};
 
 use crate::{
-    alphabeta::{LoopResult, AlphaBetaStack},
+    alphabeta::{AlphaBetaStack, LoopResult},
     bitboard::warm_magic_cache,
     iterative_deepening::{IterativeSearch, IterativeSearchOptions},
 };
@@ -81,8 +81,8 @@ impl Uci {
             match best_move {
                 Some((best_move, response_moves)) => Ok(format!(
                     "bestmove {} ponder {}",
-                    best_move.to_uci(),
-                    response_moves.iter().map(|v| v.to_uci()).join(" ")
+                    best_move,
+                    response_moves.iter().map(|v| v.to_string()).join(" ")
                 )),
                 None => Ok("bestmove (none)".to_string()),
             }

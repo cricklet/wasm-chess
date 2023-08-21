@@ -12,8 +12,8 @@ use crate::{
     alphabeta::Score,
     bitboard::{self, Bitboards, BoardIndex, ForPlayer},
     game::{CanCastleOnSide, Game},
-    helpers::ErrorResult,
-    moves::Move,
+    helpers::{err_result, ErrorResult},
+    moves::{all_moves, Move, MoveOptions},
     types::{CastlingSide, Piece, Player, PlayerPiece},
 };
 
@@ -129,7 +129,46 @@ impl ZobristHash {
     }
 }
 
-pub type SimpleMove = (BoardIndex, BoardIndex);
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct SimpleMove {
+    pub start: BoardIndex,
+    pub end: BoardIndex,
+    pub promotion: Option<Piece>,
+}
+
+impl Display for SimpleMove {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let promo = self.promotion.map(|p| p.to_uci());
+        let promo = promo.unwrap_or(&"");
+        write!(f, "{}{}{}", self.start, self.end, promo)
+    }
+}
+
+impl SimpleMove {
+    pub fn from(m: &Move) -> Self {
+        Self {
+            start: m.start_index,
+            end: m.end_index,
+            promotion: m.promotion,
+        }
+    }
+
+    pub fn make_move(&self, game: Game) -> ErrorResult<Game> {
+        let mut next = game.clone();
+        let mut moves = vec![];
+        all_moves(&mut moves, next.player(), &next, MoveOptions::default())?;
+        for m in &moves {
+            if m.start_index == self.start
+                && m.end_index == self.end
+                && m.promotion == self.promotion
+            {
+                next.make_move(*m)?;
+                return Ok(next);
+            }
+        }
+        return err_result(&format!("couldn't find move {} for game {}", self, game));
+    }
+}
 
 pub struct BestMovesCache {
     best_moves: Vec<Option<(u64, SimpleMove)>>,
@@ -146,19 +185,19 @@ impl BestMovesCache {
         }
     }
 
-    pub fn add(&mut self, game: &Game, m: Move) {
+    pub fn add(&mut self, game: &Game, m: &SimpleMove) {
         let hash = game.zobrist().value();
         let masked = hash & self.mask;
 
-        self.best_moves[masked as usize] = Some((hash, (m.start_index, m.end_index)));
+        self.best_moves[masked as usize] = Some((hash, *m));
     }
 
-    pub fn update(&mut self, game: &Game, moves: &Vec<Move>) -> ErrorResult<()> {
+    pub fn update(&mut self, game: &Game, moves: &Vec<SimpleMove>) -> ErrorResult<()> {
         let mut game = game.clone();
 
         for m in moves {
-            self.add(&game, *m);
-            game.make_move(*m)?;
+            self.add(&game, m);
+            game = m.make_move(game)?;
         }
 
         Ok(())
@@ -175,7 +214,7 @@ impl BestMovesCache {
         let hash = game.zobrist().value();
         let masked = hash & self.mask;
 
-        if let Some((long_hash, (start, end))) = self.best_moves[masked as usize] {
+        if let Some((long_hash, SimpleMove { start, end, .. })) = self.best_moves[masked as usize] {
             if long_hash != hash {
                 return Ok(&mut moves[..]);
             }

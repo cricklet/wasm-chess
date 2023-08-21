@@ -19,7 +19,7 @@ use crate::{
     moves::Move,
     transposition_table::TranspositionTable,
     traversal::null_move_sort,
-    zobrist::BestMovesCache,
+    zobrist::{BestMovesCache, SimpleMove},
 };
 
 #[derive(Debug, Clone)]
@@ -78,7 +78,7 @@ pub struct IterativeSearch {
     alpha_beta: AlphaBetaStack,
     start_game: Game,
 
-    best_variations_per_depth: Vec<Vec<Move>>,
+    best_variations_per_depth: Vec<Vec<SimpleMove>>,
     best_moves_cache: BestMovesCache,
 
     options: IterativeSearchOptions,
@@ -113,7 +113,7 @@ impl IterativeSearch {
         self.alpha_beta.evaluate_at_depth
     }
 
-    pub fn bestmove(&self) -> Option<(Move, Vec<Move>)> {
+    pub fn bestmove(&self) -> Option<(SimpleMove, Vec<SimpleMove>)> {
         let variation = self.best_variations_per_depth.last();
         match variation {
             None => None,
@@ -212,6 +212,17 @@ impl IterativeSearch {
     }
 }
 
+pub fn warmup_iterative_deepening() {
+    // make sure any lazy-statics are generated
+    IterativeSearch::new(
+        Game::from_fen("startpos").unwrap(),
+        IterativeSearchOptions::default(),
+    )
+    .unwrap()
+    .iterate(&mut |_| {})
+    .unwrap();
+}
+
 #[test]
 fn test_iterative_deepening_for_depth() {
     // let fen = "startpos";
@@ -225,14 +236,7 @@ fn test_iterative_deepening_for_depth() {
     // let fen = "6k1/8/4p3/3r4/5n2/1Q6/1K1R4/8 w";
     // let max_depth = 8;
 
-    // make sure any lazy-statics are generated
-    IterativeSearch::new(
-        Game::from_fen(fen).unwrap(),
-        IterativeSearchOptions::default(),
-    )
-    .unwrap()
-    .iterate(&mut |_| {})
-    .unwrap();
+    warmup_iterative_deepening();
 
     let mut results: Vec<(u128, String)> = vec![];
 
