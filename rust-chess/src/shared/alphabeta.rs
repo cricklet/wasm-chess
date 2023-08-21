@@ -5,7 +5,7 @@ use itertools::Itertools;
 use crate::{
     defer,
     helpers::{err_result, pad_left, Joinable, OptionResult},
-    transposition_table::{CachedValue, TranspositionTable, CacheEntry},
+    transposition_table::{CacheEntry, CachedValue, TranspositionTable},
     traversal::{null_move_sort, TraversalStack},
 };
 
@@ -332,24 +332,7 @@ fn test_evaluation_increment() {
 }
 // ************************************************************************************************* //
 
-#[derive(Eq, PartialEq, Clone)]
-struct BestMoveReturn {
-    best_move: SimpleMove,
-    response_moves: Vec<SimpleMove>, // store a relatively short PV
-    score: Score,
-}
-
-impl std::fmt::Debug for BestMoveReturn {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{} {} ({})",
-            self.best_move,
-            self.response_moves.join_vec(" "),
-            self.score
-        )
-    }
-}
+type BestMoveReturn = (Vec<SimpleMove>, Score);
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 enum SearchResult {
@@ -369,13 +352,9 @@ enum SearchResult {
 impl Display for SearchResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SearchResult::BestMove(result) => write!(
-                f,
-                "({}) best {} {}",
-                result.score,
-                result.best_move,
-                result.response_moves.join_vec(" ")
-            ),
+            SearchResult::BestMove((variation, score)) => {
+                write!(f, "({}) best {}", score, variation.join_vec(" "))
+            }
             SearchResult::StaticEvaluation(e) => write!(f, "({}) static", e),
             SearchResult::BetaCutoff(e) => write!(f, "({}) beta cutoff", e),
             SearchResult::AlphaMiss(e) => write!(f, "({}) alpha miss", e),
@@ -386,34 +365,28 @@ impl Display for SearchResult {
 impl SearchResult {
     fn score(&self) -> Score {
         match self {
-            SearchResult::BestMove(result) => result.score,
+            SearchResult::BestMove((_, score)) => *score,
             SearchResult::StaticEvaluation(e) => *e,
             SearchResult::BetaCutoff(e) => *e,
             SearchResult::AlphaMiss(e) => *e,
         }
     }
 
-    fn variation(&self) -> Vec<SimpleMove> {
-        let mut variation = vec![];
+    fn variation(&self) -> Option<&Vec<SimpleMove>> {
         match self {
-            SearchResult::BestMove(result) => {
-                variation.push(result.best_move);
-                for m in result.response_moves.iter() {
-                    variation.push(*m);
-                }
+            SearchResult::BestMove((variation, _)) => {
+                return Some(variation);
             }
             SearchResult::StaticEvaluation(_) => {}
             SearchResult::BetaCutoff(_) => {}
             SearchResult::AlphaMiss(_) => {}
         }
-        variation
+        None
     }
 
     fn to_cache_value(&self) -> CachedValue {
         match self {
-            SearchResult::BestMove(BestMoveReturn {
-                best_move, score, ..
-            }) => CachedValue::Exact(*score, *best_move),
+            SearchResult::BestMove((variation, score)) => CachedValue::Exact(*score, variation[0]),
             SearchResult::StaticEvaluation(score) => CachedValue::Static(*score),
             SearchResult::BetaCutoff(score) => CachedValue::BetaCutoff(*score),
             SearchResult::AlphaMiss(score) => CachedValue::AlphaMiss(*score),
@@ -562,13 +535,9 @@ impl AlphaBetaStack {
         })
     }
 
-    pub fn bestmove(&self) -> Option<(SimpleMove, Vec<SimpleMove>, Score)> {
+    pub fn bestmove(&self) -> Option<(Vec<SimpleMove>, Score)> {
         match self.best_move.as_ref() {
-            Some(result) => Some((
-                result.best_move,
-                result.response_moves.clone(),
-                result.score,
-            )),
+            Some((variation, score)) => Some((variation.clone(), *score)),
             _ => None,
         }
     }
@@ -645,11 +614,11 @@ impl AlphaBetaStack {
         }
 
         if Score::compare(parent.game.player(), child_score, parent.data.alpha).is_better() {
-            parent.data.alpha_move = Some(BestMoveReturn {
-                best_move: SimpleMove::from(parent_to_child_move),
-                score: child_score,
-                response_moves: child_result.variation(),
-            });
+            let mut variation = vec![SimpleMove::from(parent_to_child_move)];
+            if let Some(child_variation) = child_result.variation() {
+                variation.extend(child_variation);
+            }
+            parent.data.alpha_move = Some((variation, child_score));
             parent.data.alpha = child_score;
         }
 
@@ -927,8 +896,8 @@ fn test_start_search() {
             .into_iter(),
     );
 
-    let best_move = search.best_move.as_ref().unwrap();
-    assert!(potential_first_moves.contains(&best_move.best_move.to_string()));
+    let (variation, _) = search.best_move.as_ref().unwrap();
+    assert!(potential_first_moves.contains(&variation[0].to_string()));
 }
 
 #[test]

@@ -171,23 +171,21 @@ impl IterativeSearch {
                             return Ok(());
                         }
                     }
-                    Some((bestmove, response, score)) => {
+                    Some((variation, score)) => {
                         let depth = self.alpha_beta.evaluate_at_depth;
                         log(&format!(
                             "at depth {}: bestmove {} ponder {} ({}), beta-cutoffs {}, evaluations {}, start moves searched {}",
                             depth,
-                            bestmove.to_string(),
-                            response.iter().map(|m| m.to_string()).collect::<Vec<_>>().join_vec(" "),
+                            variation[0].to_string(),
+                            variation[1..].iter().map(|m| m.to_string()).collect::<Vec<_>>().join_vec(" "),
                             score,
                             self.alpha_beta.num_beta_cutoffs,
                             self.alpha_beta.num_evaluations,
                             self.alpha_beta.num_starting_moves_searched,
                         ));
 
-                        let best_variation = iter::once(bestmove).chain(response).collect();
-                        self.best_moves_cache
-                            .update(&self.start_game, &best_variation)?;
-                        self.best_variations_per_depth.push(best_variation);
+                        self.best_moves_cache.update(&self.start_game, &variation)?;
+                        self.best_variations_per_depth.push(variation);
 
                         let mut alpha_beta_options = self.alpha_beta.options.clone();
                         alpha_beta_options.aspiration_window =
