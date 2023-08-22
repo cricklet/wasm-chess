@@ -593,17 +593,6 @@ impl AlphaBetaStack {
             return Ok(None);
         }
 
-        if let Some(entry) = self.transposition_table_entry()? {
-            if let CacheEntry {
-                value: CacheValue::Static(score),
-                ..
-            } = entry
-            {
-                let result = SearchResult::StaticEvaluation(score);
-                return self.return_early(result);
-            }
-        }
-
         let score = Score::Centipawns(current.game.player(), evaluate(&current.game));
 
         self.num_evaluations += 1;
@@ -615,11 +604,18 @@ impl AlphaBetaStack {
             self.log_if_history_matches(|| format!("{}", child_result))?;
         }
 
-        if let Some(tt) = &mut self.options.transposition_table {
-            if let Some(cache_value) = child_result.to_cache_value() {
-                let mut tt = tt.borrow_mut();
-                let (current, current_depth) = self.traversal.current()?;
-                tt.update(&current.game, cache_value, current_depth)?;
+        let in_quiescence = {
+            let (current, _) = self.traversal.current()?;
+            current.data.in_quiescence == InQuiescence::Yes
+        };
+
+        if !in_quiescence {
+            if let Some(tt) = &mut self.options.transposition_table {
+                if let Some(cache_value) = child_result.to_cache_value() {
+                    let mut tt = tt.borrow_mut();
+                    let (current, current_depth) = self.traversal.current()?;
+                    tt.update(&current.game, cache_value, current_depth)?;
+                }
             }
         }
 
@@ -768,6 +764,19 @@ impl AlphaBetaStack {
         };
 
         if !in_quiescence {
+            if let Some(entry) = self.transposition_table_entry()? {
+                let (current, _) = self.traversal.current()?;
+                if let Some(early_return) = SearchResult::from_cache_entry(
+                    &entry,
+                    current.game.player(),
+                    current.data.alpha,
+                    current.data.beta,
+                    self.depth_remaining(self.traversal.depth()),
+                )? {
+                    return Ok(self.return_early(early_return)?.as_result()?);
+                }
+            }
+
             let (current, current_depth) = self.traversal.current_mut()?;
             if current_depth >= self.evaluate_at_depth {
                 let current_danger = current.danger()?;
