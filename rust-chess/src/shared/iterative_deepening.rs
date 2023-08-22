@@ -27,7 +27,7 @@ pub struct IterativeSearchOptions {
     pub skip_quiescence: bool,
     pub skip_cache_sort: bool,
     pub skip_capture_sort: bool,
-    pub skip_killer_move_sort: bool,
+    pub skip_sibling_beta_cutoff_sort: bool,
     pub skip_aspiration_window: bool,
     pub skip_null_move_pruning: bool,
     pub transposition_table: Option<Rc<RefCell<TranspositionTable>>>,
@@ -39,7 +39,7 @@ impl Default for IterativeSearchOptions {
             skip_quiescence: false,
             skip_cache_sort: false,
             skip_capture_sort: false,
-            skip_killer_move_sort: false,
+            skip_sibling_beta_cutoff_sort: false,
             skip_aspiration_window: false,
             skip_null_move_pruning: false,
             transposition_table: None,
@@ -59,8 +59,8 @@ impl Display for IterativeSearchOptions {
         if !self.skip_capture_sort {
             options.push("capture_sort".to_string());
         }
-        if !self.skip_killer_move_sort {
-            options.push("killer_move_sort".to_string());
+        if !self.skip_sibling_beta_cutoff_sort {
+            options.push("sibling_beta_cutoff_sort".to_string());
         }
         if !self.skip_null_move_pruning {
             options.push("null_move_pruning".to_string());
@@ -91,7 +91,7 @@ impl IterativeSearch {
         let best_moves_cache = BestMovesCache::new();
         let search_options = AlphaBetaOptions {
             skip_quiescence: options.skip_quiescence,
-            skip_killer_move_sort: options.skip_killer_move_sort,
+            skip_sibling_beta_cutoff_sort: options.skip_sibling_beta_cutoff_sort,
             skip_null_move_pruning: options.skip_null_move_pruning,
             transposition_table: options.transposition_table.clone(),
 
@@ -242,7 +242,7 @@ fn test_iterative_deepening_for_depth() {
     //     skip_aspiration_window: true,
     //     skip_cache_sort: true,
     //     skip_capture_sort: true,
-    //     skip_killer_move_sort: true,
+    //     skip_sibling_beta_cutoff_sort: true,
     //     skip_null_move_pruning: true,
     //     transposition_table: None,
     //     ..IterativeSearchOptions::default()
@@ -272,7 +272,7 @@ fn test_iterative_deepening_for_depth() {
         //     ..skip_all.clone()
         // },
         // IterativeSearchOptions {
-        //     skip_killer_move_sort: false,
+        //     skip_sibling_beta_cutoff_sort: false,
         //     ..skip_all.clone()
         // },
         // IterativeSearchOptions {

@@ -5,6 +5,7 @@ use crate::bitboard::{
 };
 use crate::board::Board;
 use crate::fen::FenDefinition;
+use crate::moves::castling_side_is_safe;
 
 use super::bitboard::FileRank;
 use super::bitboard::{self, castling_allowed_after_move, Bitboards, BoardIndex};
@@ -302,7 +303,7 @@ impl Game {
         start: BoardIndex,
         end: BoardIndex,
         promo: Option<Piece>,
-    ) -> ErrorResult<Move> {
+    ) -> ErrorResult<Option<Move>> {
         let start_piece = self
             .bitboards()
             .piece_at_index(start)
@@ -311,111 +312,116 @@ impl Game {
         let end_piece = self.bitboards().piece_at_index(end);
 
         if start_piece.player != self.player() {
-            return err_result(&format!(
-                "start index {} occupied by enemy piece {} on board {:#?}",
-                start, start_piece, self
-            ));
+            return Ok(None);
         }
 
         if promo.is_some() && start_piece.piece != Piece::Pawn {
-            return err_result(&format!(
-                "promotion not allowed for non-pawn-piece {} at {} on board {:#?}",
-                start_piece, start, self
-            ));
+            return Ok(None);
         }
 
         // Quiet
-        if end_piece.is_none() {
-            // => Castle
-            if start_piece.piece == Piece::King {
-                if let Some((side, req)) = matches_castling(self.player(), start, end) {
-                    if self.can_castle()[self.player()][side] {
-                        return Ok(Move {
-                            piece: start_piece,
-                            start_index: start,
-                            end_index: end,
-                            move_type: MoveType::Quiet(Quiet::Castle {
-                                rook_start: req.rook_start,
-                                rook_end: req.rook_end,
-                            }),
-                            promotion: promo.expect_none(|| {
-                                "promotions not allowed on castling moves".to_string()
-                            })?,
-                        });
-                    } else {
-                        return err_result(&format!(
-                            "castling move ({}{}) on board where castling not allowed {:#?}",
-                            start, end, self
-                        ));
-                    }
-                }
-            }
-            if start_piece.piece == Piece::Pawn {
-                // => PawnSkip
-                let pawn_dir = pawn_push_direction_for_player(start_piece.player).offset();
-                let pawn_start_mask = starting_pawns_mask(start_piece.player);
-                let starting_bb = single_bitboard(start);
-                if (starting_bb & pawn_start_mask) != 0 {
-                    let skipped = BoardIndex::from((start.i as isize + pawn_dir) as usize);
-                    let expected_end =
-                        BoardIndex::from((start.i as isize + pawn_dir + pawn_dir) as usize);
-
-                    if end == expected_end {
-                        if self.bitboards().is_occupied(skipped) {
-                            return err_result(&format!(
-                                "pawn skip move ({}{}) on board where skipped index {} occupied {:#?}",
-                                start, end, skipped, self
-                            ));
+        match end_piece {
+            None => {
+                // => Castle
+                if start_piece.piece == Piece::King {
+                    if let Some((side, req)) = matches_castling(self.player(), start, end) {
+                        if castling_side_is_safe(side, start_piece.player, self, req)? {
+                            return Ok(Some(Move {
+                                piece: start_piece,
+                                start_index: start,
+                                end_index: end,
+                                move_type: MoveType::Quiet(Quiet::Castle {
+                                    rook_start: req.rook_start,
+                                    rook_end: req.rook_end,
+                                }),
+                                promotion: promo.expect_none(|| {
+                                    "promotions not allowed on castling moves".to_string()
+                                })?,
+                            }));
+                        } else {
+                            return Ok(None);
                         }
-
-                        return Ok(Move {
-                            piece: start_piece,
-                            start_index: start,
-                            end_index: end,
-                            move_type: MoveType::Quiet(Quiet::PawnSkip {
-                                skipped_index: skipped,
-                            }),
-                            promotion: promo.expect_none(|| {
-                                "promotions not allowed on pawn skip moves".to_string()
-                            })?,
-                        });
                     }
                 }
+                if start_piece.piece == Piece::Pawn {
+                    // => PawnSkip
+                    let pawn_dir = pawn_push_direction_for_player(start_piece.player).offset();
+                    let pawn_start_mask = starting_pawns_mask(start_piece.player);
+                    let starting_bb = single_bitboard(start);
+                    if (starting_bb & pawn_start_mask) != 0 {
+                        let skipped = BoardIndex::from((start.i as isize + pawn_dir) as usize);
+                        let expected_end =
+                            BoardIndex::from((start.i as isize + pawn_dir + pawn_dir) as usize);
 
-                // Capture => EnPassant
-                if let Some(en_passant) = self.en_passant() {
-                    if end == en_passant {
-                        let taken_index = BoardIndex::from((end.i as isize - pawn_dir) as usize);
-                        return Ok(Move {
-                            piece: start_piece,
-                            start_index: start,
-                            end_index: end,
-                            move_type: MoveType::Capture(Capture::EnPassant { taken_index }),
-                            promotion: promo.expect_none(|| {
-                                "promotions not allowed on pawn skip moves".to_string()
-                            })?,
-                        });
+                        if end == expected_end {
+                            if self.bitboards().is_occupied(skipped) {
+                                return Ok(None);
+                            }
+
+                            return Ok(Some(Move {
+                                piece: start_piece,
+                                start_index: start,
+                                end_index: end,
+                                move_type: MoveType::Quiet(Quiet::PawnSkip {
+                                    skipped_index: skipped,
+                                }),
+                                promotion: promo.expect_none(|| {
+                                    "promotions not allowed on pawn skip moves".to_string()
+                                })?,
+                            }));
+                        }
+                    }
+
+                    // Capture => EnPassant
+                    if let Some(en_passant) = self.en_passant() {
+                        if end == en_passant {
+                            let taken_index =
+                                BoardIndex::from((end.i as isize - pawn_dir) as usize);
+                            let taken_piece =
+                                self.bitboards().piece_at_index(taken_index).as_result()?;
+                            if taken_piece.piece != Piece::Pawn
+                                && taken_piece.player != self.player().other()
+                            {
+                                return err_result(&format!(
+                                    "taken piece {} for en-passant isn't enemy pawn",
+                                    taken_piece
+                                ));
+                            }
+                            return Ok(Some(Move {
+                                piece: start_piece,
+                                start_index: start,
+                                end_index: end,
+                                move_type: MoveType::Capture(Capture::EnPassant { taken_index }),
+                                promotion: promo.expect_none(|| {
+                                    "promotions not allowed on pawn skip moves".to_string()
+                                })?,
+                            }));
+                        }
                     }
                 }
+                // => Move
+                Ok(Some(Move {
+                    piece: start_piece,
+                    start_index: start,
+                    end_index: end,
+                    move_type: MoveType::Quiet(Quiet::Move),
+                    promotion: promo,
+                }))
             }
-            // => Move
-            Ok(Move {
-                piece: start_piece,
-                start_index: start,
-                end_index: end,
-                move_type: MoveType::Quiet(Quiet::Move),
-                promotion: promo,
-            })
-        } else {
-            Ok(Move {
-                piece: start_piece,
-                start_index: start,
-                end_index: end,
-                move_type: MoveType::Capture(Capture::Take {
-                    taken_piece: end_piece.as_result()?,
-                }),
-                promotion: promo,
-            })
+            Some(end_piece) => {
+                if end_piece.player != self.player().other() {
+                    return Ok(None);
+                }
+                Ok(Some(Move {
+                    piece: start_piece,
+                    start_index: start,
+                    end_index: end,
+                    move_type: MoveType::Capture(Capture::Take {
+                        taken_piece: end_piece,
+                    }),
+                    promotion: promo,
+                }))
+            }
         }
     }
 

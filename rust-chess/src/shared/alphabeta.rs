@@ -7,7 +7,7 @@ use crate::{
     helpers::{err_result, pad_left, Joinable, OptionResult},
     score::Score,
     transposition_table::{CacheEntry, CacheValue, TranspositionTable},
-    traversal::{null_move_sort, TraversalStack, TraversalData},
+    traversal::{null_move_sort, TraversalData, TraversalStack},
 };
 
 use super::{
@@ -146,11 +146,11 @@ impl SearchResult {
 // ************************************************************************************************* //
 
 #[derive(Default, Debug, Eq, PartialEq)]
-struct CachedKillerMoves {
+struct CachedBetaCutoffs {
     moves: [Option<SimpleMove>; 2],
 }
 
-impl CachedKillerMoves {
+impl CachedBetaCutoffs {
     pub fn add(&mut self, m: &SimpleMove) {
         let m = Some(*m);
         if self.moves[0] == m || self.moves[1] == m {
@@ -186,6 +186,10 @@ struct HighPriorityMoves {
 }
 
 impl HighPriorityMoves {
+    pub fn clear(&mut self) {
+        self.moves.clear();
+        self.applied.clear();
+    }
     pub fn add(&mut self, m: &SimpleMove) {
         self.moves.push(*m);
     }
@@ -219,7 +223,9 @@ struct AlphaBetaFrame {
     found_legal_moves: bool,
 
     high_priority_moves: HighPriorityMoves,
-    cached_killer_moves: CachedKillerMoves,
+
+    // The moves that caused beta cutoffs in sibling board positions
+    cached_beta_cutoffs: CachedBetaCutoffs,
 }
 
 impl TraversalData for AlphaBetaFrame {
@@ -229,6 +235,13 @@ impl TraversalData for AlphaBetaFrame {
         self.in_quiescence = previous.in_quiescence;
         self.alpha_move = None;
         self.found_legal_moves = false;
+
+        self.high_priority_moves.clear();
+        for cutoff_move in self.cached_beta_cutoffs.moves.iter() {
+            if let Some(cutoff_move) = cutoff_move {
+                self.high_priority_moves.add(cutoff_move)
+            }
+        }
     }
 }
 
@@ -241,7 +254,7 @@ pub enum LoopResult {
 #[derive(Debug, Default, Clone)]
 pub struct AlphaBetaOptions {
     pub skip_quiescence: bool,
-    pub skip_killer_move_sort: bool,
+    pub skip_sibling_beta_cutoff_sort: bool,
     pub skip_null_move_pruning: bool,
     pub aspiration_window: Option<(Score, Score)>,
     pub transposition_table: Option<Rc<RefCell<TranspositionTable>>>,
@@ -291,7 +304,7 @@ impl AlphaBetaStack {
                     alpha_move: None,
                     found_legal_moves: false,
                     high_priority_moves: HighPriorityMoves::default(),
-                    cached_killer_moves: CachedKillerMoves::default(),
+                    cached_beta_cutoffs: CachedBetaCutoffs::default(),
                 },
             )?,
             best_move: None,
@@ -377,7 +390,13 @@ impl AlphaBetaStack {
 
         let child_score = child_result.score().increment_turns();
         let (parent, _) = self.traversal.current_mut()?;
-        let parent_to_child_move = SimpleMove::from(parent.recent_move()?.as_result()?);
+        let parent_to_child_move = SimpleMove::from(parent.recent_move()?.expect_ok(|| {
+            format!(
+                "parent.recent_move() {:?} couldn't be converted to a simple-move for {:#?}",
+                parent.recent_move(),
+                parent.game
+            )
+        })?);
 
         if Score::compare(parent.game.player(), child_score, parent.data.beta).is_better_or_equal()
         {
@@ -385,7 +404,10 @@ impl AlphaBetaStack {
             // Beta is the lower bound for the score we can get at this board state.
             self.num_beta_cutoffs += 1;
 
-            parent.data.cached_killer_moves.add(&parent_to_child_move);
+            if !self.options.skip_sibling_beta_cutoff_sort {
+                parent.data.cached_beta_cutoffs.add(&parent_to_child_move);
+            }
+
             return self.return_early(SearchResult::BetaCutoff(
                 child_score,
                 Some(parent_to_child_move),
@@ -404,56 +426,52 @@ impl AlphaBetaStack {
         Ok(Some(LoopResult::Continue))
     }
 
+    fn traverse_move(&mut self, m: &Move) -> ErrorResult<Option<LoopResult>> {
+        let (current, next) = self.traversal.current_and_next_mut()?;
+        let result = next.setup(current, &m).unwrap();
+
+        if result == Legal::No {
+            return Ok(Some(LoopResult::Continue));
+        }
+
+        current.data.found_legal_moves = true;
+
+        if self.traversal.depth() == 0 {
+            self.num_starting_moves_searched += 1;
+        }
+
+        // Recurse into our newly applied move
+        self.traversal.increment_depth();
+        Ok(Some(LoopResult::Continue))
+    }
+
     fn traverse_next<S>(&mut self, sorter: S) -> ErrorResult<Option<LoopResult>>
     where
         S: Fn(&Game, &mut [Move]) -> ErrorResult<()>,
     {
-        let skip_killer_move_sort = self.options.skip_killer_move_sort;
-
         let (current, _) = self.traversal.current_mut()?;
         let current_options = current.data.in_quiescence.move_options();
-        let current_game = &current.game;
-        let current_moves = &mut current.moves;
-        let current_killer_moves = &current.data.cached_killer_moves;
 
-        // if !current.data.high_priority_moves.done() {
+        // while !current.data.high_priority_moves.done() {
         //     if let Some(next_move) = current.data.high_priority_moves.next() {
-        //         let (current, next) = self.traversal.current_and_next_mut()?;
-        //         let result = next.setup(current, next_move).unwrap();
+        //         let next_move =
+        //             current
+        //                 .game
+        //                 .move_from(next_move.start, next_move.end, next_move.promotion)?;
 
-        //         if result == Legal::No {
-        //             return Ok(Some(LoopResult::Continue));
+        //         if let Some(next_move) = next_move {
+        //             return self.traverse_move(&next_move);
         //         }
         //     }
         // }
 
-        let next_move = current_moves.next(current_game, current_options, |game, moves| {
-            let moves = if skip_killer_move_sort {
-                moves
-            } else {
-                current_killer_moves.sort(moves)
-            };
-            sorter(game, moves)
-        })?;
+        let (current, _) = self.traversal.current_mut()?;
+        let current_game = &current.game;
+        let current_moves = &mut current.moves;
 
+        let next_move = current_moves.next(current_game, current_options, sorter)?;
         if let Some(next_move) = next_move {
-            // If there are moves left at 'current', apply the move
-            let (current, next) = self.traversal.current_and_next_mut()?;
-            let result = next.setup(current, &next_move).unwrap();
-
-            if result == Legal::No {
-                return Ok(Some(LoopResult::Continue));
-            }
-
-            current.data.found_legal_moves = true;
-
-            if self.traversal.depth() == 0 {
-                self.num_starting_moves_searched += 1;
-            }
-
-            // Recurse into our newly applied move
-            self.traversal.increment_depth();
-            Ok(Some(LoopResult::Continue))
+            return self.traverse_move(&next_move);
         } else {
             Ok(None)
         }
@@ -488,6 +506,9 @@ impl AlphaBetaStack {
     }
 
     pub fn depth_remaining(&self, current_depth: usize) -> usize {
+        if current_depth >= self.evaluate_at_depth {
+            return 0;
+        }
         self.evaluate_at_depth - current_depth
     }
 

@@ -168,7 +168,7 @@ impl Move {
                 ));
             }
         };
-        if simple_move_converted != *self {
+        if simple_move_converted != Some(*self) {
             return err_result(&format!(
                 "bug in simple-move conversion, {:?} != {:?}, for: {:#?}",
                 self, simple_move_converted, game,
@@ -493,47 +493,47 @@ pub fn en_passant_move(
     Ok(())
 }
 
-pub fn castling_moves(buffer: &mut Vec<Move>, player: Player, state: &Game) -> ErrorResult<()> {
-    let allowed_castling_sides = CASTLING_SIDES
-        .iter()
-        .filter(move |&&castling_side| state.can_castle()[player][castling_side]);
+pub fn castling_side_is_safe(
+    side: CastlingSide,
+    player: Player,
+    state: &Game,
+    req: &CastlingRequirements,
+) -> ErrorResult<bool> {
+    if !state.can_castle()[player][side] {
+        return Ok(false);
+    }
 
-    let castling_requirements = allowed_castling_sides
-        .map(move |&castling_side| castling_requirements(player, castling_side));
-
-    let empty_castling_sides = castling_requirements.filter(move |&req| {
-        for &empty_index in &req.require_empty {
-            if state.bitboards().piece_at_index(empty_index).is_some() {
-                return false;
-            }
+    for &empty_index in &req.require_empty {
+        if state.bitboards().piece_at_index(empty_index).is_some() {
+            return Ok(false);
         }
-        return true;
-    });
+    }
 
-    let safe_castling_sides = empty_castling_sides
-        .map(move |req| -> ErrorResult<Option<&CastlingRequirements>> {
-            for &safe_index in &req.require_safe {
-                if index_in_danger(player, safe_index, state.bitboards())? {
-                    return Ok(None);
-                }
-            }
+    for &safe_index in &req.require_safe {
+        if index_in_danger(player, safe_index, state.bitboards())? {
+            return Ok(false);
+        }
+    }
 
-            Ok(Some(req))
-        })
-        .filter_map(|req| req.transpose());
+    return Ok(true);
+}
 
-    for req in safe_castling_sides {
-        let req = req?;
-        buffer.push(Move {
-            piece: PlayerPiece::new(player, Piece::King),
-            start_index: req.king_start,
-            end_index: req.king_end,
-            move_type: MoveType::Quiet(Quiet::Castle {
-                rook_start: req.rook_start,
-                rook_end: req.rook_end,
-            }),
-            promotion: None,
-        });
+pub fn castling_moves(buffer: &mut Vec<Move>, player: Player, state: &Game) -> ErrorResult<()> {
+    for side in CASTLING_SIDES {
+        let req = castling_requirements(player, side);
+
+        if castling_side_is_safe(side, player, state, req)? {
+            buffer.push(Move {
+                piece: PlayerPiece::new(player, Piece::King),
+                start_index: req.king_start,
+                end_index: req.king_end,
+                move_type: MoveType::Quiet(Quiet::Castle {
+                    rook_start: req.rook_start,
+                    rook_end: req.rook_end,
+                }),
+                promotion: None,
+            });
+        }
     }
 
     Ok(())
