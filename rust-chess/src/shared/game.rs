@@ -317,28 +317,37 @@ impl Game {
             ));
         }
 
+        if promo.is_some() && start_piece.piece != Piece::Pawn {
+            return err_result(&format!(
+                "promotion not allowed for non-pawn-piece {} at {} on board {:#?}",
+                start_piece, start, self
+            ));
+        }
+
         // Quiet
         if end_piece.is_none() {
             // => Castle
-            if let Some((side, req)) = matches_castling(self.player(), start, end) {
-                if self.can_castle()[self.player()][side] {
-                    return Ok(Move {
-                        piece: start_piece,
-                        start_index: start,
-                        end_index: end,
-                        move_type: MoveType::Quiet(Quiet::Castle {
-                            rook_start: req.rook_start,
-                            rook_end: req.rook_end,
-                        }),
-                        promotion: promo.expect_none(|| {
-                            "promotions not allowed on castling moves".to_string()
-                        })?,
-                    });
-                } else {
-                    return err_result(&format!(
-                        "castling move ({}{}) cached on board where castling not allowed {:#?}",
-                        start, end, self
-                    ));
+            if start_piece.piece == Piece::King {
+                if let Some((side, req)) = matches_castling(self.player(), start, end) {
+                    if self.can_castle()[self.player()][side] {
+                        return Ok(Move {
+                            piece: start_piece,
+                            start_index: start,
+                            end_index: end,
+                            move_type: MoveType::Quiet(Quiet::Castle {
+                                rook_start: req.rook_start,
+                                rook_end: req.rook_end,
+                            }),
+                            promotion: promo.expect_none(|| {
+                                "promotions not allowed on castling moves".to_string()
+                            })?,
+                        });
+                    } else {
+                        return err_result(&format!(
+                            "castling move ({}{}) on board where castling not allowed {:#?}",
+                            start, end, self
+                        ));
+                    }
                 }
             }
             if start_piece.piece == Piece::Pawn {
@@ -354,23 +363,23 @@ impl Game {
                     if end == expected_end {
                         if self.bitboards().is_occupied(skipped) {
                             return err_result(&format!(
-                                "pawn skip move ({}{}) cached on board where skipped index {} occupied {:#?}",
+                                "pawn skip move ({}{}) on board where skipped index {} occupied {:#?}",
                                 start, end, skipped, self
                             ));
                         }
-                    }
 
-                    return Ok(Move {
-                        piece: start_piece,
-                        start_index: start,
-                        end_index: end,
-                        move_type: MoveType::Quiet(Quiet::PawnSkip {
-                            skipped_index: skipped,
-                        }),
-                        promotion: promo.expect_none(|| {
-                            "promotions not allowed on pawn skip moves".to_string()
-                        })?,
-                    });
+                        return Ok(Move {
+                            piece: start_piece,
+                            start_index: start,
+                            end_index: end,
+                            move_type: MoveType::Quiet(Quiet::PawnSkip {
+                                skipped_index: skipped,
+                            }),
+                            promotion: promo.expect_none(|| {
+                                "promotions not allowed on pawn skip moves".to_string()
+                            })?,
+                        });
+                    }
                 }
 
                 // Capture => EnPassant
@@ -405,8 +414,7 @@ impl Game {
                 move_type: MoveType::Capture(Capture::Take {
                     taken_piece: end_piece.as_result()?,
                 }),
-                promotion: promo
-                    .expect_none(|| "promotions not allowed on capture moves".to_string())?,
+                promotion: promo,
             })
         }
     }
@@ -414,6 +422,11 @@ impl Game {
     pub fn make_move(&mut self, m: Move) -> ErrorResult<()> {
         let player = m.piece.player;
         let enemy = player.other();
+
+        #[cfg(test)]
+        {
+            m.check_simple_move_conversion(self)?;
+        }
 
         for &castling_side in CASTLING_SIDES.iter() {
             if m.piece.piece != Piece::King && m.piece.piece != Piece::Rook {

@@ -1,6 +1,8 @@
 use std::{collections::HashMap, default};
 
-use crate::{bitboard::warm_magic_cache, moves::all_moves, traversal::null_move_sort};
+use crate::{
+    bitboard::warm_magic_cache, moves::all_moves, traversal::null_move_sort, zobrist::SimpleMove,
+};
 
 use super::{
     danger::Danger,
@@ -448,7 +450,7 @@ impl PerftLoop {
         }
     }
 
-    fn iterate(&mut self) -> PerftLoopResult {
+    fn iterate(&mut self) -> ErrorResult<PerftLoopResult> {
         let ref mut traversal = self.stack;
 
         // Leaf node case:
@@ -456,7 +458,7 @@ impl PerftLoop {
             self.count += 1;
             traversal.decrement_depth();
 
-            return PerftLoopResult::Continue;
+            return Ok(PerftLoopResult::Continue);
         }
 
         // We have moves to traverse, dig deeper
@@ -471,30 +473,30 @@ impl PerftLoop {
 
             let result = next.setup(current, &next_move).unwrap();
             if result == Legal::No {
-                return PerftLoopResult::Continue;
+                return Ok(PerftLoopResult::Continue);
             } else {
                 traversal.increment_depth();
-                return PerftLoopResult::Continue;
+                return Ok(PerftLoopResult::Continue);
             }
         }
 
         // We're out of moves to traverse, pop back up.
         if traversal.depth() == 0 {
-            return PerftLoopResult::Done;
+            return Ok(PerftLoopResult::Done);
         } else {
             traversal.decrement_depth();
-            return PerftLoopResult::Continue;
+            return Ok(PerftLoopResult::Continue);
         }
     }
 
-    pub fn iterate_loop(&mut self) -> PerftLoopResult {
+    pub fn iterate_loop(&mut self) -> ErrorResult<PerftLoopResult> {
         for _ in 0..self.loop_count {
-            let result = self.iterate();
+            let result = self.iterate()?;
             if result != PerftLoopResult::Continue {
-                return result;
+                return Ok(result);
             }
         }
 
-        PerftLoopResult::Continue
+        Ok(PerftLoopResult::Continue)
     }
 }

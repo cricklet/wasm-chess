@@ -108,14 +108,19 @@ impl Move {
     }
 
     pub fn to_pretty_str(&self) -> String {
+        let promo = self.promotion.map(|p| p.to_uci());
+        let promo = promo.unwrap_or(&"");
         match self.move_type {
-            MoveType::Quiet(_) => format!("{}-{}", self.piece.to_fen_char(), self.to_uci()),
+            MoveType::Quiet(_) => {
+                format!("{}-{}{}", self.piece.to_fen_char(), self.to_uci(), promo)
+            }
             MoveType::Capture(_) => format!(
-                "{}x{}-{}{}",
+                "{}x{}-{}{}{}",
                 self.piece.to_fen_char(),
                 self.target().unwrap().to_fen_char(),
                 self.start_index,
                 self.end_index,
+                promo,
             ),
             MoveType::Invalid => format!("?"),
         }
@@ -146,17 +151,42 @@ impl Move {
             _ => None,
         }
     }
+
+    #[cfg(test)]
+    pub fn check_simple_move_conversion(&self, game: &Game) -> ErrorResult<()> {
+        use crate::zobrist::SimpleMove;
+
+        let simple_move = SimpleMove::from(&self);
+        let simple_move_converted =
+            game.move_from(simple_move.start, simple_move.end, simple_move.promotion);
+        let simple_move_converted = match simple_move_converted {
+            Ok(m) => m,
+            Err(e) => {
+                return err_result(&format!(
+                    "bug in simple-move conversion, {:?} => {:?}\n{}",
+                    self, simple_move, &e
+                ));
+            }
+        };
+        if simple_move_converted != *self {
+            return err_result(&format!(
+                "bug in simple-move conversion, {:?} != {:?}, for: {:#?}",
+                self, simple_move_converted, game,
+            ));
+        }
+        Ok(())
+    }
 }
 
 impl std::fmt::Display for Move {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self,)
+        write!(f, "{}", self.to_pretty_str())
     }
 }
 
 impl std::fmt::Debug for Move {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.to_pretty_str())
+        write!(f, "{} {:?}", self.to_pretty_str(), self.move_type)
     }
 }
 

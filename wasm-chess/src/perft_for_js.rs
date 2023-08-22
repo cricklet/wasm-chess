@@ -32,7 +32,7 @@ impl PerftForJs {
         let start = chrono::Utc::now();
         match self.data {
             Some(ref mut data) => {
-                let result =  data.iterate_loop();
+                let result =  data.iterate_loop().unwrap();
                 let elapsed = chrono::Utc::now() - start;
                 log_to_js(format!("perft iterated {:#?} in {}ms", result, elapsed.num_milliseconds()).as_str());
 
