@@ -1,7 +1,6 @@
+use crate::{alphabeta::Score, game::Game, helpers::{ErrorResult, err_result}, moves::Move, zobrist::SimpleMove};
 use core::fmt;
-use std::{cell::RefCell, fmt::Formatter};
-
-use crate::{alphabeta::Score, game::Game, helpers::ErrorResult, moves::Move, zobrist::SimpleMove};
+use std::{cell::RefCell, fmt::Formatter, mem::size_of};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CacheValue {
@@ -14,7 +13,7 @@ pub enum CacheValue {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CacheEntry {
     hash: u64,
-    pub depth_remaining: usize,
+    pub depth_remaining: u8,
     pub value: CacheValue,
 }
 
@@ -24,11 +23,12 @@ pub struct TranspositionStats {
     pub misses: usize,
     pub collisions: usize,
     pub updates: usize,
+    pub size_in_bytes: usize,
 }
 
 #[derive(Clone)]
 pub struct TranspositionTable {
-    table: Vec<Option<CacheEntry>>,
+    pub table: Vec<Option<CacheEntry>>,
     bits: usize,
     mask: u64,
     pub stats: RefCell<TranspositionStats>,
@@ -43,16 +43,21 @@ impl fmt::Debug for TranspositionTable {
     }
 }
 
-const DEFAULT_BITS: u32 = 24;
+// 27 => 8gb
+// 26 => 4gb
+const DEFAULT_BITS: u32 = 25;
 
 impl TranspositionTable {
     pub fn new() -> Self {
-        Self {
+        let result = Self {
             table: vec![None; (2 as usize).pow(DEFAULT_BITS)],
             bits: DEFAULT_BITS as usize,
             mask: (2 as u64).pow(DEFAULT_BITS) - 1,
             stats: RefCell::new(TranspositionStats::default()),
-        }
+        };
+        result.stats.borrow_mut().size_in_bytes = size_of::<CacheEntry>() * result.table.len();
+
+        result
     }
 
     pub fn get(&self, game: &Game) -> Option<&CacheEntry> {
@@ -72,7 +77,16 @@ impl TranspositionTable {
         None
     }
 
-    pub fn update(&mut self, game: &Game, value: CacheValue, depth: usize) -> ErrorResult<()> {
+    pub fn update(
+        &mut self,
+        game: &Game,
+        value: CacheValue,
+        depth_remaining: usize,
+    ) -> ErrorResult<()> {
+        if depth_remaining > 255 {
+            return err_result("depth_remaining must be less than 255")
+        }
+
         let hash = game.zobrist().value();
         let mask = hash & self.mask;
 
@@ -80,9 +94,17 @@ impl TranspositionTable {
 
         let entry = &mut self.table[mask as usize];
 
-        // Always replace for now
-        *entry = Some(CacheEntry { hash, depth_remaining: depth, value });
+        if let Some(entry) = &entry {
+            if entry.hash == hash && depth_remaining as u8 <= entry.depth_remaining {
+                return Ok(());
+            }
+        }
 
+        *entry = Some(CacheEntry {
+            hash,
+            depth_remaining: depth_remaining as u8,
+            value,
+        });
         Ok(())
     }
 }

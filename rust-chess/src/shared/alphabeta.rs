@@ -388,12 +388,18 @@ impl SearchResult {
         None
     }
 
-    fn to_cache_value(&self) -> Option<CacheValue> {
+    fn to_cache_value(&self, depth_remaining: usize) -> Option<CacheValue> {
         match self {
             SearchResult::BestMove((variation, score)) => {
                 Some(CacheValue::Exact(*score, variation[0]))
             }
-            SearchResult::StaticEvaluation(score) => Some(CacheValue::Static(*score)),
+            SearchResult::StaticEvaluation(score) => {
+                if depth_remaining == 0 {
+                    Some(CacheValue::Static(*score))
+                } else {
+                    None
+                }
+            }
             SearchResult::BetaCutoff(score, Some(cutoff_move)) => {
                 Some(CacheValue::BetaCutoff(*score, *cutoff_move))
             }
@@ -409,7 +415,7 @@ impl SearchResult {
         beta: Score,
         depth_remaining: usize,
     ) -> ErrorResult<Option<Self>> {
-        if depth_remaining > entry.depth_remaining {
+        if depth_remaining > entry.depth_remaining as usize {
             return Ok(None);
         }
         match entry.value {
@@ -604,17 +610,26 @@ impl AlphaBetaStack {
             self.log_if_history_matches(|| format!("{}", child_result))?;
         }
 
-        let in_quiescence = {
-            let (current, _) = self.traversal.current()?;
-            current.data.in_quiescence == InQuiescence::Yes
+        let (in_quiescence, depth_remaining) = {
+            let (current, current_depth) = self.traversal.current()?;
+            (
+                current.data.in_quiescence == InQuiescence::Yes,
+                self.depth_remaining(current_depth),
+            )
         };
 
         if !in_quiescence {
-            if let Some(tt) = &mut self.options.transposition_table {
-                if let Some(cache_value) = child_result.to_cache_value() {
-                    let mut tt = tt.borrow_mut();
-                    let (current, current_depth) = self.traversal.current()?;
-                    tt.update(&current.game, cache_value, current_depth)?;
+            if self.options.transposition_table.is_some() {
+                if let Some(cache_value) = child_result.to_cache_value(depth_remaining) {
+                    let (current, _) = self.traversal.current()?;
+
+                    let tt = &mut self
+                        .options
+                        .transposition_table
+                        .as_ref()
+                        .as_result()?
+                        .borrow_mut();
+                    tt.update(&current.game, cache_value, depth_remaining)?;
                 }
             }
         }
@@ -630,8 +645,8 @@ impl AlphaBetaStack {
         }
 
         self.traversal.decrement_depth();
-        let child_score = child_result.score().increment_turns();
 
+        let child_score = child_result.score().increment_turns();
         let (parent, _) = self.traversal.current_mut()?;
         let parent_to_child_move = SimpleMove::from(parent.recent_move()?.as_result()?);
 
