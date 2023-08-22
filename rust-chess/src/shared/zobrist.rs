@@ -9,8 +9,7 @@ use rand_chacha::ChaCha8Rng;
 use strum::IntoEnumIterator;
 
 use crate::{
-    alphabeta::Score,
-    bitboard::{self, Bitboards, BoardIndex, ForPlayer},
+    bitboard::{Bitboards, BoardIndex, ForPlayer},
     game::{CanCastleOnSide, Game},
     helpers::{err_result, ErrorResult},
     moves::{all_moves, Move, MoveOptions},

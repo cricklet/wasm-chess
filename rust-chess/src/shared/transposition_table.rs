@@ -1,4 +1,4 @@
-use crate::{alphabeta::Score, game::Game, helpers::{ErrorResult, err_result}, moves::Move, zobrist::SimpleMove};
+use crate::{game::Game, helpers::{ErrorResult, err_result}, moves::Move, zobrist::SimpleMove, score::Score};
 use core::fmt;
 use std::{cell::RefCell, fmt::Formatter, mem::size_of};
 

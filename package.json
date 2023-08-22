@@ -16,6 +16,6 @@
 
         "watch": "watchexec -e rs",
 
-        "all": "yarn build-wasm && yarn build-perft && yarn build-uci && yarn test"
+        "all": "yarn build-wasm && yarn build-uci && yarn test"
     }
 }

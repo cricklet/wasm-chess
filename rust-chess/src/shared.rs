@@ -15,5 +15,6 @@ pub mod perft;
 pub mod transposition_table;
 pub mod traversal;
 pub mod types;
+pub mod score;
 pub mod uci;
 pub mod zobrist;
