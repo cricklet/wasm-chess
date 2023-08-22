@@ -5,7 +5,7 @@ use itertools::Itertools;
 use crate::{
     defer,
     helpers::{err_result, pad_left, Joinable, OptionResult},
-    transposition_table::{CacheEntry, CachedValue, TranspositionTable},
+    transposition_table::{CacheEntry, CacheValue, TranspositionTable},
     traversal::{null_move_sort, TraversalStack},
 };
 
@@ -91,6 +91,9 @@ impl Comparison {
     }
     pub fn is_better(self) -> bool {
         self == Comparison::Better
+    }
+    pub fn is_worse(self) -> bool {
+        self == Comparison::Worse
     }
 }
 
@@ -343,9 +346,10 @@ enum SearchResult {
     StaticEvaluation(Score),
 
     // Returned if we fail beta cut-off
-    BetaCutoff(Score),
+    BetaCutoff(Score, Option<SimpleMove>),
 
-    // Returned if we fail to improve alpha
+    // Returned if we fail to improve alpha. We don't have a
+    // recommended move in this case because all failed low.
     AlphaMiss(Score),
 }
 
@@ -356,7 +360,7 @@ impl Display for SearchResult {
                 write!(f, "({}) best {}", score, variation.join_vec(" "))
             }
             SearchResult::StaticEvaluation(e) => write!(f, "({}) static", e),
-            SearchResult::BetaCutoff(e) => write!(f, "({}) beta cutoff", e),
+            SearchResult::BetaCutoff(e, _) => write!(f, "({}) beta cutoff", e),
             SearchResult::AlphaMiss(e) => write!(f, "({}) alpha miss", e),
         }
     }
@@ -367,7 +371,7 @@ impl SearchResult {
         match self {
             SearchResult::BestMove((_, score)) => *score,
             SearchResult::StaticEvaluation(e) => *e,
-            SearchResult::BetaCutoff(e) => *e,
+            SearchResult::BetaCutoff(e, _) => *e,
             SearchResult::AlphaMiss(e) => *e,
         }
     }
@@ -378,42 +382,72 @@ impl SearchResult {
                 return Some(variation);
             }
             SearchResult::StaticEvaluation(_) => {}
-            SearchResult::BetaCutoff(_) => {}
+            SearchResult::BetaCutoff(_, _) => {}
             SearchResult::AlphaMiss(_) => {}
         }
         None
     }
 
-    fn to_cache_value(&self) -> CachedValue {
+    fn to_cache_value(&self) -> Option<CacheValue> {
         match self {
-            SearchResult::BestMove((variation, score)) => CachedValue::Exact(*score, variation[0]),
-            SearchResult::StaticEvaluation(score) => CachedValue::Static(*score),
-            SearchResult::BetaCutoff(score) => CachedValue::BetaCutoff(*score),
-            SearchResult::AlphaMiss(score) => CachedValue::AlphaMiss(*score),
+            SearchResult::BestMove((variation, score)) => {
+                Some(CacheValue::Exact(*score, variation[0]))
+            }
+            SearchResult::StaticEvaluation(score) => Some(CacheValue::Static(*score)),
+            SearchResult::BetaCutoff(score, Some(cutoff_move)) => {
+                Some(CacheValue::BetaCutoff(*score, *cutoff_move))
+            }
+            SearchResult::BetaCutoff(_, None) => None,
+            SearchResult::AlphaMiss(score) => Some(CacheValue::AlphaMiss(*score)),
         }
     }
 
-    // fn from_cache_entry(entry: &CacheEntry, player: Player, alpha: Score, beta: Score, depth_remaining: usize) -> Self {
-    //     match entry.value {
-    //         CacheValue::Static(score) => if depth_remaining == 0 {},
-    //         CacheValue::Exact(score, best_move) => {
-    //             if Score::compare(player, score, beta).is_better_or_equal() {
-    //                 Self::BetaCutoff(score)
-    //             } else if Score::compare(current_player, score, alpha).is_better() {
-    //                 Self::BestMove(BestMove {
-    //                     best_move: Move::new(best_move.start, best_move.1),
-    //                     score,
-    //                     response_moves: vec![],
-    //                 })
-    //                 CacheValue::Exact(score, best_move)
-    //             } else {
-    //                 CacheValue::AlphaMiss(score)
-    //             }
-    //         }
-    //         CacheValue::BetaCutoff(score) => score,
-    //         CacheValue::AlphaMiss(score) => score,
-    //     }
-    // }
+    fn from_cache_entry(
+        entry: &CacheEntry,
+        player: Player,
+        alpha: Score,
+        beta: Score,
+        depth_remaining: usize,
+    ) -> ErrorResult<Option<Self>> {
+        if depth_remaining > entry.depth_remaining {
+            return Ok(None);
+        }
+        match entry.value {
+            CacheValue::Static(score) => {
+                if depth_remaining != 0 {
+                    return err_result(
+                        "static evaluations should only happen if there's 0 depth remaining",
+                    );
+                }
+                Ok(Some(SearchResult::StaticEvaluation(score)))
+            }
+            CacheValue::Exact(score, best_move) => {
+                if Score::compare(player, score, beta).is_better_or_equal() {
+                    Ok(Some(Self::BetaCutoff(score, Some(best_move))))
+                } else if Score::compare(player, score, alpha).is_better() {
+                    Ok(Some(Self::BestMove((vec![best_move], score))))
+                } else {
+                    Ok(Some(Self::AlphaMiss(score)))
+                }
+            }
+            CacheValue::BetaCutoff(score, cutoff_move) => {
+                if Score::compare(player, score, beta).is_better_or_equal() {
+                    Ok(Some(Self::BetaCutoff(score, Some(cutoff_move))))
+                } else {
+                    Ok(None)
+                }
+            }
+            CacheValue::AlphaMiss(score) => {
+                if Score::compare(player, score, alpha).is_better() {
+                    Ok(None)
+                } else {
+                    Ok(Some(Self::AlphaMiss(score)))
+                }
+            }
+            #[allow(unreachable_patterns)]
+            _ => Ok(None),
+        }
+    }
 }
 
 // ************************************************************************************************* //
@@ -424,8 +458,8 @@ struct CachedKillerMoves {
 }
 
 impl CachedKillerMoves {
-    pub fn add(&mut self, m: Move) {
-        let m = Some(SimpleMove::from(&m));
+    pub fn add(&mut self, m: &SimpleMove) {
+        let m = Some(*m);
         if self.moves[0] == m || self.moves[1] == m {
             return;
         }
@@ -561,7 +595,7 @@ impl AlphaBetaStack {
 
         if let Some(entry) = self.transposition_table_entry()? {
             if let CacheEntry {
-                value: CachedValue::Static(score),
+                value: CacheValue::Static(score),
                 ..
             } = entry
             {
@@ -582,9 +616,11 @@ impl AlphaBetaStack {
         }
 
         if let Some(tt) = &mut self.options.transposition_table {
-            let mut tt = tt.borrow_mut();
-            let (current, current_depth) = self.traversal.current()?;
-            tt.update(&current.game, child_result.to_cache_value(), current_depth)?;
+            if let Some(cache_value) = child_result.to_cache_value() {
+                let mut tt = tt.borrow_mut();
+                let (current, current_depth) = self.traversal.current()?;
+                tt.update(&current.game, cache_value, current_depth)?;
+            }
         }
 
         if self.traversal.depth() == 0 {
@@ -601,7 +637,7 @@ impl AlphaBetaStack {
         let child_score = child_result.score().increment_turns();
 
         let (parent, _) = self.traversal.current_mut()?;
-        let parent_to_child_move = parent.recent_move()?.as_result()?;
+        let parent_to_child_move = SimpleMove::from(parent.recent_move()?.as_result()?);
 
         if Score::compare(parent.game.player(), child_score, parent.data.beta).is_better_or_equal()
         {
@@ -609,12 +645,15 @@ impl AlphaBetaStack {
             // Beta is the lower bound for the score we can get at this board state.
             self.num_beta_cutoffs += 1;
 
-            parent.data.cached_killer_moves.add(*parent_to_child_move);
-            return self.return_early(SearchResult::BetaCutoff(child_score));
+            parent.data.cached_killer_moves.add(&parent_to_child_move);
+            return self.return_early(SearchResult::BetaCutoff(
+                child_score,
+                Some(parent_to_child_move),
+            ));
         }
 
         if Score::compare(parent.game.player(), child_score, parent.data.alpha).is_better() {
-            let mut variation = vec![SimpleMove::from(parent_to_child_move)];
+            let mut variation = vec![parent_to_child_move];
             if let Some(child_variation) = child_result.variation() {
                 variation.extend(child_variation);
             }
@@ -758,7 +797,7 @@ impl AlphaBetaStack {
                         .is_better_or_equal()
                     {
                         return Ok(self
-                            .return_early(SearchResult::BetaCutoff(current_beta))?
+                            .return_early(SearchResult::BetaCutoff(current_beta, None))?
                             .as_result()?);
                     }
                 }
@@ -779,7 +818,7 @@ impl AlphaBetaStack {
                 if Score::compare(current_player, stand_pat, current_beta).is_better_or_equal() {
                     // The enemy will avoid this line
                     return Ok(self
-                        .return_early(SearchResult::BetaCutoff(current_beta))?
+                        .return_early(SearchResult::BetaCutoff(current_beta, None))?
                         .as_result()?);
                 } else if Score::compare(current_player, stand_pat, current_alpha).is_better() {
                     // If no capture is better than stand-pat, we should probably not capture in this situation!

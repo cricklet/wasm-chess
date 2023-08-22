@@ -4,18 +4,18 @@ use std::{cell::RefCell, fmt::Formatter};
 use crate::{alphabeta::Score, game::Game, helpers::ErrorResult, moves::Move, zobrist::SimpleMove};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CachedValue {
+pub enum CacheValue {
     Static(Score),
     Exact(Score, SimpleMove),
-    BetaCutoff(Score), // lower bound
-    AlphaMiss(Score),  // upper bound
+    BetaCutoff(Score, SimpleMove),
+    AlphaMiss(Score),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CacheEntry {
     hash: u64,
-    pub depth: usize,
-    pub value: CachedValue,
+    pub depth_remaining: usize,
+    pub value: CacheValue,
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -72,7 +72,7 @@ impl TranspositionTable {
         None
     }
 
-    pub fn update(&mut self, game: &Game, value: CachedValue, depth: usize) -> ErrorResult<()> {
+    pub fn update(&mut self, game: &Game, value: CacheValue, depth: usize) -> ErrorResult<()> {
         let hash = game.zobrist().value();
         let mask = hash & self.mask;
 
@@ -81,7 +81,7 @@ impl TranspositionTable {
         let entry = &mut self.table[mask as usize];
 
         // Always replace for now
-        *entry = Some(CacheEntry { hash, depth, value });
+        *entry = Some(CacheEntry { hash, depth_remaining: depth, value });
 
         Ok(())
     }

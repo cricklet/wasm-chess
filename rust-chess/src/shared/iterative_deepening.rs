@@ -228,7 +228,7 @@ fn test_iterative_deepening_for_depth() {
 
     // mid-game fen
     let fen = "r3k2r/1bq1bppp/pp2p3/2p1n3/P3PP2/2PBN3/1P1BQ1PP/R4RK1 b kq - 0 16";
-    let max_depth = 7;
+    let max_depth = 6;
 
     // // late-game fen
     // let fen = "6k1/8/4p3/3r4/5n2/1Q6/1K1R4/8 w";
