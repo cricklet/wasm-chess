@@ -40,10 +40,6 @@ impl<D: Debug + TraversalData> TraversalStackFrame<D> {
             .cloned()
     }
 
-    pub fn recent_move(&self) -> ErrorResult<Option<&Move>> {
-        self.moves.last()
-    }
-
     pub fn setup(
         &mut self,
         previous: &mut TraversalStackFrame<D>,

@@ -221,6 +221,7 @@ pub fn warmup_iterative_deepening() {
     .unwrap();
 }
 
+#[allow(unused)]
 #[test]
 fn test_iterative_deepening_for_depth() {
     // let fen = "startpos";
@@ -228,7 +229,7 @@ fn test_iterative_deepening_for_depth() {
 
     // mid-game fen
     let fen = "r3k2r/1bq1bppp/pp2p3/2p1n3/P3PP2/2PBN3/1P1BQ1PP/R4RK1 b kq - 0 16";
-    let max_depth = 9;
+    let max_depth = 8;
 
     // // late-game fen
     // let fen = "6k1/8/4p3/3r4/5n2/1Q6/1K1R4/8 w";
@@ -238,15 +239,15 @@ fn test_iterative_deepening_for_depth() {
 
     let mut results: Vec<(u128, String)> = vec![];
 
-    // let skip_all = IterativeSearchOptions {
-    //     skip_aspiration_window: true,
-    //     skip_cache_sort: true,
-    //     skip_capture_sort: true,
-    //     skip_sibling_beta_cutoff_sort: true,
-    //     skip_null_move_pruning: true,
-    //     transposition_table: None,
-    //     ..IterativeSearchOptions::default()
-    // };
+    let skip_all = IterativeSearchOptions {
+        skip_aspiration_window: true,
+        skip_cache_sort: true,
+        skip_capture_sort: true,
+        skip_sibling_beta_cutoff_sort: true,
+        skip_null_move_pruning: true,
+        transposition_table: None,
+        ..IterativeSearchOptions::default()
+    };
 
     let transposition_table = Some(Rc::new(RefCell::new(TranspositionTable::new())));
 
@@ -271,10 +272,10 @@ fn test_iterative_deepening_for_depth() {
         //     skip_capture_sort: false,
         //     ..skip_all.clone()
         // },
-        // IterativeSearchOptions {
-        //     skip_sibling_beta_cutoff_sort: false,
-        //     ..skip_all.clone()
-        // },
+        IterativeSearchOptions {
+            skip_sibling_beta_cutoff_sort: false,
+            ..skip_all.clone()
+        },
         // IterativeSearchOptions {
         //     skip_null_move_pruning: false,
         //     ..skip_all.clone()

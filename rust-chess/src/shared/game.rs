@@ -304,10 +304,11 @@ impl Game {
         end: BoardIndex,
         promo: Option<Piece>,
     ) -> ErrorResult<Option<Move>> {
-        let start_piece = self
-            .bitboards()
-            .piece_at_index(start)
-            .expect_ok(|| format!("start index {} unoccupied on board {:#?}", start, self))?;
+        let start_piece = self.bitboards().piece_at_index(start);
+        let start_piece = match start_piece {
+            Some(start_piece) => start_piece,
+            None => return Ok(None),
+        };
 
         let end_piece = self.bitboards().piece_at_index(end);
 
@@ -410,6 +411,9 @@ impl Game {
             }
             Some(end_piece) => {
                 if end_piece.player != self.player().other() {
+                    return Ok(None);
+                }
+                if end_piece.piece == Piece::King {
                     return Ok(None);
                 }
                 Ok(Some(Move {

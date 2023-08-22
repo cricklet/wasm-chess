@@ -1,4 +1,10 @@
-use crate::{game::Game, helpers::{ErrorResult, err_result}, moves::Move, zobrist::SimpleMove, score::Score};
+use crate::{
+    game::Game,
+    helpers::{err_result, ErrorResult},
+    moves::Move,
+    score::Score,
+    zobrist::SimpleMove,
+};
 use core::fmt;
 use std::{cell::RefCell, fmt::Formatter, mem::size_of};
 
@@ -8,6 +14,16 @@ pub enum CacheValue {
     Exact(Score, SimpleMove),
     BetaCutoff(Score, SimpleMove),
     AlphaMiss(Score),
+}
+
+impl CacheValue {
+    pub fn best_move(&self) -> Option<SimpleMove> {
+        match self {
+            CacheValue::Exact(_, m) => Some(*m),
+            CacheValue::BetaCutoff(_, m) => Some(*m),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -84,7 +100,7 @@ impl TranspositionTable {
         depth_remaining: usize,
     ) -> ErrorResult<()> {
         if depth_remaining > 255 {
-            return err_result("depth_remaining must be less than 255")
+            return err_result("depth_remaining must be less than 255");
         }
 
         let hash = game.zobrist().value();

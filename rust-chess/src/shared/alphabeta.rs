@@ -224,6 +224,8 @@ struct AlphaBetaFrame {
 
     high_priority_moves: HighPriorityMoves,
 
+    last_applied_move: Option<SimpleMove>,
+
     // The moves that caused beta cutoffs in sibling board positions
     cached_beta_cutoffs: CachedBetaCutoffs,
 }
@@ -235,6 +237,7 @@ impl TraversalData for AlphaBetaFrame {
         self.in_quiescence = previous.in_quiescence;
         self.alpha_move = None;
         self.found_legal_moves = false;
+        self.last_applied_move = None;
 
         self.high_priority_moves.clear();
         for cutoff_move in self.cached_beta_cutoffs.moves.iter() {
@@ -304,6 +307,7 @@ impl AlphaBetaStack {
                     alpha_move: None,
                     found_legal_moves: false,
                     high_priority_moves: HighPriorityMoves::default(),
+                    last_applied_move: None,
                     cached_beta_cutoffs: CachedBetaCutoffs::default(),
                 },
             )?,
@@ -390,13 +394,12 @@ impl AlphaBetaStack {
 
         let child_score = child_result.score().increment_turns();
         let (parent, _) = self.traversal.current_mut()?;
-        let parent_to_child_move = SimpleMove::from(parent.recent_move()?.expect_ok(|| {
+        let parent_to_child_move = parent.data.last_applied_move.expect_ok(|| {
             format!(
-                "parent.recent_move() {:?} couldn't be converted to a simple-move for {:#?}",
-                parent.recent_move(),
-                parent.game
+                "last_move should exist on parent when handling child_result: {:#?}\nparent {:#?}",
+                child_result, parent,
             )
-        })?);
+        })?;
 
         if Score::compare(parent.game.player(), child_score, parent.data.beta).is_better_or_equal()
         {
@@ -427,21 +430,48 @@ impl AlphaBetaStack {
     }
 
     fn traverse_move(&mut self, m: &Move) -> ErrorResult<Option<LoopResult>> {
-        let (current, next) = self.traversal.current_and_next_mut()?;
-        let result = next.setup(current, &m).unwrap();
+        {
+            let (current, next) = self.traversal.current_and_next_mut()?;
+            let result = next.setup(current, &m).unwrap();
 
-        if result == Legal::No {
-            return Ok(Some(LoopResult::Continue));
-        }
+            if result == Legal::No {
+                return Ok(Some(LoopResult::Continue));
+            }
 
-        current.data.found_legal_moves = true;
+            current.data.last_applied_move = Some(SimpleMove::from(m));
+            current.data.found_legal_moves = true;
 
-        if self.traversal.depth() == 0 {
-            self.num_starting_moves_searched += 1;
+            if self.traversal.depth() == 0 {
+                self.num_starting_moves_searched += 1;
+            }
         }
 
         // Recurse into our newly applied move
         self.traversal.increment_depth();
+
+        {
+            if let Some(entry) = self.transposition_table_entry()? {
+                let (current, _) = self.traversal.current()?;
+
+                // Return immediately if we can
+                if let Some(early_return) = SearchResult::from_cache_entry(
+                    &entry,
+                    current.game.player(),
+                    current.data.alpha,
+                    current.data.beta,
+                    self.depth_remaining(self.traversal.depth()),
+                )? {
+                    return self.return_early(early_return);
+                }
+
+                // Otherwise, prioritize the previous best-move
+                if let Some(best_move) = entry.value.best_move() {
+                    let (current, _) = self.traversal.current_mut()?;
+                    current.data.high_priority_moves.add(&best_move);
+                }
+            }
+        }
+
         Ok(Some(LoopResult::Continue))
     }
 
@@ -452,18 +482,18 @@ impl AlphaBetaStack {
         let (current, _) = self.traversal.current_mut()?;
         let current_options = current.data.in_quiescence.move_options();
 
-        // while !current.data.high_priority_moves.done() {
-        //     if let Some(next_move) = current.data.high_priority_moves.next() {
-        //         let next_move =
-        //             current
-        //                 .game
-        //                 .move_from(next_move.start, next_move.end, next_move.promotion)?;
+        while !current.data.high_priority_moves.done() {
+            if let Some(next_move) = current.data.high_priority_moves.next() {
+                let next_move =
+                    current
+                        .game
+                        .move_from(next_move.start, next_move.end, next_move.promotion)?;
 
-        //         if let Some(next_move) = next_move {
-        //             return self.traverse_move(&next_move);
-        //         }
-        //     }
-        // }
+                if let Some(next_move) = next_move {
+                    return self.traverse_move(&next_move);
+                }
+            }
+        }
 
         let (current, _) = self.traversal.current_mut()?;
         let current_game = &current.game;
@@ -534,19 +564,6 @@ impl AlphaBetaStack {
         };
 
         if !in_quiescence {
-            if let Some(entry) = self.transposition_table_entry()? {
-                let (current, _) = self.traversal.current()?;
-                if let Some(early_return) = SearchResult::from_cache_entry(
-                    &entry,
-                    current.game.player(),
-                    current.data.alpha,
-                    current.data.beta,
-                    self.depth_remaining(self.traversal.depth()),
-                )? {
-                    return Ok(self.return_early(early_return)?.as_result()?);
-                }
-            }
-
             let (current, current_depth) = self.traversal.current_mut()?;
             if current_depth >= self.evaluate_at_depth {
                 let current_danger = current.danger()?;
