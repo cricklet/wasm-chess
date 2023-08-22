@@ -5,8 +5,9 @@ use itertools::Itertools;
 use crate::{
     defer,
     helpers::{err_result, pad_left, Joinable, OptionResult},
+    score::Score,
     transposition_table::{CacheEntry, CacheValue, TranspositionTable},
-    traversal::{null_move_sort, TraversalStack}, score::Score,
+    traversal::{null_move_sort, TraversalStack},
 };
 
 use super::{
@@ -179,6 +180,36 @@ impl CachedKillerMoves {
 }
 
 #[derive(Default, Debug, Eq, PartialEq)]
+struct HighPriorityMoves {
+    moves: Vec<SimpleMove>,
+    applied: HashSet<SimpleMove>,
+}
+
+impl HighPriorityMoves {
+    pub fn add(&mut self, m: &SimpleMove) {
+        self.moves.push(*m);
+    }
+    pub fn done(&self) -> bool {
+        self.moves.is_empty()
+    }
+    pub fn next(&mut self) -> Option<SimpleMove> {
+        let m = self.moves.pop();
+        if let Some(m) = &m {
+            if self.applied.contains(m) {
+                return self.next();
+            }
+            self.applied.insert(*m);
+            Some(*m)
+        } else {
+            None
+        }
+    }
+    pub fn already_applied(&self, m: &SimpleMove) -> bool {
+        self.applied.contains(m)
+    }
+}
+
+#[derive(Default, Debug, Eq, PartialEq)]
 struct AlphaBetaFrame {
     alpha: Score,
     beta: Score,
@@ -186,6 +217,8 @@ struct AlphaBetaFrame {
 
     alpha_move: Option<BestMoveReturn>,
     found_legal_moves: bool,
+
+    high_priority_moves: HighPriorityMoves,
 
     cached_killer_moves: CachedKillerMoves,
 }
@@ -248,6 +281,7 @@ impl AlphaBetaStack {
                     in_quiescence: InQuiescence::No,
                     alpha_move: None,
                     found_legal_moves: false,
+                    high_priority_moves: HighPriorityMoves::default(),
                     cached_killer_moves: CachedKillerMoves::default(),
                 },
             )?,
@@ -372,6 +406,18 @@ impl AlphaBetaStack {
         let current_game = &current.game;
         let current_moves = &mut current.moves;
         let current_killer_moves = &current.data.cached_killer_moves;
+
+        // if !current.data.high_priority_moves.done() {
+        //     if let Some(next_move) = current.data.high_priority_moves.next() {
+        //         let (current, next) = self.traversal.current_and_next_mut()?;
+        //         let result = next.setup(current, next_move).unwrap();
+
+        //         if result == Legal::No {
+        //             return Ok(Some(LoopResult::Continue));
+        //         }
+        //     }
+        // }
+
         let next_move = current_moves.next(current_game, current_options, |game, moves| {
             let moves = if skip_killer_move_sort {
                 moves

@@ -387,12 +387,20 @@ fn test_map_results() {
 
 pub trait OptionResult<T> {
     fn expect_ok<F: Fn() -> String>(self, msg_callback: F) -> ErrorResult<T>;
+    fn expect_none<F: Fn() -> String>(self, msg_callback: F) -> ErrorResult<Option<T>>;
     fn as_result(self) -> ErrorResult<T>;
 }
 
 impl<T> OptionResult<T> for Option<T> {
     fn expect_ok<F: Fn() -> String>(self, msg_callback: F) -> ErrorResult<T> {
         self.ok_or_else(|| err(&msg_callback()))
+    }
+
+    fn expect_none<F: Fn() -> String>(self, msg_callback: F) -> ErrorResult<Option<T>> {
+        match self {
+            Some(_) => err_result(&msg_callback()),
+            None => Ok(None),
+        }
     }
 
     fn as_result(self) -> ErrorResult<T> {
@@ -522,9 +530,7 @@ pub struct AutoVec<T: Default> {
 
 impl<T: Default> AutoVec<T> {
     pub fn new(t: T) -> Self {
-        Self {
-            vec: vec![t],
-        }
+        Self { vec: vec![t] }
     }
 
     pub fn get(&mut self, i: usize) -> ErrorResult<&mut T> {

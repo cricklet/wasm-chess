@@ -1,5 +1,8 @@
 use strum::IntoEnumIterator;
 
+use crate::bitboard::{
+    matches_castling, pawn_push_direction_for_player, single_bitboard, starting_pawns_mask,
+};
 use crate::board::Board;
 use crate::fen::FenDefinition;
 
@@ -292,6 +295,120 @@ impl Game {
             }
         }
         Legal::Yes
+    }
+
+    pub fn move_from(
+        &self,
+        start: BoardIndex,
+        end: BoardIndex,
+        promo: Option<Piece>,
+    ) -> ErrorResult<Move> {
+        let start_piece = self
+            .bitboards()
+            .piece_at_index(start)
+            .expect_ok(|| format!("start index {} unoccupied on board {:#?}", start, self))?;
+
+        let end_piece = self.bitboards().piece_at_index(end);
+
+        if start_piece.player != self.player() {
+            return err_result(&format!(
+                "start index {} occupied by enemy piece {} on board {:#?}",
+                start, start_piece, self
+            ));
+        }
+
+        // Quiet
+        if end_piece.is_none() {
+            // => Castle
+            if let Some((side, req)) = matches_castling(self.player(), start, end) {
+                if self.can_castle()[self.player()][side] {
+                    return Ok(Move {
+                        piece: start_piece,
+                        start_index: start,
+                        end_index: end,
+                        move_type: MoveType::Quiet(Quiet::Castle {
+                            rook_start: req.rook_start,
+                            rook_end: req.rook_end,
+                        }),
+                        promotion: promo.expect_none(|| {
+                            "promotions not allowed on castling moves".to_string()
+                        })?,
+                    });
+                } else {
+                    return err_result(&format!(
+                        "castling move ({}{}) cached on board where castling not allowed {:#?}",
+                        start, end, self
+                    ));
+                }
+            }
+            if start_piece.piece == Piece::Pawn {
+                // => PawnSkip
+                let pawn_dir = pawn_push_direction_for_player(start_piece.player).offset();
+                let pawn_start_mask = starting_pawns_mask(start_piece.player);
+                let starting_bb = single_bitboard(start);
+                if (starting_bb & pawn_start_mask) != 0 {
+                    let skipped = BoardIndex::from((start.i as isize + pawn_dir) as usize);
+                    let expected_end =
+                        BoardIndex::from((start.i as isize + pawn_dir + pawn_dir) as usize);
+
+                    if end == expected_end {
+                        if self.bitboards().is_occupied(skipped) {
+                            return err_result(&format!(
+                                "pawn skip move ({}{}) cached on board where skipped index {} occupied {:#?}",
+                                start, end, skipped, self
+                            ));
+                        }
+                    }
+
+                    return Ok(Move {
+                        piece: start_piece,
+                        start_index: start,
+                        end_index: end,
+                        move_type: MoveType::Quiet(Quiet::PawnSkip {
+                            skipped_index: skipped,
+                        }),
+                        promotion: promo.expect_none(|| {
+                            "promotions not allowed on pawn skip moves".to_string()
+                        })?,
+                    });
+                }
+
+                // Capture => EnPassant
+                if let Some(en_passant) = self.en_passant() {
+                    if end == en_passant {
+                        let taken_index = BoardIndex::from((end.i as isize - pawn_dir) as usize);
+                        return Ok(Move {
+                            piece: start_piece,
+                            start_index: start,
+                            end_index: end,
+                            move_type: MoveType::Capture(Capture::EnPassant { taken_index }),
+                            promotion: promo.expect_none(|| {
+                                "promotions not allowed on pawn skip moves".to_string()
+                            })?,
+                        });
+                    }
+                }
+            }
+            // => Move
+            Ok(Move {
+                piece: start_piece,
+                start_index: start,
+                end_index: end,
+                move_type: MoveType::Quiet(Quiet::Move),
+                promotion: promo,
+            })
+        } else {
+            Ok(Move {
+                piece: start_piece,
+                start_index: start,
+                end_index: end,
+                move_type: MoveType::Capture(Capture::Take {
+                    taken_piece: end_piece.as_result()?,
+                }),
+                promotion: promo
+                    .expect_none(|| "promotions not allowed on capture moves".to_string())?,
+            })
+        }
     }
 
     pub fn make_move(&mut self, m: Move) -> ErrorResult<()> {

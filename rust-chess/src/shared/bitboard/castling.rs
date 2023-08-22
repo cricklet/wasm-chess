@@ -78,3 +78,18 @@ pub fn castling_allowed_after_move(
     let castling_piece_moved = bb_contains(castling_requirements.castling_pieces, start_index);
     !castling_piece_moved
 }
+
+pub fn matches_castling(
+    player: Player,
+    start: BoardIndex,
+    end: BoardIndex,
+) -> Option<(CastlingSide, &'static CastlingRequirements)> {
+    for side in CASTLING_SIDES {
+        let req = castling_requirements(player, side);
+        if start == req.king_start && end == req.king_end {
+            return Some((side, req));
+        }
+    }
+
+    None
+}

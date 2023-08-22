@@ -128,7 +128,7 @@ impl ZobristHash {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct SimpleMove {
     pub start: BoardIndex,
     pub end: BoardIndex,
