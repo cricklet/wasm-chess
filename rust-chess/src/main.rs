@@ -13,10 +13,7 @@ fn next_stdin() -> String {
 }
 
 fn run() -> ErrorResult<()> {
-    let mut uci = Uci {
-        game: Game::from_position_uci(&"position startpos")?,
-        search: None,
-    };
+    let mut uci = Uci::new();
 
     loop {
         let input = next_stdin().to_string();

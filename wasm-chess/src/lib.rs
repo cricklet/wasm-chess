@@ -5,7 +5,6 @@ use wasm_bindgen::prelude::*;
 
 use rust_chess::{
     bitboard::warm_magic_cache,
-    game::Game,
     helpers::{err, Error},
     *,
 };
@@ -63,10 +62,7 @@ impl UciForJs {
         log_to_js("... done");
 
         UciForJs {
-            uci: uci::Uci {
-                game: Game::from_position_uci(&"position startpos").unwrap(),
-                search: None,
-            },
+            uci: uci::Uci::new(),
         }
     }
     pub fn handle_line(&mut self, line: &str) -> Result<String, JsError> {

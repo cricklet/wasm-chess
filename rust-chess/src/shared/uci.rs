@@ -1,10 +1,11 @@
 use itertools::Itertools;
-use std::{iter, sync::Mutex};
+use std::{cell::RefCell, iter, rc::Rc, sync::Mutex};
 
 use crate::{
     alphabeta::{AlphaBetaStack, LoopResult},
     bitboard::warm_magic_cache,
     iterative_deepening::{IterativeSearch, IterativeSearchOptions},
+    transposition_table::TranspositionTable,
 };
 
 use super::{
@@ -20,6 +21,7 @@ pub struct UciAsync {
 pub struct Uci {
     pub game: Game,
     pub search: Option<IterativeSearch>,
+    pub tt: Rc<RefCell<TranspositionTable>>,
 }
 
 impl Uci {
@@ -27,6 +29,7 @@ impl Uci {
         Self {
             game: Game::from_position_uci(&"position startpos").unwrap(),
             search: None,
+            tt: Rc::new(RefCell::new(TranspositionTable::new())),
         }
     }
     pub fn handle_line(&mut self, line: &str) -> ErrorResult<String> {
@@ -63,7 +66,13 @@ impl Uci {
             let debug_str = format!("{}\nFen: {}", self.game, self.game.to_fen());
             Ok(debug_str)
         } else if line == "go" {
-            let search = IterativeSearch::new(self.game, IterativeSearchOptions::default())?;
+            let search = IterativeSearch::new(
+                self.game,
+                IterativeSearchOptions {
+                    transposition_table: Some(self.tt.clone()),
+                    ..IterativeSearchOptions::default()
+                },
+            )?;
             self.search = Some(search);
             Ok("".to_string())
         } else if line == "stop" {
