@@ -17,8 +17,12 @@ use super::moves::MoveOptions;
 use super::moves::OnlyCaptures;
 use super::moves::OnlyQueenPromotion;
 
+pub trait TraversalData: Debug + Default {
+    fn setup(&mut self, previous: &Self);
+}
+
 #[derive(Default, Debug)]
-pub struct TraversalStackFrame<D> {
+pub struct TraversalStackFrame<D: Debug + TraversalData> {
     pub game: Game,
 
     danger: LazyDanger,
@@ -29,7 +33,7 @@ pub struct TraversalStackFrame<D> {
     pub data: D,
 }
 
-impl<D: Debug> TraversalStackFrame<D> {
+impl<D: Debug + TraversalData> TraversalStackFrame<D> {
     pub fn danger(&mut self) -> ErrorResult<Danger> {
         self.danger
             .get(self.game.player(), self.game.bitboards())
@@ -47,11 +51,11 @@ impl<D: Debug> TraversalStackFrame<D> {
     ) -> ErrorResult<Legal> {
         self.game = previous.game;
         self.game.make_move(*move_to_apply)?;
-
         self.danger.reset();
         self.moves.reset();
-
         self.history_move = Some(move_to_apply.clone());
+
+        self.data.setup(&previous.data);
 
         if self.game.move_legality(move_to_apply, &previous.danger()?) == Legal::No {
             return Ok(Legal::No);
@@ -61,12 +65,12 @@ impl<D: Debug> TraversalStackFrame<D> {
     }
 }
 
-pub struct TraversalStack<D: Debug + Default> {
+pub struct TraversalStack<D: TraversalData> {
     stack: Vec<TraversalStackFrame<D>>,
     depth: usize,
 }
 
-impl<D: Debug + Default> Debug for TraversalStack<D> {
+impl<D: TraversalData> Debug for TraversalStack<D> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut debug = f.debug_struct("TraversalStack");
         debug.field("depth", &self.depth);
@@ -81,7 +85,7 @@ impl<D: Debug + Default> Debug for TraversalStack<D> {
     }
 }
 
-impl<D: Debug + Default> TraversalStack<D> {
+impl<D: TraversalData> TraversalStack<D> {
     pub fn new(game: Game, data: D) -> ErrorResult<Self> {
         let data = Self {
             stack: vec![

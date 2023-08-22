@@ -1,7 +1,7 @@
 use std::{collections::HashMap, default};
 
 use crate::{
-    bitboard::warm_magic_cache, moves::all_moves, traversal::null_move_sort, zobrist::SimpleMove,
+    bitboard::warm_magic_cache, moves::all_moves, traversal::{null_move_sort, TraversalData}, zobrist::SimpleMove,
 };
 
 use super::{
@@ -422,6 +422,10 @@ pub enum PerftLoopResult {
     Continue,
     Done,
     Interrupted,
+}
+
+impl TraversalData for () {
+    fn setup(&mut self, _: &Self) {}
 }
 
 #[derive(Debug)]

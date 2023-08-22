@@ -7,7 +7,7 @@ use crate::{
     helpers::{err_result, pad_left, Joinable, OptionResult},
     score::Score,
     transposition_table::{CacheEntry, CacheValue, TranspositionTable},
-    traversal::{null_move_sort, TraversalStack},
+    traversal::{null_move_sort, TraversalStack, TraversalData},
 };
 
 use super::{
@@ -219,8 +219,17 @@ struct AlphaBetaFrame {
     found_legal_moves: bool,
 
     high_priority_moves: HighPriorityMoves,
-
     cached_killer_moves: CachedKillerMoves,
+}
+
+impl TraversalData for AlphaBetaFrame {
+    fn setup(&mut self, previous: &Self) {
+        self.alpha = previous.beta;
+        self.beta = previous.alpha;
+        self.in_quiescence = previous.in_quiescence;
+        self.alpha_move = None;
+        self.found_legal_moves = false;
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -437,13 +446,6 @@ impl AlphaBetaStack {
             }
 
             current.data.found_legal_moves = true;
-
-            // Finish setting up the new data
-            next.data.alpha = current.data.beta;
-            next.data.beta = current.data.alpha;
-            next.data.in_quiescence = current.data.in_quiescence;
-            next.data.alpha_move = None;
-            next.data.found_legal_moves = false;
 
             if self.traversal.depth() == 0 {
                 self.num_starting_moves_searched += 1;
