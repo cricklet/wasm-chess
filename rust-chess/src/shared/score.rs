@@ -102,7 +102,7 @@ impl Score {
                     Some((-99999 + *n as isize, 0))
                 }
             }
-            Score::DrawInN(_) => Some((0, 0)),
+            Score::DrawInN(_) => Some((0, -300)),
         }
     }
 
@@ -120,16 +120,8 @@ impl Score {
         if left_points.is_none() || right_points.is_none() {
             return Comparison::Unknown;
         }
-        let (left_mate, mut left_eval) = left_points.unwrap();
-        let (right_mate, mut right_eval) = right_points.unwrap();
-
-        if left.is_draw() && !right.is_draw() {
-            right_eval += 400;
-        }
-
-        if right.is_draw() && !left.is_draw() {
-            left_eval += 400;
-        }
+        let (left_mate, left_eval) = left_points.unwrap();
+        let (right_mate, right_eval) = right_points.unwrap();
 
         if left_mate > right_mate {
             Comparison::Better

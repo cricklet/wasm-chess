@@ -184,40 +184,23 @@ impl Game {
         *self.board.zobrist()
     }
 
-    pub fn from_position_uci(uci_line: &str) -> ErrorResult<Game> {
-        let uci_line = uci_line.trim();
+    pub fn from_position_uci(uci: &str) -> ErrorResult<Game> {
+        let (position_str, moves) = FenDefinition::split_uci(uci)?;
+        Game::from_position_and_moves(&position_str, &moves)
+    }
 
-        let position_prefix = "position";
-        let moves_separator = "moves";
-
-        if !uci_line.starts_with(position_prefix) {
-            return err_result(&format!("invalid uci line {}", uci_line));
-        }
-
-        let position_str = uci_line[position_prefix.len()..].trim().to_string();
-        let (position_str, moves_str) = if position_str.contains(moves_separator) {
-            let split: Vec<&str> = position_str.split(moves_separator).collect();
-            if split.len() != 2 {
-                return err_result(&format!("invalid uci line {}", uci_line));
-            }
-            (split[0].trim(), split[1].trim())
-        } else {
-            (position_str.trim(), "")
-        };
-
-        let game: ErrorResult<Game> = {
+    pub fn from_position_and_moves(position_str: &str, moves: &[String]) -> ErrorResult<Game> {
+        let mut game = {
             if position_str == "startpos" {
                 Game::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
             } else if position_str.starts_with("fen") {
                 let fen_part = &position_str["fen".len()..].trim();
                 Game::from_fen(fen_part)
             } else {
-                err_result(&format!("invalid uci line {}", uci_line))
+                err_result(&format!("invalid position {}", position_str))
             }
-        };
-        let mut game = game?;
+        }?;
 
-        let moves: Vec<&str> = moves_str.split(" ").filter(|m| !m.is_empty()).collect();
         for m in moves {
             let m = game
                 .move_from_str(m)
@@ -567,9 +550,7 @@ fn test_should_discard_invalid_simple_moves() {
         let simple_move = SimpleMove::from_str(move_str).unwrap();
 
         assert!(
-            simple_move.to_move(&game)
-                .unwrap()
-                .is_none(),
+            simple_move.to_move(&game).unwrap().is_none(),
             "should discard move {} for game {:#?}",
             simple_move,
             game

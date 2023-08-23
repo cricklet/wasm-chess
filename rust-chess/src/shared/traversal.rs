@@ -3,8 +3,11 @@ use std::fmt::Formatter;
 
 use crate::danger::LazyDanger;
 use crate::helpers::indent;
+use crate::helpers::Error;
 use crate::helpers::StableOption;
 use crate::moves::LazyMoves;
+use crate::zobrist::IsDraw;
+use crate::zobrist::ZobristHistory;
 
 use super::danger::Danger;
 use super::game::Game;
@@ -64,6 +67,7 @@ impl<D: Debug + TraversalData> TraversalStackFrame<D> {
 pub struct TraversalStack<D: TraversalData> {
     stack: Vec<TraversalStackFrame<D>>,
     depth: usize,
+    zobrist_history: ZobristHistory,
 }
 
 impl<D: TraversalData> Debug for TraversalStack<D> {
@@ -82,7 +86,7 @@ impl<D: TraversalData> Debug for TraversalStack<D> {
 }
 
 impl<D: TraversalData> TraversalStack<D> {
-    pub fn new(game: Game, data: D) -> ErrorResult<Self> {
+    pub fn new(game: Game, data: D, starting_history: ZobristHistory) -> ErrorResult<Self> {
         let data = Self {
             stack: vec![
                 TraversalStackFrame::<D> {
@@ -95,6 +99,7 @@ impl<D: TraversalData> TraversalStack<D> {
                 Default::default(),
             ],
             depth: 0,
+            zobrist_history: starting_history,
         };
 
         Ok(data)
@@ -104,15 +109,27 @@ impl<D: TraversalData> TraversalStack<D> {
         self.depth
     }
 
-    pub fn increment_depth(&mut self) {
+    pub fn is_draw_by_repetition(&self) -> bool {
+        self.zobrist_history.is_draw() == IsDraw::Yes
+    }
+
+    pub fn increment_depth(&mut self) -> ErrorResult<()> {
         self.depth += 1;
+
+        let (current, _) = self.current()?;
+        self.zobrist_history.add(current.game.zobrist());
+
         if self.depth + 1 >= self.stack.len() {
             self.stack.push(Default::default());
         }
+
+        Ok(())
     }
 
-    pub fn decrement_depth(&mut self) {
+    pub fn decrement_depth(&mut self) -> ErrorResult<()> {
+        self.zobrist_history.pop()?;
         self.depth -= 1;
+        Ok(())
     }
 
     pub fn root(&self) -> &TraversalStackFrame<D> {

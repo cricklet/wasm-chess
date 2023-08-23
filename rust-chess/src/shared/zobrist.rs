@@ -1,5 +1,7 @@
 use std::{
+    collections::{HashMap, HashSet},
     fmt::{Display, Formatter},
+    hash::Hash,
     sync::Mutex,
 };
 
@@ -10,10 +12,12 @@ use strum::IntoEnumIterator;
 
 use crate::{
     bitboard::{Bitboards, BoardIndex, ForPlayer},
+    fen::FenDefinition,
     game::{CanCastleOnSide, Game},
     helpers::{err_result, ErrorResult, Joinable, OptionResult},
     moves::{all_moves, Move, MoveOptions},
-    types::{CastlingSide, Piece, Player, PlayerPiece}, simple_move::SimpleMove,
+    simple_move::SimpleMove,
+    types::{CastlingSide, Piece, Player, PlayerPiece},
 };
 
 lazy_static! {
@@ -126,4 +130,107 @@ impl ZobristHash {
     pub fn on_update_square(&mut self, index: BoardIndex, piece: PlayerPiece) {
         self.value ^= ZOBRIST_PIECE_AT_SQUARE[piece.to_usize()][index.i];
     }
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
+pub struct ZobristHistory {
+    seen: HashMap<ZobristHash, u8>,
+    move_stack: Vec<ZobristHash>,
+    draw_stack: Vec<IsDraw>,
+}
+
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum IsDraw {
+    #[default]
+    No,
+    Yes,
+}
+
+impl ZobristHistory {
+    pub fn new() -> Self {
+        Self {
+            seen: HashMap::new(),
+            move_stack: vec![],
+            draw_stack: vec![],
+        }
+    }
+
+    pub fn update(&mut self, startpos: String, moves: &[String]) -> IsDraw {
+        self.seen.clear();
+        self.move_stack.clear();
+        self.draw_stack.clear();
+
+        let mut game = Game::from_fen(&startpos).unwrap();
+        self.add(game.zobrist());
+
+        for (_i, mv) in moves.iter().enumerate() {
+
+            let mv = game.move_from_str(mv).unwrap();
+            game.make_move(mv).unwrap();
+            self.add(game.zobrist());
+
+            // println!("({} / {}) {} => {}", i + 1, moves.len(), mv, game);
+
+            if self.is_draw() == IsDraw::Yes {
+                return IsDraw::Yes;
+            }
+        }
+        IsDraw::No
+    }
+
+    pub fn is_draw(&self) -> IsDraw {
+        *self.draw_stack.last().unwrap_or(&IsDraw::No)
+    }
+
+    pub fn add(&mut self, zobrist: ZobristHash) {
+        let entry = self.seen.entry(zobrist).or_insert(0);
+        *entry += 1;
+        let entry = *entry;
+
+        self.move_stack.push(zobrist);
+
+        let is_draw = if self.is_draw() == IsDraw::Yes || entry > 2 {
+            IsDraw::Yes
+        } else {
+            IsDraw::No
+        };
+        self.draw_stack.push(is_draw);
+    }
+
+    pub fn pop(&mut self) -> ErrorResult<()> {
+        let zobrist = self.move_stack.pop();
+        let _ = self.draw_stack.pop();
+
+        if let Some(zobrist) = zobrist {
+            if let Some(entry) = self.seen.get_mut(&zobrist) {
+                *entry -= 1;
+                return Ok(());
+            }
+        }
+        err_result(&format!("zobrist hash not found in history"))
+    }
+}
+
+#[test]
+fn test_draw_detection() {
+    let uci = "position startpos moves d2d4 d7d5 b1c3 b8c6 g1f3 g8f6 c1g5 f6e4 e2e3 e4g5 f3g5 e7e5 f2f4 f7f6 g5f3 e5e4 f3d2 c8e6 d2e4 d5e4 d4d5 e6d5 c3d5 f8d6 g2g3 d8d7 f1g2 f6f5 d1d2 e8c8 e1c1 c6e7 d2a5 e7c6 a5d2 a7a5 h1e1 c6b4 d5b4 a5b4 c2c3 d7e6 d2d5 e6d5 d1d5 g7g6 c3b4 d6b4 d5d8 h8d8 e1d1 d8d6 d1d6 c7d6 b2b3 d6d5 a2a4 h7h5 c1d1 b4c3 g2f1 c8d8 h2h4 b7b6 f1b5 d8e7 b5c6 d5d4 e3d4 c3d4 d1e2 e7f6 b3b4 f6e7 e2f1 e7e6 b4b5 e6e7 c6d5 e4e3 d5b3 e7f6 f1e1 f6e7 e1e2 e7f6 e2d3 f6e7 d3c2 e3e2 c2d2 d4f2 d2e2 f2g3 e2f1 e7f6 f1g1 g3f4 g1f2 g6g5 h4g5 f6g5 f2f1 h5h4 f1g2 f4g3 g2f3 g5f6 f3g2 f6g5 g2f3 g5f6 f3g2 f6g5";
+    let (position, moves) = FenDefinition::split_uci(uci).unwrap();
+    let mut history = ZobristHistory::new();
+    history.update(position, &moves);
+    assert_eq!(history.is_draw(), IsDraw::Yes);
+}
+
+#[test]
+fn test_draw_simple() {
+    let position = "8/8/3k4/8/8/8/3K4/8 w".to_string();
+    let moves: Vec<String> = vec![
+        "d2c1", "d6c5", "c1d2", "c5d6", "d2c1", "d6c5", "c1d2", "c5d6",
+    ]
+    .iter()
+    .map(|v| v.to_string())
+    .collect();
+
+    let mut history = ZobristHistory::new();
+    history.update(position, &moves);
+    assert_eq!(history.is_draw(), IsDraw::Yes);
 }

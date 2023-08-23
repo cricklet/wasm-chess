@@ -1,7 +1,7 @@
 use std::{collections::HashMap, default};
 
 use crate::{
-    bitboard::warm_magic_cache, moves::all_moves, traversal::{null_move_sort, TraversalData},
+    bitboard::warm_magic_cache, moves::all_moves, traversal::{null_move_sort, TraversalData}, zobrist::ZobristHistory,
 };
 
 use super::{
@@ -296,7 +296,7 @@ pub fn run_perft_recursively(game: Game, max_depth: usize) -> ErrorResult<usize>
 }
 
 pub fn run_perft_iteratively<const N: usize>(game: Game) -> ErrorResult<usize> {
-    let mut data = TraversalStack::<()>::new(game, ())?;
+    let mut data = TraversalStack::<()>::new(game, (), ZobristHistory::default())?;
     let mut overall_count = 0;
 
     if N <= 1 {
@@ -307,7 +307,7 @@ pub fn run_perft_iteratively<const N: usize>(game: Game) -> ErrorResult<usize> {
         // Leaf node case:
         if data.depth() + 1 >= N {
             overall_count += 1;
-            data.decrement_depth();
+            data.decrement_depth()?;
         }
 
         // We have moves to traverse, dig deeper
@@ -322,7 +322,7 @@ pub fn run_perft_iteratively<const N: usize>(game: Game) -> ErrorResult<usize> {
             if result == Legal::No {
                 continue;
             } else {
-                data.increment_depth();
+                data.increment_depth()?;
                 continue;
             }
         }
@@ -331,7 +331,7 @@ pub fn run_perft_iteratively<const N: usize>(game: Game) -> ErrorResult<usize> {
         if data.depth() == 0 {
             break;
         } else {
-            data.decrement_depth();
+            data.decrement_depth()?;
             continue;
         }
     }
@@ -443,7 +443,7 @@ const LOOP_COUNT: usize = 1_000_000;
 impl PerftLoop {
     pub fn new(fen: &str, max_depth: usize) -> Self {
         let game = Game::from_fen(fen).unwrap();
-        let stack = TraversalStack::<()>::new(game, ()).unwrap();
+        let stack = TraversalStack::<()>::new(game, (), ZobristHistory::default()).unwrap();
 
         Self {
             stack,
@@ -460,7 +460,7 @@ impl PerftLoop {
         // Leaf node case:
         if traversal.depth() + 1 >= self.max_depth {
             self.count += 1;
-            traversal.decrement_depth();
+            traversal.decrement_depth()?;
 
             return Ok(PerftLoopResult::Continue);
         }
@@ -479,7 +479,7 @@ impl PerftLoop {
             if result == Legal::No {
                 return Ok(PerftLoopResult::Continue);
             } else {
-                traversal.increment_depth();
+                traversal.increment_depth()?;
                 return Ok(PerftLoopResult::Continue);
             }
         }
@@ -488,7 +488,7 @@ impl PerftLoop {
         if traversal.depth() == 0 {
             return Ok(PerftLoopResult::Done);
         } else {
-            traversal.decrement_depth();
+            traversal.decrement_depth()?;
             return Ok(PerftLoopResult::Continue);
         }
     }

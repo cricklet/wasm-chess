@@ -4,9 +4,11 @@ use std::{cell::RefCell, iter, rc::Rc, sync::Mutex};
 use crate::{
     alphabeta::{AlphaBetaStack, LoopResult},
     bitboard::warm_magic_cache,
+    fen::FenDefinition,
     helpers::Joinable,
     iterative_deepening::{IterativeSearch, IterativeSearchOptions},
     transposition_table::TranspositionTable,
+    zobrist::{ZobristHistory, IsDraw},
 };
 
 use super::{
@@ -23,6 +25,7 @@ pub struct Uci {
     pub game: Game,
     pub search: Option<IterativeSearch>,
     pub tt: Rc<RefCell<TranspositionTable>>,
+    pub history: ZobristHistory,
 }
 
 impl Uci {
@@ -31,16 +34,23 @@ impl Uci {
             game: Game::from_position_uci(&"position startpos").unwrap(),
             search: None,
             tt: Rc::new(RefCell::new(TranspositionTable::new())),
+            history: ZobristHistory::new(),
         }
     }
     pub fn handle_line(&mut self, line: &str) -> ErrorResult<String> {
         if line.starts_with("position") {
-            let game = Game::from_position_uci(line);
+            let (position_str, moves) = FenDefinition::split_uci(line)?;
+            let game = Game::from_position_and_moves(&position_str, &moves);
             if let Err(e) = &game {
                 return Err(e.clone());
             }
             self.game = game.unwrap();
-            Ok(format!("{:?}", self.game))
+
+            if self.history.update(position_str, &moves) == IsDraw::Yes {
+                Ok(format!("draw detected\n{:?}", self.game))
+            } else {
+                Ok(format!("{:?}", self.game))
+            }
         } else if line.starts_with("go perft") {
             let depth = line["go perft".len()..].trim();
             let depth = match depth.parse::<usize>() {
@@ -71,6 +81,7 @@ impl Uci {
                 self.game,
                 IterativeSearchOptions {
                     transposition_table: Some(self.tt.clone()),
+                    starting_history: self.history.clone(),
                     ..IterativeSearchOptions::default()
                 },
             )?;
@@ -255,12 +266,20 @@ fn test_match_avoid_draw() {
         "d6d5", "a2a4", "h7h5", "c1d1", "b4c3", "g2f1", "c8d8", "h2h4", "b7b6", "f1b5", "d8e7",
         "b5c6", "d5d4", "e3d4", "c3d4", "d1e2", "e7f6", "b3b4", "f6e7", "e2f1", "e7e6", "b4b5",
         "e6e7", "c6d5", "e4e3", "d5b3", "e7f6",
-    ].iter().map(|s| s.to_string()).collect();
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .collect();
 
     loop {
         let position_uci_line = format!("position startpos moves {}", moves.join(" "));
         println!("{}", position_uci_line);
-        uci.handle_line(position_uci_line.as_str()).unwrap();
+
+        let result = uci.handle_line(position_uci_line.as_str()).unwrap();
+        println!("{}", result);
+        if result.contains("draw detected") {
+            break;
+        }
 
         let start = std::time::Instant::now();
         uci.handle_line("go").unwrap();
@@ -284,7 +303,6 @@ fn test_match_avoid_draw() {
 
         let result = uci.finish_search().unwrap();
         println!("{}", result);
-        println!("{}", uci.handle_line("d").unwrap());
 
         let bestmove = result.split_whitespace().nth(1).unwrap();
         if bestmove.contains("none") {

@@ -9,6 +9,7 @@ use crate::{
     simple_move::SimpleMove,
     transposition_table::{CacheEntry, CacheValue, TranspositionTable},
     traversal::{null_move_sort, TraversalData, TraversalStack},
+    zobrist::ZobristHistory,
 };
 
 use super::{
@@ -260,6 +261,7 @@ pub struct AlphaBetaOptions {
     pub skip_sibling_beta_cutoff_sort: bool,
     pub skip_null_move_pruning: bool,
     pub aspiration_window: Option<(Score, Score)>,
+    pub starting_history: ZobristHistory,
     pub transposition_table: Option<Rc<RefCell<TranspositionTable>>>,
     pub log_state_at_history: Option<String>,
 }
@@ -310,6 +312,7 @@ impl AlphaBetaStack {
                     last_applied_move: None,
                     cached_beta_cutoffs: CachedBetaCutoffs::default(),
                 },
+                options.starting_history.clone(),
             )?,
             best_move: None,
             evaluate_at_depth,
@@ -390,7 +393,7 @@ impl AlphaBetaStack {
             return Ok(Some(LoopResult::Done));
         }
 
-        self.traversal.decrement_depth();
+        self.traversal.decrement_depth()?;
 
         let child_score = child_result.score().increment_turns();
         let (parent, _) = self.traversal.current_mut()?;
@@ -447,7 +450,7 @@ impl AlphaBetaStack {
         }
 
         // Recurse into our newly applied move
-        self.traversal.increment_depth();
+        self.traversal.increment_depth()?;
 
         {
             if let Some(entry) = self.transposition_table_entry()? {
@@ -553,6 +556,12 @@ impl AlphaBetaStack {
 
         {
             self.log_if_history_matches(|| "".to_string())?;
+        }
+
+        if self.traversal.is_draw_by_repetition() {
+            return self
+                .return_early(SearchResult::StaticEvaluation(Score::DrawInN(0)))?
+                .as_result();
         }
 
         let in_quiescence = {

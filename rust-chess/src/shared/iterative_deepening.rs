@@ -18,6 +18,7 @@ use crate::{
     moves::Move,
     simple_move::SimpleMove,
     transposition_table::TranspositionTable,
+    zobrist::ZobristHistory,
 };
 
 #[derive(Debug, Clone)]
@@ -28,6 +29,7 @@ pub struct IterativeSearchOptions {
     pub skip_sibling_beta_cutoff_sort: bool,
     pub skip_aspiration_window: bool,
     pub skip_null_move_pruning: bool,
+    pub starting_history: ZobristHistory,
     pub transposition_table: Option<Rc<RefCell<TranspositionTable>>>,
 }
 
@@ -40,6 +42,7 @@ impl Default for IterativeSearchOptions {
             skip_sibling_beta_cutoff_sort: false,
             skip_aspiration_window: false,
             skip_null_move_pruning: false,
+            starting_history: ZobristHistory::new(),
             transposition_table: None,
         }
     }
@@ -89,6 +92,7 @@ impl IterativeSearch {
             skip_quiescence: options.skip_quiescence,
             skip_sibling_beta_cutoff_sort: options.skip_sibling_beta_cutoff_sort,
             skip_null_move_pruning: options.skip_null_move_pruning,
+            starting_history: options.starting_history.clone(),
             transposition_table: options.transposition_table.clone(),
 
             aspiration_window: None,

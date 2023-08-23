@@ -1,5 +1,5 @@
 use crate::{
-    bitboard::{Bitboard, BoardIndex, ForPlayer, Bitboards, index_from_file_rank_str},
+    bitboard::{index_from_file_rank_str, Bitboard, Bitboards, BoardIndex, ForPlayer},
     game::CanCastleOnSide,
     helpers::{err_result, ErrorResult},
     types::Player,
@@ -15,6 +15,34 @@ pub struct FenDefinition {
 }
 
 impl FenDefinition {
+    pub fn split_uci(uci: &str) -> ErrorResult<(String, Vec<String>)> {
+        let uci = uci.trim();
+
+        let position_prefix = "position";
+        let moves_separator = "moves";
+
+        if !uci.starts_with(position_prefix) {
+            return err_result(&format!("invalid uci line {}", uci));
+        }
+
+        let position_str = uci[position_prefix.len()..].trim().to_string();
+        let (position_str, moves_str) = if position_str.contains(moves_separator) {
+            let split: Vec<&str> = position_str.split(moves_separator).collect();
+            if split.len() != 2 {
+                return err_result(&format!("invalid uci line {}", uci));
+            }
+            (split[0].trim(), split[1].trim())
+        } else {
+            (position_str.trim(), "")
+        };
+
+        let moves: Vec<&str> = moves_str.split(" ").filter(|m| !m.is_empty()).collect();
+        Ok((
+            position_str.to_string(),
+            moves.into_iter().map(|m| m.to_string()).collect(),
+        ))
+    }
+
     pub fn from(fen: &str) -> ErrorResult<FenDefinition> {
         if fen == "startpos" {
             return FenDefinition::from("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
