@@ -16,8 +16,8 @@ use crate::{
     helpers::{ErrorResult, Joinable},
     move_ordering::capture_sort,
     moves::Move,
+    simple_move::SimpleMove,
     transposition_table::TranspositionTable,
-    zobrist::BestMovesCache, simple_move::SimpleMove,
 };
 
 #[derive(Debug, Clone)]
@@ -77,7 +77,6 @@ pub struct IterativeSearch {
     start_game: Game,
 
     best_variations_per_depth: Vec<Vec<SimpleMove>>,
-    best_moves_cache: BestMovesCache,
 
     options: IterativeSearchOptions,
 
@@ -86,7 +85,6 @@ pub struct IterativeSearch {
 
 impl IterativeSearch {
     pub fn new(game: Game, options: IterativeSearchOptions) -> ErrorResult<Self> {
-        let best_moves_cache = BestMovesCache::new();
         let search_options = AlphaBetaOptions {
             skip_quiescence: options.skip_quiescence,
             skip_sibling_beta_cutoff_sort: options.skip_sibling_beta_cutoff_sort,
@@ -101,7 +99,6 @@ impl IterativeSearch {
             alpha_beta: search,
             start_game: game,
             best_variations_per_depth: vec![],
-            best_moves_cache,
             options,
             no_moves_found: false,
         })
@@ -129,17 +126,11 @@ impl IterativeSearch {
             return Ok(());
         }
 
-        let skip_cache_sort = self.options.skip_cache_sort;
         let skip_capture_sort = self.options.skip_capture_sort;
-        let best_moves_cache = &self.best_moves_cache;
 
-        let sorter = move |game: &Game, moves: &mut [Move]| -> ErrorResult<()> {
-            let mut unsorted: &mut [Move] = moves;
-            if !skip_cache_sort {
-                unsorted = best_moves_cache.sort(game, moves)?;
-            }
+        let sorter = move |_: &Game, moves: &mut [Move]| -> ErrorResult<()> {
             if !skip_capture_sort {
-                capture_sort(unsorted)?;
+                capture_sort(moves)?;
             }
             Ok(())
         };
@@ -182,7 +173,6 @@ impl IterativeSearch {
                             self.alpha_beta.num_starting_moves_searched,
                         ));
 
-                        self.best_moves_cache.update(&self.start_game, &variation)?;
                         self.best_variations_per_depth.push(variation);
 
                         let mut alpha_beta_options = self.alpha_beta.options.clone();
