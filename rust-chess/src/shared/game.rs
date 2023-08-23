@@ -5,7 +5,7 @@ use crate::bitboard::{
 };
 use crate::board::Board;
 use crate::fen::FenDefinition;
-use crate::moves::{castling_side_is_safe, walk_potential_bb};
+use crate::moves::{can_castle_on_side, walk_potential_bb};
 use crate::simple_move::SimpleMove;
 
 use super::bitboard::FileRank;

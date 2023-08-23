@@ -169,8 +169,8 @@ impl Move {
         };
         if simple_move_converted != Some(*self) {
             return err_result(&format!(
-                "bug in simple-move conversion, {:?} != {:?}, for: {:#?}",
-                self, simple_move_converted, game,
+                "bug in simple-move conversion, {:?} != {:?}, for simple-move {} game: {:#?}",
+                self, simple_move_converted, simple_move,  game,
             ));
         }
         Ok(())
@@ -195,22 +195,6 @@ pub enum JumpingPiece {
     King,
 }
 
-fn quiet_and_capture_bb_from_potential(
-    player: Player,
-    potential: Bitboard,
-    bitboards: &Bitboards,
-) -> (Bitboard, Bitboard) {
-    let self_occupied = bitboards.occupied[player];
-    let enemy_occupied = bitboards.occupied[other_player(player)];
-
-    let moves = potential & !self_occupied;
-
-    let capture = moves & enemy_occupied;
-    let quiet = moves & !capture;
-
-    (capture, quiet)
-}
-
 pub fn potential_bb_to_moves(
     buffer: &mut Vec<Move>,
     PlayerPiece { player, piece }: PlayerPiece,
@@ -219,7 +203,14 @@ pub fn potential_bb_to_moves(
     bitboards: &Bitboards,
     only_captures: OnlyCaptures,
 ) -> ErrorResult<()> {
-    let (quiet, capture) = quiet_and_capture_bb_from_potential(player, potential, bitboards);
+    let self_occupied = bitboards.occupied[player];
+    let enemy_occupied = bitboards.occupied[other_player(player)];
+
+    let moves = potential & !self_occupied;
+
+    let capture = moves & enemy_occupied;
+    let quiet = moves & !capture;
+
     let start_index = piece_index;
 
     for end_index in each_index_of_one(capture) {
@@ -237,8 +228,9 @@ pub fn potential_bb_to_moves(
             }
             None => {
                 return err_result(&format!(
-                    "no piece at index {:} but marked as capture",
-                    end_index
+                    "no piece at index but marked as capture {:} for\n{:#?}",
+                    end_index,
+                    bitboards
                 ));
             }
         };
@@ -498,7 +490,7 @@ pub fn en_passant_move(
     Ok(())
 }
 
-pub fn castling_side_is_safe(
+pub fn can_castle_on_side(
     side: CastlingSide,
     player: Player,
     state: &Game,
@@ -527,7 +519,7 @@ pub fn castling_moves(buffer: &mut Vec<Move>, player: Player, state: &Game) -> E
     for side in CASTLING_SIDES {
         let req = castling_requirements(player, side);
 
-        if castling_side_is_safe(side, player, state, req)? {
+        if can_castle_on_side(side, player, state, req)? {
             buffer.push(Move {
                 piece: PlayerPiece::new(player, Piece::King),
                 start_index: req.king_start,

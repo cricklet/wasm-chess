@@ -43,8 +43,14 @@ impl Score {
                     Score::Centipawns(player, score + offset),
                 )
             }
-            Score::WinInN(_player, _n) => todo!(),
-            Score::DrawInN(_n) => todo!(),
+            Score::WinInN(_, _) => (
+                Score::WinInN(for_player.other(), 0),
+                Score::WinInN(for_player, 0),
+            ),
+            Score::DrawInN(_) => (
+                Score::WinInN(for_player.other(), 0),
+                Score::WinInN(for_player, 0),
+            ),
         }
     }
 

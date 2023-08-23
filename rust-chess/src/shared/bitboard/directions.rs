@@ -98,6 +98,13 @@ pub const ROOK_DIRS: [Direction; 4] = [Direction::N, Direction::S, Direction::E,
 pub const BISHOP_DIRS: [Direction; 4] =
     [Direction::NE, Direction::NW, Direction::SE, Direction::SW];
 
+pub fn pawn_push_rank_direction_for_player(player: Player) -> isize {
+    match player {
+        Player::White => 1,
+        Player::Black => -1,
+    }
+}
+
 pub fn pawn_push_direction_for_player(player: Player) -> Direction {
     match player {
         Player::White => Direction::N,
