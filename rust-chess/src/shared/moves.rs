@@ -258,10 +258,7 @@ pub fn walk_potential_bb(
     all_occupied: Bitboard,
     piece: Piece,
 ) -> ErrorResult<Bitboard> {
-    let walk_types = walk_type_for_piece(piece);
-
-    let walk_types = walk_types?;
-
+    let walk_types = walk_type_for_piece(piece)?;
     let mut danger_bb = 0;
 
     for walk_type in walk_types.iter() {
@@ -297,6 +294,31 @@ pub fn walk_moves(
 
     Ok(())
 }
+
+// pub fn walk_move_is_legal(
+//     start: BoardIndex,
+//     end: BoardIndex,
+//     PlayerPiece { player, piece }: PlayerPiece,
+//     game: &Game,
+// ) -> ErrorResult<bool> {
+//     todo!()
+// }
+
+// pub fn walk_or_jump_move_is_legal(
+//     start: BoardIndex,
+//     end: BoardIndex,
+//     piece: PlayerPiece,
+//     game: &Game,
+// ) -> ErrorResult<bool> {
+//     match piece.piece {
+//         Piece::Bishop => walk_move_is_legal(start, end, piece, game),
+//         Piece::Rook => walk_move_is_legal(start, end, piece, game),
+//         Piece::Queen => walk_move_is_legal(start, end, piece, game),
+//         Piece::Pawn => pawn_move_is_legal(start, end, piece, game),
+//         Piece::Knight => jump_move_is_legal(start, end, piece, game),
+//         Piece::King => jump_move_is_legal(start, end, piece, game),
+//     }
+// }
 
 pub fn jumping_bitboard(index: BoardIndex, jumping_piece: JumpingPiece) -> Bitboard {
     let lookup: &[Bitboard; 64] = match jumping_piece {

@@ -5,7 +5,8 @@ use crate::bitboard::{
 };
 use crate::board::Board;
 use crate::fen::FenDefinition;
-use crate::moves::castling_side_is_safe;
+use crate::moves::{castling_side_is_safe, walk_potential_bb};
+use crate::zobrist::SimpleMove;
 
 use super::bitboard::FileRank;
 use super::bitboard::{self, castling_allowed_after_move, Bitboards, BoardIndex};
@@ -358,6 +359,9 @@ impl Game {
                             if self.bitboards().is_occupied(skipped) {
                                 return Ok(None);
                             }
+                            if self.bitboards().is_occupied(expected_end) {
+                                return err_result("pawn skip end index is occupied, should have been checked above");
+                            }
 
                             return Ok(Some(Move {
                                 piece: start_piece,
@@ -686,5 +690,26 @@ fn test_map_results() {
             results,
             vec![Ok(1 + 1), Ok(2 + 1), Ok(3 + 1), Ok(4 + 1), Err(e.clone())]
         )
+    }
+}
+
+#[test]
+fn test_should_discard_invalid_simple_moves() {
+    let values = vec![(
+        "r2qkb1r/ppp1pppp/2n2n2/3p4/3P4/2N1PP1P/PPP2P2/R1BQKB1R b KQkq - 11 6",
+        "f8d6",
+    )];
+    for (fen, move_str) in values {
+        let game = Game::from_fen(fen).unwrap();
+        let simple_move = SimpleMove::from_str(move_str).unwrap();
+
+        assert!(
+            game.move_from(simple_move.start, simple_move.end, None)
+                .unwrap()
+                .is_none(),
+            "should discard move {} for game {:#?}",
+            simple_move,
+            game
+        );
     }
 }

@@ -11,7 +11,7 @@ use strum::IntoEnumIterator;
 use crate::{
     bitboard::{Bitboards, BoardIndex, ForPlayer},
     game::{CanCastleOnSide, Game},
-    helpers::{err_result, ErrorResult, Joinable},
+    helpers::{err_result, ErrorResult, Joinable, OptionResult},
     moves::{all_moves, Move, MoveOptions},
     types::{CastlingSide, Piece, Player, PlayerPiece},
 };
@@ -144,6 +144,22 @@ impl Display for SimpleMove {
 }
 
 impl SimpleMove {
+    pub fn from_str(s: &str) -> ErrorResult<Self> {
+        let start = BoardIndex::from_str(&s[0..2])?;
+        let end = BoardIndex::from_str(&s[2..4])?;
+        let promotion = if s.len() > 4 {
+            Piece::from(s.chars().nth(4).as_result()?)
+        } else {
+            None
+        };
+
+        Ok(Self {
+            start,
+            end,
+            promotion,
+        })
+    }
+
     pub fn from(m: &Move) -> Self {
         Self {
             start: m.start_index,
@@ -201,7 +217,9 @@ impl BestMovesCache {
                 Err(e) => {
                     return err_result(&format!(
                         "failed to update moves: {} for start game: {}\n{}",
-                        moves.join_vec(", "), start, e
+                        moves.join_vec(", "),
+                        start,
+                        e
                     ))
                 }
             }

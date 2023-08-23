@@ -29,15 +29,7 @@ impl PlayerPiece {
     }
 
     pub fn from(c: char) -> Option<PlayerPiece> {
-        let piece = match c.to_ascii_uppercase() {
-            'P' => Piece::Pawn,
-            'R' => Piece::Rook,
-            'N' => Piece::Knight,
-            'B' => Piece::Bishop,
-            'Q' => Piece::Queen,
-            'K' => Piece::King,
-            _ => return None,
-        };
+        let piece = Piece::from(c)?;
 
         let player = match c.is_uppercase() {
             true => Player::White,
@@ -122,6 +114,17 @@ pub enum Piece {
 }
 
 impl Piece {
+    pub fn from(c: char) -> Option<Piece> {
+        match c.to_ascii_lowercase() {
+            'p' => Some(Piece::Pawn),
+            'r' => Some(Piece::Rook),
+            'n' => Some(Piece::Knight),
+            'b' => Some(Piece::Bishop),
+            'q' => Some(Piece::Queen),
+            'k' => Some(Piece::King),
+            _ => None,
+        }
+    }
     pub fn to_uci(&self) -> &'static str {
         match self {
             Piece::Pawn => "p",
