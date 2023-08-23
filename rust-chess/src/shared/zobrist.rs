@@ -143,6 +143,7 @@ pub struct ZobristHistory {
 pub enum IsDraw {
     #[default]
     No,
+    Almost,
     Yes,
 }
 
@@ -155,6 +156,10 @@ impl ZobristHistory {
         }
     }
 
+    pub fn seen(&self) -> &HashMap<ZobristHash, u8> {
+        &self.seen
+    }
+
     pub fn update(&mut self, startpos: String, moves: &[String]) -> IsDraw {
         self.seen.clear();
         self.move_stack.clear();
@@ -164,12 +169,9 @@ impl ZobristHistory {
         self.add(game.zobrist());
 
         for (_i, mv) in moves.iter().enumerate() {
-
             let mv = game.move_from_str(mv).unwrap();
             game.make_move(mv).unwrap();
             self.add(game.zobrist());
-
-            // println!("({} / {}) {} => {}", i + 1, moves.len(), mv, game);
 
             if self.is_draw() == IsDraw::Yes {
                 return IsDraw::Yes;
@@ -189,11 +191,14 @@ impl ZobristHistory {
 
         self.move_stack.push(zobrist);
 
-        let is_draw = if self.is_draw() == IsDraw::Yes || entry > 2 {
+        let is_draw = if self.is_draw() == IsDraw::Yes || entry >= 3 {
             IsDraw::Yes
+        } else if entry == 2 {
+            IsDraw::Almost
         } else {
             IsDraw::No
         };
+
         self.draw_stack.push(is_draw);
     }
 

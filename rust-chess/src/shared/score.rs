@@ -102,7 +102,7 @@ impl Score {
                     Some((-99999 + *n as isize, 0))
                 }
             }
-            Score::DrawInN(_) => Some((0, -300)),
+            Score::DrawInN(_) => Some((0, -50)),
         }
     }
 

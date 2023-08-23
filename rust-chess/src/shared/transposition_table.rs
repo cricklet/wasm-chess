@@ -2,7 +2,7 @@ use crate::{
     game::Game,
     helpers::{err_result, ErrorResult},
     moves::Move,
-    score::Score, simple_move::SimpleMove,
+    score::Score, simple_move::SimpleMove, zobrist::ZobristHash,
 };
 use core::fmt;
 use std::{cell::RefCell, fmt::Formatter, mem::size_of};
@@ -90,6 +90,11 @@ impl TranspositionTable {
         }
         self.stats.borrow_mut().misses += 1;
         None
+    }
+
+    pub fn clear(&mut self, zobrist: ZobristHash) {
+        let mask = zobrist.value() & self.mask;
+        self.table[mask as usize] = None;
     }
 
     pub fn update(

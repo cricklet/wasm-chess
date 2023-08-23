@@ -88,6 +88,14 @@ pub struct IterativeSearch {
 
 impl IterativeSearch {
     pub fn new(game: Game, options: IterativeSearchOptions) -> ErrorResult<Self> {
+        // Always clear past game states from the transposition table when starting a search.
+        // This helps us avoid looking up stale positions that lead to draws.
+        for (zobrist, _) in options.starting_history.seen().iter() {
+            if let Some(tt) = options.transposition_table.as_ref() {
+                tt.borrow_mut().clear(*zobrist);
+            }
+        }
+
         let search_options = AlphaBetaOptions {
             skip_quiescence: options.skip_quiescence,
             skip_sibling_beta_cutoff_sort: options.skip_sibling_beta_cutoff_sort,
