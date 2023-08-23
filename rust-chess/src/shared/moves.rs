@@ -154,11 +154,10 @@ impl Move {
 
     #[cfg(test)]
     pub fn check_simple_move_conversion(&self, game: &Game) -> ErrorResult<()> {
-        use crate::zobrist::SimpleMove;
+        use crate::simple_move::SimpleMove;
 
         let simple_move = SimpleMove::from(&self);
-        let simple_move_converted =
-            game.move_from(simple_move.start, simple_move.end, simple_move.promotion);
+        let simple_move_converted = simple_move.to_move(game);
         let simple_move_converted = match simple_move_converted {
             Ok(m) => m,
             Err(e) => {
@@ -196,14 +195,11 @@ pub enum JumpingPiece {
     King,
 }
 
-pub fn potential_bb_to_moves(
-    buffer: &mut Vec<Move>,
-    PlayerPiece { player, piece }: PlayerPiece,
-    piece_index: BoardIndex,
+fn quiet_and_capture_bb_from_potential(
+    player: Player,
     potential: Bitboard,
     bitboards: &Bitboards,
-    only_captures: OnlyCaptures,
-) -> ErrorResult<()> {
+) -> (Bitboard, Bitboard) {
     let self_occupied = bitboards.occupied[player];
     let enemy_occupied = bitboards.occupied[other_player(player)];
 
@@ -212,6 +208,18 @@ pub fn potential_bb_to_moves(
     let capture = moves & enemy_occupied;
     let quiet = moves & !capture;
 
+    (capture, quiet)
+}
+
+pub fn potential_bb_to_moves(
+    buffer: &mut Vec<Move>,
+    PlayerPiece { player, piece }: PlayerPiece,
+    piece_index: BoardIndex,
+    potential: Bitboard,
+    bitboards: &Bitboards,
+    only_captures: OnlyCaptures,
+) -> ErrorResult<()> {
+    let (quiet, capture) = quiet_and_capture_bb_from_potential(player, potential, bitboards);
     let start_index = piece_index;
 
     for end_index in each_index_of_one(capture) {
@@ -294,31 +302,6 @@ pub fn walk_moves(
 
     Ok(())
 }
-
-// pub fn walk_move_is_legal(
-//     start: BoardIndex,
-//     end: BoardIndex,
-//     PlayerPiece { player, piece }: PlayerPiece,
-//     game: &Game,
-// ) -> ErrorResult<bool> {
-//     todo!()
-// }
-
-// pub fn walk_or_jump_move_is_legal(
-//     start: BoardIndex,
-//     end: BoardIndex,
-//     piece: PlayerPiece,
-//     game: &Game,
-// ) -> ErrorResult<bool> {
-//     match piece.piece {
-//         Piece::Bishop => walk_move_is_legal(start, end, piece, game),
-//         Piece::Rook => walk_move_is_legal(start, end, piece, game),
-//         Piece::Queen => walk_move_is_legal(start, end, piece, game),
-//         Piece::Pawn => pawn_move_is_legal(start, end, piece, game),
-//         Piece::Knight => jump_move_is_legal(start, end, piece, game),
-//         Piece::King => jump_move_is_legal(start, end, piece, game),
-//     }
-// }
 
 pub fn jumping_bitboard(index: BoardIndex, jumping_piece: JumpingPiece) -> Bitboard {
     let lookup: &[Bitboard; 64] = match jumping_piece {

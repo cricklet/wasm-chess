@@ -6,7 +6,7 @@ use crate::bitboard::{
 use crate::board::Board;
 use crate::fen::FenDefinition;
 use crate::moves::{castling_side_is_safe, walk_potential_bb};
-use crate::zobrist::SimpleMove;
+use crate::simple_move::SimpleMove;
 
 use super::bitboard::FileRank;
 use super::bitboard::{self, castling_allowed_after_move, Bitboards, BoardIndex};
@@ -299,143 +299,6 @@ impl Game {
         Legal::Yes
     }
 
-    pub fn move_from(
-        &self,
-        start: BoardIndex,
-        end: BoardIndex,
-        promo: Option<Piece>,
-    ) -> ErrorResult<Option<Move>> {
-        let start_piece = self.bitboards().piece_at_index(start);
-        let start_piece = match start_piece {
-            Some(start_piece) => start_piece,
-            None => return Ok(None),
-        };
-
-        let end_piece = self.bitboards().piece_at_index(end);
-
-        if start_piece.player != self.player() {
-            return Ok(None);
-        }
-
-        if promo.is_some() && start_piece.piece != Piece::Pawn {
-            return Ok(None);
-        }
-
-        // Quiet
-        match end_piece {
-            None => {
-                // => Castle
-                if start_piece.piece == Piece::King {
-                    if let Some((side, req)) = matches_castling(self.player(), start, end) {
-                        if castling_side_is_safe(side, start_piece.player, self, req)? {
-                            return Ok(Some(Move {
-                                piece: start_piece,
-                                start_index: start,
-                                end_index: end,
-                                move_type: MoveType::Quiet(Quiet::Castle {
-                                    rook_start: req.rook_start,
-                                    rook_end: req.rook_end,
-                                }),
-                                promotion: promo.expect_none(|| {
-                                    "promotions not allowed on castling moves".to_string()
-                                })?,
-                            }));
-                        } else {
-                            return Ok(None);
-                        }
-                    }
-                }
-                if start_piece.piece == Piece::Pawn {
-                    // => PawnSkip
-                    let pawn_dir = pawn_push_direction_for_player(start_piece.player).offset();
-                    let pawn_start_mask = starting_pawns_mask(start_piece.player);
-                    let starting_bb = single_bitboard(start);
-                    if (starting_bb & pawn_start_mask) != 0 {
-                        let skipped = BoardIndex::from((start.i as isize + pawn_dir) as usize);
-                        let expected_end =
-                            BoardIndex::from((start.i as isize + pawn_dir + pawn_dir) as usize);
-
-                        if end == expected_end {
-                            if self.bitboards().is_occupied(skipped) {
-                                return Ok(None);
-                            }
-                            if self.bitboards().is_occupied(expected_end) {
-                                return err_result("pawn skip end index is occupied, should have been checked above");
-                            }
-
-                            return Ok(Some(Move {
-                                piece: start_piece,
-                                start_index: start,
-                                end_index: end,
-                                move_type: MoveType::Quiet(Quiet::PawnSkip {
-                                    skipped_index: skipped,
-                                }),
-                                promotion: promo.expect_none(|| {
-                                    "promotions not allowed on pawn skip moves".to_string()
-                                })?,
-                            }));
-                        }
-                    }
-
-                    // Capture => EnPassant
-                    if let Some(en_passant) = self.en_passant() {
-                        if end == en_passant {
-                            let taken_index =
-                                BoardIndex::from((end.i as isize - pawn_dir) as usize);
-                            let taken_piece =
-                                self.bitboards().piece_at_index(taken_index).as_result()?;
-                            if taken_piece.piece != Piece::Pawn
-                                && taken_piece.player != self.player().other()
-                            {
-                                return err_result(&format!(
-                                    "taken piece {} for en-passant isn't enemy pawn",
-                                    taken_piece
-                                ));
-                            }
-                            return Ok(Some(Move {
-                                piece: start_piece,
-                                start_index: start,
-                                end_index: end,
-                                move_type: MoveType::Capture(Capture::EnPassant { taken_index }),
-                                promotion: promo.expect_none(|| {
-                                    "promotions not allowed on pawn skip moves".to_string()
-                                })?,
-                            }));
-                        }
-                    }
-                }
-                // => Move
-                // TODO: make sure the walk squares are empty
-                Ok(Some(Move {
-                    piece: start_piece,
-                    start_index: start,
-                    end_index: end,
-                    move_type: MoveType::Quiet(Quiet::Move),
-                    promotion: promo,
-                }))
-            }
-            Some(end_piece) => {
-                // Capture => Take
-                if end_piece.player != self.player().other() {
-                    return Ok(None);
-                }
-                if end_piece.piece == Piece::King {
-                    return Ok(None);
-                }
-                // TODO: make sure the walk squares are empty
-                Ok(Some(Move {
-                    piece: start_piece,
-                    start_index: start,
-                    end_index: end,
-                    move_type: MoveType::Capture(Capture::Take {
-                        taken_piece: end_piece,
-                    }),
-                    promotion: promo,
-                }))
-            }
-        }
-    }
-
     pub fn make_move(&mut self, m: Move) -> ErrorResult<()> {
         let player = m.piece.player;
         let enemy = player.other();
@@ -704,7 +567,7 @@ fn test_should_discard_invalid_simple_moves() {
         let simple_move = SimpleMove::from_str(move_str).unwrap();
 
         assert!(
-            game.move_from(simple_move.start, simple_move.end, None)
+            simple_move.to_move(&game)
                 .unwrap()
                 .is_none(),
             "should discard move {} for game {:#?}",

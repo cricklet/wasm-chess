@@ -12,14 +12,12 @@ use num_format::{Locale, ToFormattedString};
 
 use crate::{
     alphabeta::{AlphaBetaOptions, AlphaBetaStack, LoopResult},
-    bitboard::BoardIndex,
     game::Game,
-    helpers::{ErrorResult, Joinable, OptionResult},
+    helpers::{ErrorResult, Joinable},
     move_ordering::capture_sort,
     moves::Move,
     transposition_table::TranspositionTable,
-    traversal::null_move_sort,
-    zobrist::{BestMovesCache, SimpleMove},
+    zobrist::BestMovesCache, simple_move::SimpleMove,
 };
 
 #[derive(Debug, Clone)]

@@ -13,7 +13,7 @@ use crate::{
     game::{CanCastleOnSide, Game},
     helpers::{err_result, ErrorResult, Joinable, OptionResult},
     moves::{all_moves, Move, MoveOptions},
-    types::{CastlingSide, Piece, Player, PlayerPiece},
+    types::{CastlingSide, Piece, Player, PlayerPiece}, simple_move::SimpleMove,
 };
 
 lazy_static! {
@@ -125,63 +125,6 @@ impl ZobristHash {
     }
     pub fn on_update_square(&mut self, index: BoardIndex, piece: PlayerPiece) {
         self.value ^= ZOBRIST_PIECE_AT_SQUARE[piece.to_usize()][index.i];
-    }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct SimpleMove {
-    pub start: BoardIndex,
-    pub end: BoardIndex,
-    pub promotion: Option<Piece>,
-}
-
-impl Display for SimpleMove {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let promo = self.promotion.map(|p| p.to_uci());
-        let promo = promo.unwrap_or(&"");
-        write!(f, "{}{}{}", self.start, self.end, promo)
-    }
-}
-
-impl SimpleMove {
-    pub fn from_str(s: &str) -> ErrorResult<Self> {
-        let start = BoardIndex::from_str(&s[0..2])?;
-        let end = BoardIndex::from_str(&s[2..4])?;
-        let promotion = if s.len() > 4 {
-            Piece::from(s.chars().nth(4).as_result()?)
-        } else {
-            None
-        };
-
-        Ok(Self {
-            start,
-            end,
-            promotion,
-        })
-    }
-
-    pub fn from(m: &Move) -> Self {
-        Self {
-            start: m.start_index,
-            end: m.end_index,
-            promotion: m.promotion,
-        }
-    }
-
-    pub fn make_move(&self, game: Game) -> ErrorResult<Game> {
-        let mut next = game.clone();
-        let mut moves = vec![];
-        all_moves(&mut moves, next.player(), &next, MoveOptions::default())?;
-        for m in &moves {
-            if m.start_index == self.start
-                && m.end_index == self.end
-                && m.promotion == self.promotion
-            {
-                next.make_move(*m)?;
-                return Ok(next);
-            }
-        }
-        return err_result(&format!("couldn't find move {} for game {}", self, game));
     }
 }
 

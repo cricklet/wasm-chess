@@ -2,8 +2,7 @@ use crate::{
     game::Game,
     helpers::{err_result, ErrorResult},
     moves::Move,
-    score::Score,
-    zobrist::SimpleMove,
+    score::Score, simple_move::SimpleMove,
 };
 use core::fmt;
 use std::{cell::RefCell, fmt::Formatter, mem::size_of};

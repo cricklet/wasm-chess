@@ -18,3 +18,4 @@ pub mod types;
 pub mod score;
 pub mod uci;
 pub mod zobrist;
+pub mod simple_move;

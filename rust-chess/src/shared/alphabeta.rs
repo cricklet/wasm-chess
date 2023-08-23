@@ -6,6 +6,7 @@ use crate::{
     defer,
     helpers::{err_result, pad_left, Joinable, OptionResult},
     score::Score,
+    simple_move::SimpleMove,
     transposition_table::{CacheEntry, CacheValue, TranspositionTable},
     traversal::{null_move_sort, TraversalData, TraversalStack},
 };
@@ -17,7 +18,6 @@ use super::{
     helpers::ErrorResult,
     moves::*,
     types::*,
-    zobrist::SimpleMove,
 };
 
 // ************************************************************************************************* //
@@ -484,10 +484,7 @@ impl AlphaBetaStack {
 
         while !current.data.high_priority_moves.done() {
             if let Some(next_move) = current.data.high_priority_moves.next() {
-                let next_move =
-                    current
-                        .game
-                        .move_from(next_move.start, next_move.end, next_move.promotion)?;
+                let next_move = next_move.to_move(&current.game)?;
 
                 if let Some(next_move) = next_move {
                     return self.traverse_move(&next_move);

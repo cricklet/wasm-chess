@@ -1,7 +1,7 @@
 use std::{collections::HashMap, default};
 
 use crate::{
-    bitboard::warm_magic_cache, moves::all_moves, traversal::{null_move_sort, TraversalData}, zobrist::SimpleMove,
+    bitboard::warm_magic_cache, moves::all_moves, traversal::{null_move_sort, TraversalData},
 };
 
 use super::{
