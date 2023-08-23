@@ -11,7 +11,7 @@ use strum::IntoEnumIterator;
 use crate::{
     bitboard::{Bitboards, BoardIndex, ForPlayer},
     game::{CanCastleOnSide, Game},
-    helpers::{err_result, ErrorResult},
+    helpers::{err_result, ErrorResult, Joinable},
     moves::{all_moves, Move, MoveOptions},
     types::{CastlingSide, Piece, Player, PlayerPiece},
 };
@@ -191,12 +191,20 @@ impl BestMovesCache {
         self.best_moves[masked as usize] = Some((hash, *m));
     }
 
-    pub fn update(&mut self, game: &Game, moves: &Vec<SimpleMove>) -> ErrorResult<()> {
-        let mut game = game.clone();
+    pub fn update(&mut self, start: &Game, moves: &Vec<SimpleMove>) -> ErrorResult<()> {
+        let mut game = start.clone();
 
         for m in moves {
             self.add(&game, m);
-            game = m.make_move(game)?;
+            game = match m.make_move(game) {
+                Ok(g) => g,
+                Err(e) => {
+                    return err_result(&format!(
+                        "failed to update moves: {} for start game: {}\n{}",
+                        moves.join_vec(", "), start, e
+                    ))
+                }
+            }
         }
 
         Ok(())

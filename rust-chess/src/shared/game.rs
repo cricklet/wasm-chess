@@ -401,6 +401,7 @@ impl Game {
                     }
                 }
                 // => Move
+                // TODO: make sure the walk squares are empty
                 Ok(Some(Move {
                     piece: start_piece,
                     start_index: start,
@@ -410,12 +411,14 @@ impl Game {
                 }))
             }
             Some(end_piece) => {
+                // Capture => Take
                 if end_piece.player != self.player().other() {
                     return Ok(None);
                 }
                 if end_piece.piece == Piece::King {
                     return Ok(None);
                 }
+                // TODO: make sure the walk squares are empty
                 Ok(Some(Move {
                     piece: start_piece,
                     start_index: start,

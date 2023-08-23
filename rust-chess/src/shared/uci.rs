@@ -5,7 +5,7 @@ use crate::{
     alphabeta::{AlphaBetaStack, LoopResult},
     bitboard::warm_magic_cache,
     iterative_deepening::{IterativeSearch, IterativeSearchOptions},
-    transposition_table::TranspositionTable,
+    transposition_table::TranspositionTable, helpers::Joinable,
 };
 
 use super::{
@@ -109,5 +109,42 @@ impl Uci {
         }
 
         Ok(output.join("\n"))
+    }
+}
+
+#[test]
+fn test_match() {
+    let mut uci = Uci::new();
+    let mut moves: Vec<String> = vec![];
+
+    loop {
+        let position_uci_line = format!("position startpos moves {}", moves.join(" "));
+        println!("{}", position_uci_line);
+        uci.handle_line(position_uci_line.as_str()).unwrap();
+
+        let start = std::time::Instant::now();
+        uci.handle_line("go").unwrap();
+
+        let mut log = vec![];
+
+        loop {
+            log.push(uci.think().unwrap());
+            if start.elapsed().as_millis() > 500 {
+                break;
+            }
+        }
+
+        println!(
+            "{}",
+            log.iter().filter(|&l| !l.is_empty()).collect::<Vec<_>>().join_vec(", ")
+        );
+
+        let result = uci.finish_search().unwrap();
+        println!("{}", result);
+
+        let bestmove = result.split_whitespace().nth(1).unwrap();
+        moves.push(bestmove.to_string());
+
+        println!("{}", uci.handle_line("d").unwrap());
     }
 }
