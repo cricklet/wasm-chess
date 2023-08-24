@@ -175,14 +175,17 @@ impl IterativeSearch {
                     Some((variation, score)) => {
                         let depth = self.alpha_beta.evaluate_at_depth;
                         log(&format!(
-                            "at depth {}: bestmove {} ponder {} ({}), beta-cutoffs {}, evaluations {}, start moves searched {}",
+                            "at depth {}: bestmove {} ponder {} ({}), β-cuts {}, evals {}",
                             depth,
                             variation[0].to_string(),
-                            variation[1..].iter().map(|m| m.to_string()).collect::<Vec<_>>().join_vec(" "),
+                            variation[1..]
+                                .iter()
+                                .map(|m| m.to_string())
+                                .collect::<Vec<_>>()
+                                .join_vec(" "),
                             score,
                             self.alpha_beta.num_beta_cutoffs,
                             self.alpha_beta.num_evaluations,
-                            self.alpha_beta.num_starting_moves_searched,
                         ));
 
                         self.best_variations_per_depth.push(variation);

@@ -1,4 +1,7 @@
-use std::collections::HashSet;
+use std::{
+    cmp::{max, min},
+    collections::HashSet,
+};
 
 use lazy_static::lazy_static;
 use strum::IntoEnumIterator;
@@ -9,76 +12,131 @@ use super::{
     types::{Piece, Player},
 };
 
-lazy_static! {
-    static ref ROOK_DEVELOPMENT_BBS: [Vec<(isize, Bitboard)>; 2] =
-        evaluation_bitboards_per_player([
-            [0, 0, 0, 1, 1, 0, 0, 0],
-            [0, 2, 2, 2, 2, 2, 2, 0],
-            [1, 0, 0, 0, 0, 0, 0, 1],
-            [-1, 0, 0, 0, 0, 0, 0, -1],
-            [-1, 0, 0, 0, 0, 0, 0, -1],
-            [-1, 0, 0, 0, 0, 0, 0, -1],
-            [-1, 0, 0, 1, 1, 0, 0, -1],
-            [0, 0, 1, 2, 2, 1, 0, 0],
-        ]);
-    static ref PAWN_DEVELOPMENT_BBS: [Vec<(isize, Bitboard)>; 2] =
-        evaluation_bitboards_per_player([
-            [4, 4, 4, 4, 4, 4, 4, 4],
-            [3, 3, 3, 4, 4, 3, 3, 3],
-            [3, 3, 3, 3, 3, 3, 3, 3],
-            [2, 2, 2, 1, 1, 2, 2, 2],
-            [1, 1, 1, 3, 3, 1, 1, 1],
-            [0, 1, 1, 2, 2, 1, 1, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0],
-        ]);
-    static ref BISHOP_DEVELOPMENT_BBS: [Vec<(isize, Bitboard)>; 2] =
-        evaluation_bitboards_per_player([
-            [-1, -1, -1, -1, -1, -1, -1, -1],
-            [-1, 0, 0, 0, 0, 0, 0, -1],
-            [-1, 0, 1, 1, 1, 1, 0, -1],
-            [-1, 1, 1, 2, 2, 1, 1, -1],
-            [-1, 0, 1, 2, 2, 1, 0, -1],
-            [-1, 2, 2, 2, 2, 2, 2, -1],
-            [-1, 1, 0, 0, 0, 0, 1, -1],
-            [-1, -1, -1, -1, -1, -1, -1, -1],
-        ]);
-    static ref KNIGHT_DEVELOPMENT_BBS: [Vec<(isize, Bitboard)>; 2] =
-        evaluation_bitboards_per_player([
-            [-2, -2, -2, -2, -2, -2, -2, -2],
-            [-2, -1, 0, 0, 0, 0, -1, -2],
-            [-2, 0, 1, 2, 2, 1, 0, -2],
-            [-2, 1, 2, 2, 2, 2, 1, -2],
-            [-2, 0, 2, 2, 2, 2, 0, -2],
-            [-2, 1, 1, 2, 2, 1, 1, -2],
-            [-2, -1, 0, 0, 0, 0, -1, -2],
-            [-2, -2, -2, -2, -2, -2, -2, -2],
-        ]);
-    static ref QUEEN_DEVELOPMENT_BBS: [Vec<(isize, Bitboard)>; 2] =
-        evaluation_bitboards_per_player([
-            [-1, -1, -1, -1, -1, -1, -1, -1],
-            [-1, 1, 1, 1, 1, 1, 1, -1],
-            [-1, 0, 0, 0, 0, 0, 0, -1],
-            [-1, 0, 0, -1, -1, 0, 0, -1],
-            [0, 0, 0, -1, -1, 0, 0, 0],
-            [-1, 0, 0, 0, 0, 0, 0, -1],
-            [-1, 0, 0, 1, 1, 0, 0, -1],
-            [-1, -1, -1, 0, 0, -1, -1, -1],
-        ]);
-    static ref KING_DEVELOPMENT_BBS: [Vec<(isize, Bitboard)>; 2] =
-        evaluation_bitboards_per_player([
-            [0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 1, 1, 1, 1, 1, 1, 0],
-            [0, 1, 1, 1, 1, 1, 1, 0],
-            [0, 1, 1, 1, 1, 1, 1, 0],
-            [0, 1, 1, 1, 1, 1, 1, 0],
-            [-1, 1, 1, 1, 1, 1, 1, -1],
-            [-1, 1, 1, 0, 0, 1, 1, -1],
-            [-1, 1, 1, 0, 0, 1, 1, -1],
-        ]);
+#[derive(Debug, Copy, Clone)]
+enum GameStage {
+    Early,
+    Late,
 }
 
-fn evaluation_bitboards_from_point_board(point_board: [[isize; 8]; 8]) -> Vec<(isize, Bitboard)> {
+lazy_static! {
+    static ref EARLY_ROOK_DEVELOPMENT_BBS: [Vec<(isize, Bitboard)>; 2] =
+        evaluation_bitboards_per_player(
+            15,
+            [
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 1, 1, 0, 0, 0],
+                [0, 0, 0, 1, 1, 0, 0, 0],
+            ]
+        );
+    static ref EARLY_PAWN_DEVELOPMENT_BBS: [Vec<(isize, Bitboard)>; 2] =
+        evaluation_bitboards_per_player(
+            15,
+            [
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 1, 3, 3, 1, 0, 0],
+                [0, 1, 0, 2, 2, 0, 1, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+            ]
+        );
+    static ref LATE_PAWN_DEVELOPMENT_BBS: [Vec<(isize, Bitboard)>; 2] =
+        evaluation_bitboards_per_player(
+            10,
+            [
+                [4, 4, 4, 4, 4, 4, 4, 4],
+                [4, 4, 4, 4, 4, 4, 4, 4],
+                [3, 3, 3, 3, 3, 3, 3, 3],
+                [2, 2, 2, 2, 2, 2, 2, 2],
+                [1, 1, 1, 1, 1, 1, 1, 1],
+                [1, 1, 0, 0, 0, 0, 1, 1],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+            ]
+        );
+    static ref EARLY_BISHOP_DEVELOPMENT_BBS: [Vec<(isize, Bitboard)>; 2] =
+        evaluation_bitboards_per_player(
+            10,
+            [
+                [-1, -1, -1, -1, -1, -1, -1, -1],
+                [-1, 0, 0, 0, 0, 0, 0, -1],
+                [-1, 0, 0, 0, 0, 0, 0, -1],
+                [-1, 0, 0, 0, 0, 0, 0, -1],
+                [-1, 0, 1, 1, 1, 1, 0, -1],
+                [-1, 1, 1, 1, 1, 1, 1, -1],
+                [-1, 1, 0, 1, 1, 0, 1, -1],
+                [-1, -1, -1, -1, -1, -1, -1, -1],
+            ]
+        );
+    static ref EARLY_KNIGHT_DEVELOPMENT_BBS: [Vec<(isize, Bitboard)>; 2] =
+        evaluation_bitboards_per_player(
+            10,
+            [
+                [-1, -1, -1, -1, -1, -1, -1, -1],
+                [-1, 0, 0, 0, 0, 0, 0, -1],
+                [-1, 0, 0, 0, 0, 0, 0, -1],
+                [-1, 0, 0, 0, 0, 0, 0, -1],
+                [-1, 0, 1, 1, 1, 1, 0, -1],
+                [-1, 1, 1, 1, 1, 1, 1, -1],
+                [-1, 0, 0, 0, 0, 0, 0, -1],
+                [-1, -1, -1, -1, -1, -1, -1, -1],
+            ]
+        );
+    static ref EARLY_QUEEN_DEVELOPMENT_BBS: [Vec<(isize, Bitboard)>; 2] =
+        evaluation_bitboards_per_player(
+            10,
+            [
+                [-1, -1, -1, -1, -1, -1, -1, -1],
+                [-1, 0, 0, 0, 0, 0, 0, -1],
+                [-1, 0, 0, 0, 0, 0, 0, -1],
+                [-1, 0, 0, -1, -1, 0, 0, -1],
+                [0, 0, 0, -1, -1, 0, 0, 0],
+                [-1, 0, 0, 1, 1, 0, 0, -1],
+                [-1, 0, 0, 1, 1, 0, 0, -1],
+                [-1, -1, -1, 0, 0, -1, -1, -1],
+            ]
+        );
+    static ref EARLY_KING_DEVELOPMENT_BBS: [Vec<(isize, Bitboard)>; 2] =
+        evaluation_bitboards_per_player(
+            10,
+            [
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 1, 0, 0, 0, 1, 0],
+            ]
+        );
+    static ref LATE_KING_DEVELOPMENT_BBS: [Vec<(isize, Bitboard)>; 2] =
+        evaluation_bitboards_per_player(
+            20,
+            [
+                [-1, -1, 0, 0, 0, 0, -1, -1],
+                [-1, 0, 0, 0, 0, 0, 0, -1],
+                [0, 0, 1, 1, 1, 1, 0, 0],
+                [0, 0, 1, 1, 1, 1, 0, 0],
+                [0, 0, 1, 1, 1, 1, 0, 0],
+                [0, 0, 1, 1, 1, 1, 0, 0],
+                [-1, 0, 0, 0, 0, 0, 0, -1],
+                [-1, -1, 0, 0, 0, 0, -1, -1],
+            ]
+        );
+}
+
+fn evaluation_bitboards_from_point_board(
+    scale: isize,
+    point_board: [[isize; 8]; 8],
+) -> Vec<(isize, Bitboard)> {
     let mut bitboards = Vec::new();
     let point_values = HashSet::<isize>::from_iter(point_board.iter().flatten().map(|&x| x));
 
@@ -90,13 +148,16 @@ fn evaluation_bitboards_from_point_board(point_board: [[isize; 8]; 8]) -> Vec<(i
                 bitboard |= single_bitboard(BoardIndex::from(index));
             }
         }
-        bitboards.push((point_value, bitboard));
+        bitboards.push((scale * point_value, bitboard));
     }
 
     bitboards
 }
 
-fn evaluation_bitboards_per_player(point_board: [[isize; 8]; 8]) -> [Vec<(isize, Bitboard)>; 2] {
+fn evaluation_bitboards_per_player(
+    scale: isize,
+    point_board: [[isize; 8]; 8],
+) -> [Vec<(isize, Bitboard)>; 2] {
     let mut flipped_point_board = [[0; 8]; 8];
     for rank in 0..8 {
         for file in 0..8 {
@@ -105,61 +166,67 @@ fn evaluation_bitboards_per_player(point_board: [[isize; 8]; 8]) -> [Vec<(isize,
     }
 
     [
-        evaluation_bitboards_from_point_board(point_board),
-        evaluation_bitboards_from_point_board(flipped_point_board),
+        evaluation_bitboards_from_point_board(scale, point_board),
+        evaluation_bitboards_from_point_board(scale, flipped_point_board),
     ]
 }
 
-fn evaluation_bitboards_for_piece(player: Player, piece: Piece) -> &'static Vec<(isize, Bitboard)> {
-    match piece {
-        Piece::Pawn => &PAWN_DEVELOPMENT_BBS[player as usize],
-        Piece::Rook => &ROOK_DEVELOPMENT_BBS[player as usize],
-        Piece::Bishop => &BISHOP_DEVELOPMENT_BBS[player as usize],
-        Piece::Knight => &KNIGHT_DEVELOPMENT_BBS[player as usize],
-        Piece::Queen => &QUEEN_DEVELOPMENT_BBS[player as usize],
-        Piece::King => &KING_DEVELOPMENT_BBS[player as usize],
-    }
-}
-fn centipawn_evaluation(game: &Game, player: Player) -> isize {
-    let mut score = 0;
-
-    {
-        let pieces = &game.bitboards().pieces[player];
-        for piece in Piece::iter() {
-            score += pieces[piece].count_ones() as isize * piece.centipawns();
-        }
-    }
-
-    {
-        let enemy = player.other();
-        let pieces = &game.bitboards().pieces[enemy];
-        for piece in Piece::iter() {
-            score -= pieces[piece].count_ones() as isize * piece.centipawns();
-        }
-    }
-
-    score
+fn evaluation_bitboards_for(
+    player: Player,
+    development_bbs: &(isize, [Vec<(isize, Bitboard)>; 2]),
+) -> (isize, &Vec<(isize, Bitboard)>) {
+    (
+        development_bbs.0,
+        development_bbs.1.get(player as usize).unwrap(),
+    )
 }
 
-fn development_evaluation(game: &Game, player: Player) -> isize {
+fn evaluation_bitboards_for_piece(
+    stage: GameStage,
+    player: Player,
+    piece: Piece,
+) -> Option<&'static Vec<(isize, Bitboard)>> {
+    match stage {
+        GameStage::Early => match piece {
+            Piece::Pawn => Some(&EARLY_PAWN_DEVELOPMENT_BBS[player as usize]),
+            Piece::Rook => Some(&EARLY_ROOK_DEVELOPMENT_BBS[player as usize]),
+            Piece::Bishop => Some(&EARLY_BISHOP_DEVELOPMENT_BBS[player as usize]),
+            Piece::Knight => Some(&EARLY_KNIGHT_DEVELOPMENT_BBS[player as usize]),
+            Piece::Queen => Some(&EARLY_QUEEN_DEVELOPMENT_BBS[player as usize]),
+            Piece::King => Some(&EARLY_KING_DEVELOPMENT_BBS[player as usize]),
+        },
+        GameStage::Late => match piece {
+            Piece::Pawn => Some(&LATE_PAWN_DEVELOPMENT_BBS[player as usize]),
+            Piece::King => Some(&LATE_KING_DEVELOPMENT_BBS[player as usize]),
+            _ => None,
+        },
+    }
+}
+
+fn development_evaluation(stage: GameStage, game: &Game, player: Player) -> isize {
     let mut score = 0;
 
     let enemy = player.other();
 
     let player_pieces = game.bitboards().pieces[player];
     let enemy_pieces = game.bitboards().pieces[enemy];
+
     for piece in Piece::iter() {
         {
             let player_piece = player_pieces[piece];
-            for (score_multiple, score_bitboard) in evaluation_bitboards_for_piece(player, piece) {
-                score += score_multiple * (player_piece & score_bitboard).count_ones() as isize;
+            if let Some(eval_bbs) = evaluation_bitboards_for_piece(stage, player, piece) {
+                for (score_multiple, score_bitboard) in eval_bbs {
+                    score += score_multiple * (player_piece & score_bitboard).count_ones() as isize;
+                }
             }
         }
 
         {
             let enemy_piece = enemy_pieces[piece];
-            for (score_multiple, score_bitboard) in evaluation_bitboards_for_piece(enemy, piece) {
-                score -= score_multiple * (enemy_piece & score_bitboard).count_ones() as isize;
+            if let Some(eval_bbs) = evaluation_bitboards_for_piece(stage, enemy, piece) {
+                for (score_multiple, score_bitboard) in eval_bbs {
+                    score -= score_multiple * (enemy_piece & score_bitboard).count_ones() as isize;
+                }
             }
         }
     }
@@ -167,40 +234,106 @@ fn development_evaluation(game: &Game, player: Player) -> isize {
     score
 }
 
+lazy_static! {
+    static ref STARTING_CENTIPAWNS: isize = {
+        let mut score = 0;
+        score += Piece::Pawn.centipawns() * 8;
+        score += Piece::Knight.centipawns() * 2;
+        score += Piece::Bishop.centipawns() * 2;
+        score += Piece::Rook.centipawns() * 2;
+        score += Piece::Queen.centipawns() * 1;
+        score
+    };
+}
+fn centipawns_for_player(player: Player, game: &Game) -> isize {
+    let mut score = 0;
+    let pieces = &game.bitboards().pieces[player];
+    for piece in Piece::iter() {
+        score += pieces[piece].count_ones() as isize * piece.centipawns();
+    }
+    score
+}
+
+fn pieces_missing_for_player(player: Player, game: &Game) -> usize {
+    let mut missing: usize = 0;
+    let pieces = &game.bitboards().pieces[player];
+    missing += 8 - min(8, pieces[Piece::Pawn].count_zeros()) as usize;
+    missing += 2 - min(2, pieces[Piece::Rook].count_zeros()) as usize;
+    missing += 2 - min(2, pieces[Piece::Bishop].count_zeros()) as usize;
+    missing += 2 - min(2, pieces[Piece::Knight].count_zeros()) as usize;
+    missing += 1 - min(1, pieces[Piece::Queen].count_zeros()) as usize;
+    missing
+}
+
+fn centipawn_evaluation(player: Player, game: &Game) -> isize {
+    let player_centipawns = centipawns_for_player(player, game);
+    let enemy_centipawns = centipawns_for_player(player.other(), game);
+    player_centipawns - enemy_centipawns
+}
+
+// lazy_static!{
+//     static ref E_FILE = 
+// }
+
+// fn keep_center_pawns(player: Player, game: &Game) -> isize {
+    
+// }
+
 pub fn evaluate(game: &Game) -> isize {
-    centipawn_evaluation(game, game.player()) + development_evaluation(game, game.player())
+    let player = game.player();
+    let enemy = player.other();
+
+    let player_centipawns = centipawns_for_player(player, game);
+    let enemy_centipawns = centipawns_for_player(player.other(), game);
+
+    let stage = if player_centipawns < *STARTING_CENTIPAWNS - 800
+        || enemy_centipawns < *STARTING_CENTIPAWNS - 800
+        || pieces_missing_for_player(player, game) + pieces_missing_for_player(enemy, game) >= 6
+    {
+        GameStage::Late
+    } else {
+        GameStage::Early
+    };
+
+    let eval = centipawn_evaluation(player, game) + development_evaluation(stage, game, game.player());
+
+    eval
+
 }
 
 #[test]
 fn test_early_game_evaluation() {
     let game = Game::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR").unwrap();
-    assert_eq!(development_evaluation(&game, game.player()), 0);
+    assert_eq!(
+        development_evaluation(GameStage::Early, &game, game.player()),
+        0
+    );
 
     // after e4, white is winning
     let game =
         Game::from_fen("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1").unwrap();
-    let score = development_evaluation(&game, game.player());
+    let score = development_evaluation(GameStage::Early, &game, game.player());
     assert!(score < 0, "{} should be negative", score);
 
     // after e6, white is still winning
     let game =
         Game::from_fen("rnbqkbnr/pppp1ppp/4p3/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2").unwrap();
-    let score = development_evaluation(&game, game.player());
+    let score = development_evaluation(GameStage::Early, &game, game.player());
     assert!(score > 0, "{} should be positive", score);
 }
 
 #[test]
 fn test_point_evaluation() {
     let game = Game::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR").unwrap();
-    assert_eq!(centipawn_evaluation(&game, game.player()), 0);
+    assert_eq!(centipawn_evaluation(game.player(), &game), 0);
 
     let game =
         Game::from_fen("rnbqkbnr/ppp2ppp/4p3/3P4/3P4/8/PPP2PPP/RNBQKBNR b KQkq - 0 3").unwrap();
-    let score = centipawn_evaluation(&game, game.player());
+    let score = centipawn_evaluation(game.player(), &game);
     assert_eq!(score, -100, "white has taken a pawn");
 
     let game =
         Game::from_fen("rnbqkbnr/ppp2ppp/4p3/3P4/3P4/8/PPP2PPP/RNBQKBNR w KQkq - 0 3").unwrap();
-    let score = centipawn_evaluation(&game, game.player());
+    let score = centipawn_evaluation(game.player(), &game);
     assert_eq!(score, 100, "white has taken a pawn");
 }

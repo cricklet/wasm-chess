@@ -8,7 +8,7 @@ use crate::{
     helpers::Joinable,
     iterative_deepening::{IterativeSearch, IterativeSearchOptions},
     transposition_table::TranspositionTable,
-    zobrist::{ZobristHistory, IsDraw},
+    zobrist::{IsDraw, ZobristHistory},
 };
 
 use super::{
@@ -116,7 +116,11 @@ impl Uci {
         let mut output: Vec<String> = vec![];
         for _ in 0..100_000 {
             if let Some(search) = &mut self.search {
-                search.iterate(&mut |line| output.push(line.to_string()))?;
+                search.iterate(&mut |line| {
+                    if line.len() > 0 {
+                        output.push(line.to_string())
+                    }
+                })?;
             }
         }
 
@@ -218,7 +222,7 @@ fn test_match_1000ms() {
     loop {
         let position_uci_line = format!("position startpos moves {}", moves.join(" "));
         println!("{}", position_uci_line);
-        uci.handle_line(position_uci_line.as_str()).unwrap();
+        println!("{}", uci.handle_line(position_uci_line.as_str()).unwrap());
 
         let start = std::time::Instant::now();
         uci.handle_line("go").unwrap();
@@ -237,12 +241,11 @@ fn test_match_1000ms() {
             log.iter()
                 .filter(|&l| !l.is_empty())
                 .collect::<Vec<_>>()
-                .join_vec(", ")
+                .join_vec("\n")
         );
 
         let result = uci.finish_search().unwrap();
         println!("{}", result);
-        println!("{}", uci.handle_line("d").unwrap());
 
         let bestmove = result.split_whitespace().nth(1).unwrap();
         if bestmove.contains("none") {
