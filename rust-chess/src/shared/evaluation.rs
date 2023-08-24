@@ -6,13 +6,15 @@ use std::{
 use lazy_static::lazy_static;
 use strum::IntoEnumIterator;
 
+use crate::bitboard::{bitboard_from_string, ForPlayer};
+
 use super::{
     bitboard::{single_bitboard, Bitboard, BoardIndex, FileRank},
     game::Game,
     types::{Piece, Player},
 };
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 enum GameStage {
     Early,
     Late,
@@ -21,7 +23,7 @@ enum GameStage {
 lazy_static! {
     static ref EARLY_ROOK_DEVELOPMENT_BBS: [Vec<(isize, Bitboard)>; 2] =
         evaluation_bitboards_per_player(
-            15,
+            10,
             [
                 [0, 0, 0, 0, 0, 0, 0, 0],
                 [0, 0, 0, 0, 0, 0, 0, 0],
@@ -98,7 +100,7 @@ lazy_static! {
                 [-1, 0, 0, 0, 0, 0, 0, -1],
                 [-1, 0, 0, -1, -1, 0, 0, -1],
                 [0, 0, 0, -1, -1, 0, 0, 0],
-                [-1, 0, 0, 1, 1, 0, 0, -1],
+                [-1, 0, 0, 0, 0, 0, 0, -1],
                 [-1, 0, 0, 1, 1, 0, 0, -1],
                 [-1, -1, -1, 0, 0, -1, -1, -1],
             ]
@@ -271,13 +273,61 @@ fn centipawn_evaluation(player: Player, game: &Game) -> isize {
     player_centipawns - enemy_centipawns
 }
 
-// lazy_static!{
-//     static ref E_FILE = 
-// }
+fn bitboard_and_flipped(bb: Bitboard) -> ForPlayer<Bitboard> {
+    let mut flipped = Bitboard::default();
+    for rank in 0..8 {
+        for file in 0..8 {
+            if bb & single_bitboard(BoardIndex::from_file_rank(file, rank)) != 0 {
+                flipped |= single_bitboard(BoardIndex::from_file_rank(file, 7 - rank));
+            }
+        }
+    }
+    ForPlayer {
+        white: bb,
+        black: flipped,
+    }
+}
 
-// fn keep_center_pawns(player: Player, game: &Game) -> isize {
-    
-// }
+lazy_static! {
+    static ref E_FILE_PAWN: ForPlayer<Bitboard> = bitboard_and_flipped(
+        single_bitboard(BoardIndex::from_str("e2").unwrap())
+            | single_bitboard(BoardIndex::from_str("e3").unwrap())
+            | single_bitboard(BoardIndex::from_str("e4").unwrap())
+    );
+    static ref D_FILE_PAWN: ForPlayer<Bitboard> = bitboard_and_flipped(
+        single_bitboard(BoardIndex::from_str("d2").unwrap())
+            | single_bitboard(BoardIndex::from_str("d3").unwrap())
+            | single_bitboard(BoardIndex::from_str("d4").unwrap())
+    );
+}
+
+fn keep_center_pawns(player: Player, game: &Game) -> isize {
+    let pawns = game.bitboards().pieces[player][Piece::Pawn];
+    let has_e = pawns & E_FILE_PAWN[player] != 0;
+    let has_d = pawns & D_FILE_PAWN[player] != 0;
+    if has_e && has_d {
+        10
+    } else {
+        0
+    }
+}
+
+#[test]
+fn test_keep_center_pawns() {
+    let game = Game::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR").unwrap();
+    assert!(keep_center_pawns(Player::White, &game) > 0);
+    assert!(keep_center_pawns(Player::Black, &game) > 0);
+
+    let game =
+        Game::from_fen("rnbqkbnr/pppp1ppp/4p3/3P4/3P4/8/PPP2PPP/RNBQKBNR w KQkq - 0 3").unwrap();
+    assert!(keep_center_pawns(Player::White, &game) == 0);
+    assert!(keep_center_pawns(Player::Black, &game) > 0);
+
+    let game =
+        Game::from_fen("rnbqkbnr/pppp1ppp/8/3p4/3P4/8/PPP2PPP/RNBQKBNR w KQkq - 0 4").unwrap();
+    assert!(keep_center_pawns(Player::White, &game) == 0);
+    assert!(keep_center_pawns(Player::Black, &game) == 0);
+}
 
 pub fn evaluate(game: &Game) -> isize {
     let player = game.player();
@@ -295,10 +345,15 @@ pub fn evaluate(game: &Game) -> isize {
         GameStage::Early
     };
 
-    let eval = centipawn_evaluation(player, game) + development_evaluation(stage, game, game.player());
+    let mut eval =
+        centipawn_evaluation(player, game) + development_evaluation(stage, game, game.player());
+
+    if stage == GameStage::Early {
+        eval += keep_center_pawns(player, game);
+        eval -= keep_center_pawns(enemy, game);
+    }
 
     eval
-
 }
 
 #[test]
