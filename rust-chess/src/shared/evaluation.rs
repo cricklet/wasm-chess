@@ -123,14 +123,14 @@ lazy_static! {
         evaluation_bitboards_per_player(
             20,
             [
-                [-1, -1, 0, 0, 0, 0, -1, -1],
-                [-1, 0, 0, 0, 0, 0, 0, -1],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
                 [0, 0, 1, 1, 1, 1, 0, 0],
-                [0, 0, 1, 1, 1, 1, 0, 0],
-                [0, 0, 1, 1, 1, 1, 0, 0],
-                [0, 0, 1, 1, 1, 1, 0, 0],
-                [-1, 0, 0, 0, 0, 0, 0, -1],
-                [-1, -1, 0, 0, 0, 0, -1, -1],
+                [-1, 0, 1, 1, 1, 1, 0, -1],
+                [-1, 0, 1, 1, 1, 1, 0, -1],
+                [-1, 0, 1, 1, 1, 1, 0, -1],
+                [-2, 0, 0, 0, 0, 0, 0, -2],
+                [-2, -2, -1, -1, -1, -1, -2, -2],
             ]
         );
 }
@@ -391,4 +391,18 @@ fn test_point_evaluation() {
         Game::from_fen("rnbqkbnr/ppp2ppp/4p3/3P4/3P4/8/PPP2PPP/RNBQKBNR w KQkq - 0 3").unwrap();
     let score = centipawn_evaluation(game.player(), &game);
     assert_eq!(score, 100, "white has taken a pawn");
+}
+
+#[test]
+fn test_late_game_king_position() {
+    let king_on_edge = "1k6/7p/b5pN/pp1B4/3P1P1P/1P6/8/2K2n2 w - - 68 35";
+    let king_in_center = "1k6/7p/b5pN/pp1B4/3P1P1P/1P1K4/8/5n2 w - - 72 37";
+
+    let game_edge = Game::from_fen(king_on_edge).unwrap();
+    let game_center = Game::from_fen(king_in_center).unwrap();
+
+    let score_edge = evaluate(&game_edge);
+    let score_center = evaluate(&game_center);
+
+    assert!(score_edge < score_center);
 }

@@ -701,11 +701,11 @@ impl InQuiescence {
         match self {
             InQuiescence::No => MoveOptions {
                 only_captures: OnlyCaptures::No,
-                only_queen_promotion: OnlyQueenPromotion::No,
+                only_queen_promotion: OnlyQueenPromotion::Yes,
             },
             InQuiescence::Yes => MoveOptions {
                 only_captures: OnlyCaptures::Yes,
-                only_queen_promotion: OnlyQueenPromotion::No,
+                only_queen_promotion: OnlyQueenPromotion::Yes,
             },
         }
     }

@@ -217,7 +217,7 @@ fn test_evaluation_comparison() {
         Score::compare(
             Player::White,
             Score::DrawInN(0),
-            Score::Centipawns(Player::Black, 50),
+            Score::Centipawns(Player::Black, 20),
         ),
         Comparison::Worse
     );
