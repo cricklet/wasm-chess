@@ -10,7 +10,7 @@ import QueenSvg from './assets/queen.svg'
 import PawnSvg from './assets/pawn.svg'
 import { Board, Piece, Row, locationStr, rankStr, } from './helpers'
 import { atom, useAtom, useAtomValue, useSetAtom } from 'jotai'
-import { atomBoard, logAtom, atomInput, atomLegalMoves, atomCompleteMovesMatchingInput, atomValidPortionOfInput, atomInputIsLegal as atomInputIsLegalMove, atomValidStartsForInput as atomValidStartsMatchingInput, atomStartFromInput, atomValidEndsForInput as atomValidEndsMatchingInput, atomGame, atomLegalStarts, atomEndFromInput, finalizeMove, performMove, atomLastMove, moveContainsLocation } from './state'
+import { atomBoard, logAtom, atomInput, atomLegalMoves, atomCompleteMovesMatchingInput, atomValidPortionOfInput, atomInputIsLegal as atomInputIsLegalMove, atomValidStartsForInput as atomValidStartsMatchingInput, atomStartFromInput, atomValidEndsForInput as atomValidEndsMatchingInput, atomGame, atomLegalStarts, atomEndFromInput, finalizeMove, performMove, atomLastMove, moveContainsLocation, atomEngineControlsBlack, atomEngineControlsWhite } from './state'
 import { isValidElement, useEffect } from 'react'
 import * as wasm from './wasm-bindings'
 
@@ -200,6 +200,44 @@ function BoardComponent(props: { board: Board }) {
   )
 }
 
+function EngineOptions() {
+  let [engineControlsWhite, setEngineControlsWhite] = useAtom(atomEngineControlsWhite)
+  let [engineControlsBlack, setEngineControlsBlack] = useAtom(atomEngineControlsBlack)
+
+  let value = "-"
+  if (engineControlsWhite && !engineControlsBlack) {
+    value = "w"
+  } else if (!engineControlsWhite && engineControlsBlack) {
+    value = "b"
+  } else if (engineControlsWhite && engineControlsBlack) {
+    value = "wb"
+  }
+
+  return (
+    <select value={value} onChange={(e) => {
+      let value = e.target.value
+      if (value === "w") {
+        setEngineControlsWhite(true)
+        setEngineControlsBlack(false)
+      } else if (value === "b") {
+        setEngineControlsWhite(false)
+        setEngineControlsBlack(true)
+      } else if (value === "wb") {
+        setEngineControlsWhite(true)
+        setEngineControlsBlack(true)
+      } else if (value === "-") {
+        setEngineControlsWhite(false)
+        setEngineControlsBlack(false)
+      }
+    }}>
+      <option value="w">Engine plays white</option>
+      <option value="b">Engine plays black</option>
+      <option value="wb">Engine vs engine</option>
+      <option value="-">Player vs player</option>
+    </select>
+  )
+}
+
 function InputComponent() {
   let input = useAtomValue(atomInput)
   let isLegal = useAtomValue(atomInputIsLegalMove)
@@ -230,6 +268,9 @@ function App() {
   let [input, setInput] = useAtom(atomInput)
   let allMoves = useAtomValue(atomLegalMoves)
 
+  let engineControlsWhite = useAtomValue(atomEngineControlsWhite)
+  let engineControlsBlack = useAtomValue(atomEngineControlsBlack)
+
   useEffect(() => {
     let cleanup = wasm.listen((line: string) => {
       setLog((log) => [...log, line])
@@ -242,7 +283,11 @@ function App() {
       let start = game.start
       let moves = [...game.moves]
 
-      if (moves.length % 2 === 0) {
+      if (moves.length % 2 === 0 && !engineControlsWhite) {
+        return
+      }
+
+      if (moves.length % 2 === 1 && !engineControlsBlack) {
         return
       }
 
@@ -254,7 +299,7 @@ function App() {
       setGame((_) => performMove(bestMove, { start, moves }))
     }
     think()
-  }, [game])
+  }, [game, engineControlsBlack, engineControlsWhite])
 
   useEffect(() => {
     document.onkeydown = (event) => {
@@ -299,6 +344,7 @@ function App() {
       <InputComponent />
       <div className="log">
       </div>
+      <EngineOptions />
     </div>
   )
 }

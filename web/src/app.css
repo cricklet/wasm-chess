@@ -175,10 +175,23 @@ body {
 
 /***********************************/
 
+select {
+  font-family: monospace;
+  font-size: calc(var(--square-size) * 0.2);
+  font-weight: 600;
+  padding:8px;
+
+  color: var(--label);
+  margin-top: calc(var(--square-size) / 4);
+  margin-bottom: calc(var(--square-size) / 4);
+}
+
 .input {
   font-family: monospace;
   font-size: calc(var(--square-size) * 0.5);
   font-weight: 600;
+
+  height: calc(var(--square-size) * 0.5);
 
   color: var(--label);
   margin-top: calc(var(--square-size) / 4);

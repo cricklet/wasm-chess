@@ -15,6 +15,9 @@ function wasmUci(): ReturnType<typeof wasm.syncWasmUci> {
     return _wasmUci
 }
 
+export const atomEngineControlsWhite = atom<boolean>(false)
+export const atomEngineControlsBlack = atom<boolean>(true)
+
 export const atomGame = atom<GameState>({
     start: 'startpos',
     moves: [],
