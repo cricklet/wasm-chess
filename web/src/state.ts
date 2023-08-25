@@ -27,6 +27,18 @@ export function performMove(move: string, game: GameState): GameState {
     }
 }
 
+export const atomLastMove = atom<string | undefined>(get => {
+    let moves = get(atomGame).moves
+    return moves.length > 0 ? moves[moves.length - 1] : undefined
+})
+
+export function moveContainsLocation(move: string | undefined, location: string): boolean {
+    if (move == undefined) {
+        return false
+    }
+    return move.includes(location)
+}
+
 export const atomBoard = atom<Board>(get => {
     let state = get(atomGame)
     wasmUci().setPosition(state.start, state.moves)

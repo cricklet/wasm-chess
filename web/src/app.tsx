@@ -10,7 +10,7 @@ import QueenSvg from './assets/queen.svg'
 import PawnSvg from './assets/pawn.svg'
 import { Board, Piece, Row, locationStr, rankStr, } from './helpers'
 import { atom, useAtom, useAtomValue, useSetAtom } from 'jotai'
-import { atomBoard, logAtom, atomInput, atomLegalMoves, atomCompleteMovesMatchingInput, atomValidPortionOfInput, atomInputIsLegal as atomInputIsLegalMove, atomValidStartsForInput as atomValidStartsMatchingInput, atomStartFromInput, atomValidEndsForInput as atomValidEndsMatchingInput, atomGame, atomLegalStarts, atomEndFromInput, finalizeMove, performMove } from './state'
+import { atomBoard, logAtom, atomInput, atomLegalMoves, atomCompleteMovesMatchingInput, atomValidPortionOfInput, atomInputIsLegal as atomInputIsLegalMove, atomValidStartsForInput as atomValidStartsMatchingInput, atomStartFromInput, atomValidEndsForInput as atomValidEndsMatchingInput, atomGame, atomLegalStarts, atomEndFromInput, finalizeMove, performMove, atomLastMove, moveContainsLocation } from './state'
 import { isValidElement, useEffect } from 'react'
 import * as wasm from './wasm-bindings'
 
@@ -63,6 +63,7 @@ enum SquareHighlight {
   StartComplete,
   EndAvailable,
   EndComplete,
+  LastMove,
 }
 
 function computeHighlightAndPotential(location: string): [SquarePotential, SquareHighlight] {
@@ -73,6 +74,8 @@ function computeHighlightAndPotential(location: string): [SquarePotential, Squar
 
   let startFromInput = useAtomValue(atomStartFromInput)
   let endFromInput = useAtomValue(atomEndFromInput)
+
+  let lastMove = useAtomValue(atomLastMove)
 
   let isStart = allStarts.has(location)
   let isEnd = startFromInput !== undefined && matchingEnds.has(location)
@@ -90,6 +93,8 @@ function computeHighlightAndPotential(location: string): [SquarePotential, Squar
     } else if (matchingStarts.has(location)) {
       squareHighlight = SquareHighlight.StartAvailable
     }
+  } else if (moveContainsLocation(lastMove, location)) {
+    squareHighlight = SquareHighlight.LastMove
   }
 
   let squarePotential = SquarePotential.None
@@ -114,6 +119,8 @@ function SquareHint(props: { highlight: SquareHighlight, location: string }) {
     className = 'is-start'
   } else if (highlight === SquareHighlight.EndComplete) {
     className = 'is-end'
+  } else if (highlight === SquareHighlight.LastMove) {
+    className = 'is-last-move'
   }
 
   return <div className={`square square-hint ${className}`}>
@@ -233,13 +240,17 @@ function App() {
   useEffect(() => {
     async function think() {
       let start = game.start
-      let moves = [... game.moves]
+      let moves = [...game.moves]
 
-      // if (moves.length % 2 === 0) {
-      //   return
-      // }
+      if (moves.length % 2 === 0) {
+        return
+      }
 
       let bestMove = await worker.search(start, moves)
+      if (bestMove.indexOf("none") !== -1) {
+        return
+      }
+
       setGame((_) => performMove(bestMove, { start, moves }))
     }
     think()
