@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './app'
 import { loadWasmBindgen, searchWorker } from './wasm-bindings'
+import { BrowserRouter, Router, createBrowserRouter } from 'react-router-dom'
 
 
 new EventSource('/esbuild').addEventListener('change', () => location.reload())
@@ -17,7 +18,9 @@ const root = ReactDOM.createRoot(rootEl);
 
   root.render(
     <React.StrictMode>
-      <App />
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
     </React.StrictMode>
   );
 })()

@@ -2,7 +2,7 @@ import { SetStateAction, atom } from "jotai";
 import { Board, boardFromFen, } from "./helpers";
 import * as wasm from "./wasm-bindings";
 
-interface GameState {
+export interface GameState {
     start: string,
     moves: string[],
 }
@@ -42,12 +42,20 @@ export function moveContainsLocation(move: string | undefined, location: string)
     return move.includes(location)
 }
 
-export const atomBoard = atom<Board>(get => {
+export const atomFen = atom<string>(get => {
     let state = get(atomGame)
     wasmUci().setPosition(state.start, state.moves)
-    let currentFen = wasmUci().currentFen()
+    return wasmUci().currentFen()
+})
 
+export const atomBoard = atom<Board>(get => {
+    let currentFen = get(atomFen)
     return boardFromFen(currentFen)
+})
+
+export const atomWhiteToMove = atom<boolean>(get => {
+    let fen = get(atomFen)
+    return fen.split(' ')[1] === 'w'
 })
 
 export const atomInput = atom<string>('')

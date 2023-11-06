@@ -62,7 +62,7 @@ impl UciForJs {
         log_to_js("... done");
 
         UciForJs {
-            uci: uci::Uci::new(),
+            uci: uci::Uci::new(log_to_js),
         }
     }
     pub fn handle_line(&mut self, line: &str) -> Result<String, JsError> {

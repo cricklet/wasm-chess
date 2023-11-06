@@ -47,6 +47,9 @@ impl FenDefinition {
         if fen == "startpos" {
             return FenDefinition::from("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
         }
+        if fen.starts_with("fen ") {
+            return FenDefinition::from(&fen[4..]);
+        }
 
         let split = fen.split(' ');
         let split = split.filter(|v| !v.is_empty()).collect::<Vec<_>>();

@@ -197,7 +197,7 @@ impl Game {
                 let fen_part = &position_str["fen".len()..].trim();
                 Game::from_fen(fen_part)
             } else {
-                err_result(&format!("invalid position {}", position_str))
+                err_result(&format!("invalid position '{}'", position_str))
             }
         }?;
 
@@ -214,6 +214,9 @@ impl Game {
     pub fn from_fen(fen: &str) -> ErrorResult<Game> {
         if fen == "startpos" {
             return Game::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+        }
+        if fen.starts_with("fen ") {
+            return Game::from_fen(&fen["fen ".len()..]);
         }
 
         let definition = FenDefinition::from(fen)?;

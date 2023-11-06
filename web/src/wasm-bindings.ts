@@ -141,7 +141,11 @@ export async function searchWorker(): Promise<{
             await worker.handle_line('stop')
 
             let output = []
-            output.push(await worker.handle_line(`position ${start} moves ${moves.join(' ')}`))
+            if (start === 'startpos') {
+                output.push(await worker.handle_line(`position ${start} moves ${moves.join(' ')}`))
+            } else {
+                output.push(await worker.handle_line(`position fen ${start} moves ${moves.join(' ')}`))
+            }
             output.push(await worker.handle_line('go'))
             await new Promise(resolve => setTimeout(resolve, 1000))
             output.push(await worker.handle_line('stop'))

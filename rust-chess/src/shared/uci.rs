@@ -26,25 +26,26 @@ pub struct Uci {
     pub search: Option<IterativeSearch>,
     pub tt: Rc<RefCell<TranspositionTable>>,
     pub history: ZobristHistory,
+    pub logger: fn (s: &str),
 }
 
 impl Uci {
-    pub fn new() -> Self {
+    pub fn new(logger: fn (&str)) -> Self {
         Self {
             game: Game::from_position_uci(&"position startpos").unwrap(),
             search: None,
             tt: Rc::new(RefCell::new(TranspositionTable::new())),
             history: ZobristHistory::new(),
+            logger: logger,
         }
     }
     pub fn handle_line(&mut self, line: &str) -> ErrorResult<String> {
         if line.starts_with("position") {
             let (position_str, moves) = FenDefinition::split_uci(line)?;
-            let game = Game::from_position_and_moves(&position_str, &moves);
-            if let Err(e) = &game {
-                return Err(e.clone());
-            }
-            self.game = game.unwrap();
+            (self.logger)(&format!("{}, {}", position_str, moves.join(" ")));
+
+            let game = Game::from_position_and_moves(&position_str, &moves)?;
+            self.game = game;
 
             if self.history.update(position_str, &moves) == IsDraw::Yes {
                 Ok(format!("draw detected\n{:?}", self.game))
@@ -128,9 +129,13 @@ impl Uci {
     }
 }
 
+fn debug_logger(s: &str) {
+    println!("{}", s);
+}
+
 #[test]
 fn test_match_50ms() {
-    let mut uci = Uci::new();
+    let mut uci = Uci::new(debug_logger);
     let mut moves: Vec<String> = vec![];
 
     loop {
@@ -173,7 +178,7 @@ fn test_match_50ms() {
 
 #[test]
 fn test_match_100ms() {
-    let mut uci = Uci::new();
+    let mut uci = Uci::new(debug_logger);
     let mut moves: Vec<String> = vec![];
 
     loop {
@@ -216,7 +221,7 @@ fn test_match_100ms() {
 
 #[test]
 fn test_match_1000ms() {
-    let mut uci = Uci::new();
+    let mut uci = Uci::new(debug_logger);
     let mut moves: Vec<String> = vec![];
 
     loop {
@@ -258,7 +263,7 @@ fn test_match_1000ms() {
 
 #[test]
 fn test_match_avoid_draw() {
-    let mut uci = Uci::new();
+    let mut uci = Uci::new(debug_logger );
 
     let mut moves: Vec<String> = vec![
         "d2d4", "d7d5", "b1c3", "b8c6", "g1f3", "g8f6", "c1g5", "f6e4", "e2e3", "e4g5", "f3g5",

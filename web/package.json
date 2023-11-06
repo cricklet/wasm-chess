@@ -2,8 +2,8 @@
   "name": "web",
   "version": "0.1.0",
   "private": true,
-  "engines" : { 
-    "node" : ">=18.0.0"
+  "engines": {
+    "node": ">=18.0.0"
   },
   "dependencies": {
     "@types/node": "^20.4.5",
@@ -13,6 +13,7 @@
     "jotai": "^2.2.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-router-dom": "^6.18.0",
     "stream": "^0.0.2",
     "typescript": "^5.1.6",
     "util": "^0.12.5",

@@ -2,17 +2,19 @@
 
 import './app.css'
 
-import RookSvg from './assets/rook.svg'
-import KnightSvg from './assets/knight.svg'
+import { atom, useAtom, useAtomValue, useSetAtom } from 'jotai'
+import { isValidElement, useEffect, useState } from 'react'
 import BishopSvg from './assets/bishop.svg'
 import KingSvg from './assets/king.svg'
-import QueenSvg from './assets/queen.svg'
+import KnightSvg from './assets/knight.svg'
 import PawnSvg from './assets/pawn.svg'
+import QueenSvg from './assets/queen.svg'
+import RookSvg from './assets/rook.svg'
 import { Board, Piece, Row, locationStr, rankStr, } from './helpers'
-import { atom, useAtom, useAtomValue, useSetAtom } from 'jotai'
-import { atomBoard, logAtom, atomInput, atomLegalMoves, atomCompleteMovesMatchingInput, atomValidPortionOfInput, atomInputIsLegal as atomInputIsLegalMove, atomValidStartsForInput as atomValidStartsMatchingInput, atomStartFromInput, atomValidEndsForInput as atomValidEndsMatchingInput, atomGame, atomLegalStarts, atomEndFromInput, finalizeMove, performMove, atomLastMove, moveContainsLocation, atomEngineControlsBlack, atomEngineControlsWhite } from './state'
-import { isValidElement, useEffect } from 'react'
+import { GameState, atomBoard, atomCompleteMovesMatchingInput, atomEndFromInput, atomEngineControlsBlack, atomEngineControlsWhite, atomFen, atomGame, atomInput, atomInputIsLegal as atomInputIsLegalMove, atomLastMove, atomLegalMoves, atomLegalStarts, atomStartFromInput, atomValidEndsForInput as atomValidEndsMatchingInput, atomValidPortionOfInput, atomValidStartsForInput as atomValidStartsMatchingInput, atomWhiteToMove, finalizeMove, logAtom, moveContainsLocation, performMove } from './state'
 import * as wasm from './wasm-bindings'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+
 
 function PieceComponent(props: { piece: Piece }) {
   let { piece } = props
@@ -264,12 +266,65 @@ let worker = await wasm.searchWorker()
 function App() {
   let board = useAtomValue(atomBoard)
   let [game, setGame] = useAtom(atomGame)
+  let [fen] = useAtom(atomFen)
   let setLog = useSetAtom(logAtom)
   let [input, setInput] = useAtom(atomInput)
   let allMoves = useAtomValue(atomLegalMoves)
 
-  let engineControlsWhite = useAtomValue(atomEngineControlsWhite)
-  let engineControlsBlack = useAtomValue(atomEngineControlsBlack)
+  let [engineControlsWhite, setEngineControlsWhite] = useAtom(atomEngineControlsWhite)
+  let [engineControlsBlack, setEngineControlsBlack] = useAtom(atomEngineControlsBlack)
+
+  let whiteToMove = useAtomValue(atomWhiteToMove)
+
+  let [params, setParams] = useSearchParams()
+  let [initialized, setInitialized] = useState(false)
+  useEffect(() => {
+    if (initialized) {
+      return
+    }
+    setInitialized(true)
+
+    let start = params.get('fen')
+    if (start !== null) {
+      setGame({ start, moves: [] })
+    }
+
+    let white = params.get('white')
+    if (white === 'engine') {
+      setEngineControlsWhite(true)
+    } else if (white === 'player') {
+      setEngineControlsWhite(false)
+    }
+
+    let black = params.get('black')
+    if (black === 'engine') {
+      setEngineControlsBlack(true)
+    } else if (black === 'player') {
+      setEngineControlsBlack(false)
+    }
+  }, [params])
+
+  useEffect(() => {
+    if (!initialized) {
+      return
+    }
+
+    let newParams = new URLSearchParams()
+    if (game.start !== undefined) {
+      newParams.set('fen', fen)
+    }
+    if (engineControlsWhite) {
+      newParams.set('white', 'engine')
+    } else {
+      newParams.set('white', 'player')
+    }
+    if (engineControlsBlack) {
+      newParams.set('black', 'engine')
+    } else {
+      newParams.set('black', 'player')
+    }
+    setParams(newParams)
+  }, [game, engineControlsWhite, engineControlsBlack])
 
   useEffect(() => {
     let cleanup = wasm.listen((line: string) => {
@@ -283,11 +338,11 @@ function App() {
       let start = game.start
       let moves = [...game.moves]
 
-      if (moves.length % 2 === 0 && !engineControlsWhite) {
+      if (whiteToMove && !engineControlsWhite) {
         return
       }
 
-      if (moves.length % 2 === 1 && !engineControlsBlack) {
+      if (!whiteToMove && !engineControlsBlack) {
         return
       }
 

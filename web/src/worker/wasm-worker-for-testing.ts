@@ -1,6 +1,6 @@
 import { ReceiveFromWorker, ReceiveFromWorkerMessage, decodeSendToWorker, encodeReceiveFromWorker } from "./worker-types";
 
-importScripts('/lib/wasm-pack/wasm_chess.js');
+importScripts('../../lib/wasm-pack/wasm_chess.js');
 
 function send(msg: ReceiveFromWorker) {
     self.postMessage(encodeReceiveFromWorker(msg));
@@ -81,7 +81,7 @@ async function setupPerftForJs(): Promise<{handleEvent: (MessageEvent: any) => b
 
 async function init_wasm_in_worker() {
     // load the wasm
-    await wasm_bindgen('/lib/wasm-pack/wasm_chess_bg.wasm');
+    await wasm_bindgen('../../lib/wasm-pack/wasm_chess_bg.wasm');
 
     let counter = await setupCounterForJs();
     let perft = await setupPerftForJs();
