@@ -23,6 +23,10 @@ export const atomGame = atom<GameState>({
     moves: [],
 })
 
+export function equalsGame(game1: GameState, game2: GameState): boolean {
+    return game1.start === game2.start && game1.moves.join(' ') === game2.moves.join(' ')
+}
+
 export function performMove(move: string, game: GameState): GameState {
     return {
         ...game,
@@ -56,6 +60,18 @@ export const atomBoard = atom<Board>(get => {
 export const atomWhiteToMove = atom<boolean>(get => {
     let fen = get(atomFen)
     return fen.split(' ')[1] === 'w'
+})
+
+export const atomPlayerToMove = atom<boolean>(get => {
+    let whiteToMove = get(atomWhiteToMove)
+    let engineControlsWhite = get(atomEngineControlsWhite)
+    let engineControlsBlack = get(atomEngineControlsBlack)
+
+    if (whiteToMove) {
+        return !engineControlsWhite
+    } else {
+        return !engineControlsBlack
+    }
 })
 
 export const atomInput = atom<string>('')

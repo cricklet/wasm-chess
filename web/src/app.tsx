@@ -3,7 +3,7 @@
 import './app.css'
 
 import { atom, useAtom, useAtomValue, useSetAtom } from 'jotai'
-import { isValidElement, useEffect, useState } from 'react'
+import { isValidElement, useEffect, useRef, useState } from 'react'
 import BishopSvg from './assets/bishop.svg'
 import KingSvg from './assets/king.svg'
 import KnightSvg from './assets/knight.svg'
@@ -11,9 +11,9 @@ import PawnSvg from './assets/pawn.svg'
 import QueenSvg from './assets/queen.svg'
 import RookSvg from './assets/rook.svg'
 import { Board, Piece, Row, locationStr, rankStr, } from './helpers'
-import { GameState, atomBoard, atomCompleteMovesMatchingInput, atomEndFromInput, atomEngineControlsBlack, atomEngineControlsWhite, atomFen, atomGame, atomInput, atomInputIsLegal as atomInputIsLegalMove, atomLastMove, atomLegalMoves, atomLegalStarts, atomStartFromInput, atomValidEndsForInput as atomValidEndsMatchingInput, atomValidPortionOfInput, atomValidStartsForInput as atomValidStartsMatchingInput, atomWhiteToMove, finalizeMove, logAtom, moveContainsLocation, performMove } from './state'
+import { GameState, atomBoard, atomCompleteMovesMatchingInput, atomEndFromInput, atomEngineControlsBlack, atomEngineControlsWhite, atomFen, atomGame, atomInput, atomInputIsLegal as atomInputIsLegalMove, atomLastMove, atomLegalMoves, atomLegalStarts, atomPlayerToMove, atomStartFromInput, atomValidEndsForInput as atomValidEndsMatchingInput, atomValidPortionOfInput, atomValidStartsForInput as atomValidStartsMatchingInput, atomWhiteToMove, equalsGame, finalizeMove, logAtom, moveContainsLocation, performMove } from './state'
 import * as wasm from './wasm-bindings'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useNavigationType, useParams, useSearchParams } from 'react-router-dom'
 
 
 function PieceComponent(props: { piece: Piece }) {
@@ -275,56 +275,56 @@ function App() {
   let [engineControlsBlack, setEngineControlsBlack] = useAtom(atomEngineControlsBlack)
 
   let whiteToMove = useAtomValue(atomWhiteToMove)
+  let playerToMove = useAtomValue(atomPlayerToMove)
 
-  let [params, setParams] = useSearchParams()
+  let [searchParams, setSearchParams] = useSearchParams()
+
   let [initialized, setInitialized] = useState(false)
   useEffect(() => {
-    if (initialized) {
-      return
+    if (!initialized) {
+      let start = searchParams.get('start')
+      let moves = searchParams.get('moves')
+      if (start !== null && moves !== null) {
+        setGame({ start, moves: moves.split('-') })
+      }
     }
+
+    let navigateTo = {
+      start: game.start,
+      moves: game.moves.join('-'),
+    }
+    let navigateFrom = {
+      start: searchParams.get('start'),
+      moves: searchParams.get('moves'),
+    }
+    if (navigateTo.start !== navigateFrom.start || navigateTo.moves !== navigateFrom.moves) {
+      setSearchParams(navigateTo, { replace: !initialized || playerToMove })
+    }
+
     setInitialized(true)
 
-    let start = params.get('fen')
-    if (start !== null) {
-      setGame({ start, moves: [] })
-    }
+    let popstateCallback = () => {
+      let currentSearchParams = new URLSearchParams(window.location.search)
 
-    let white = params.get('white')
-    if (white === 'engine') {
-      setEngineControlsWhite(true)
-    } else if (white === 'player') {
-      setEngineControlsWhite(false)
+      let start = currentSearchParams.get('start')
+      let moves = currentSearchParams.get('moves')
+      if (start != null && moves != null) {
+        setGame({ start, moves: moves.split('-') })
+      }
     }
-
-    let black = params.get('black')
-    if (black === 'engine') {
-      setEngineControlsBlack(true)
-    } else if (black === 'player') {
-      setEngineControlsBlack(false)
+    window.addEventListener('popstate', popstateCallback);
+    return () => {
+      window.removeEventListener('popstate', popstateCallback)
     }
-  }, [params])
+  }, [game])
 
   useEffect(() => {
-    if (!initialized) {
-      return
-    }
-
-    let newParams = new URLSearchParams()
-    if (game.start !== undefined) {
-      newParams.set('fen', fen)
-    }
-    if (engineControlsWhite) {
-      newParams.set('white', 'engine')
+    if (game.moves.length > 0) {
+      document.title = `${game.moves[game.moves.length - 1]} ${fen}`
     } else {
-      newParams.set('white', 'player')
+      document.title = fen
     }
-    if (engineControlsBlack) {
-      newParams.set('black', 'engine')
-    } else {
-      newParams.set('black', 'player')
-    }
-    setParams(newParams)
-  }, [game, engineControlsWhite, engineControlsBlack])
+  }, [fen, game])
 
   useEffect(() => {
     let cleanup = wasm.listen((line: string) => {
@@ -338,27 +338,36 @@ function App() {
       let start = game.start
       let moves = [...game.moves]
 
-      if (whiteToMove && !engineControlsWhite) {
+      if (playerToMove) {
         return
       }
 
-      if (!whiteToMove && !engineControlsBlack) {
-        return
-      }
+      let bestMovePromise = worker.search(start, moves)
+      let minWaitPromise = new Promise((resolve) => setTimeout(resolve, 1000))
 
-      let bestMove = await worker.search(start, moves)
+      await Promise.all([bestMovePromise, minWaitPromise])
+
+      let bestMove = await bestMovePromise
       if (bestMove.indexOf("none") !== -1) {
         return
       }
 
-      setGame((_) => performMove(bestMove, { start, moves }))
+      setGame((currentGame: GameState): GameState => {
+        if (equalsGame(currentGame, { start, moves })) {
+          return performMove(bestMove, { start, moves })
+        } else {
+          return currentGame
+        }
+      })
     }
     think()
   }, [game, engineControlsBlack, engineControlsWhite])
 
   useEffect(() => {
     document.onkeydown = (event) => {
-      if (event.key === 'Enter') {
+      if (event.altKey || event.metaKey || event.ctrlKey) {
+        return
+      } else if (event.key === 'Enter') {
         let move = finalizeMove(input, allMoves);
         if (move !== undefined) {
           setGame((game) => performMove(move as string, game))
@@ -395,11 +404,13 @@ function App() {
 
   return (
     <div className="app">
-      <BoardComponent board={board} />
-      <InputComponent />
-      <div className="log">
-      </div>
-      <EngineOptions />
+      {initialized && <>
+        <BoardComponent board={board} />
+        <InputComponent />
+        <div className="log">
+        </div>
+        <EngineOptions />
+      </>}
     </div>
   )
 }
