@@ -10,10 +10,11 @@ import KnightSvg from './assets/knight.svg'
 import PawnSvg from './assets/pawn.svg'
 import QueenSvg from './assets/queen.svg'
 import RookSvg from './assets/rook.svg'
-import { Board, Piece, Row, locationStr, rankStr, } from './helpers'
+import { Board, Piece, Row, indent_string, locationStr, omit, prettyJson, rankStr, } from './helpers'
 import { GameState, atomBoard, atomCompleteMovesMatchingInput, atomEndFromInput, atomEngineControlsBlack, atomEngineControlsWhite, atomFen, atomGame, atomInput, atomInputIsLegal as atomInputIsLegalMove, atomLastMove, atomLegalMoves, atomLegalStarts, atomPlayerToMove, atomStartFromInput, atomValidEndsForInput as atomValidEndsMatchingInput, atomValidPortionOfInput, atomValidStartsForInput as atomValidStartsMatchingInput, atomWhiteToMove, equalsGame, finalizeMove, logAtom, moveContainsLocation, performMove } from './state'
 import * as wasm from './wasm-bindings'
 import { useLocation, useNavigate, useNavigationType, useParams, useSearchParams } from 'react-router-dom'
+import { ReceiveFromWorker, isEmpty } from './worker/worker-types'
 
 
 function PieceComponent(props: { piece: Piece }) {
@@ -261,13 +262,45 @@ function InputComponent() {
   )
 }
 
+function updateLog(log: string[], e: ReceiveFromWorker): string[] {
+  if (isEmpty(e)) {
+    return log
+  }
+
+  if (e.name === 'log' || e.name === 'error') {
+    let value = prettyJson(e.msg).trim()
+
+    let lastLine = log[log.length - 1]
+    if (value === 'think() for < 200ms') {
+      const regex = /think\(\) for < (\d+)ms/;
+      const match = lastLine.match(regex);
+      if (match) {
+        const number = parseInt(match[1]);
+        return [...log.slice(0, -1), "think() for < " + (number + 200) + "ms"]
+      }
+    }
+
+    if (value.indexOf('handle_line') !== -1) {
+      return log;
+    }
+
+    return [...log, value]
+  } else if (e.name === 'uci') {
+    return [...log, e.output.trim()]
+  } else if (e.name === 'uci-flush-output') {
+    return [...log, e.output.trim()]
+  }
+
+  return log
+}
+
 let worker = await wasm.searchWorker()
 
 function App() {
   let board = useAtomValue(atomBoard)
   let [game, setGame] = useAtom(atomGame)
   let [fen] = useAtom(atomFen)
-  let setLog = useSetAtom(logAtom)
+  let [log, setLog] = useAtom(logAtom)
   let [input, setInput] = useAtom(atomInput)
   let allMoves = useAtomValue(atomLegalMoves)
 
@@ -279,14 +312,16 @@ function App() {
 
   let [searchParams, setSearchParams] = useSearchParams()
 
-  let [initialized, setInitialized] = useState(false)
+  let initialized = useRef(false)
   useEffect(() => {
-    if (!initialized) {
+    if (!initialized.current) {
       let start = searchParams.get('start')
       let moves = searchParams.get('moves')
       if (start !== null && moves !== null) {
         setGame({ start, moves: moves.split('-') })
       }
+      setLog(['wasm worker loaded 🏃‍♂️'])
+      initialized.current = true;
     }
 
     let navigateTo = {
@@ -300,8 +335,6 @@ function App() {
     if (navigateTo.start !== navigateFrom.start || navigateTo.moves !== navigateFrom.moves) {
       setSearchParams(navigateTo, { replace: !initialized || playerToMove })
     }
-
-    setInitialized(true)
 
     let popstateCallback = () => {
       let currentSearchParams = new URLSearchParams(window.location.search)
@@ -327,11 +360,27 @@ function App() {
   }, [fen, game])
 
   useEffect(() => {
-    let cleanup = wasm.listen((line: string) => {
-      setLog((log) => [...log, line])
+    const workerListenerCleanup = worker.listen((e: ReceiveFromWorker) => {
+      if (isEmpty(e)) {
+        return
+      }
+
+      setLog((log: Array<string>) => {
+        return updateLog(log, e);
+      })
     })
-    return cleanup
-  }, [])
+
+    // const consoleLogListenerCleanup = wasm.listen((s: string) => {
+    //   setLog((log: Array<string>) => {
+    //     return [...log, ...s.trim().split('\n')];
+    //   })
+    // })
+
+    return () => {
+      workerListenerCleanup()
+      // consoleLogListenerCleanup()
+    }
+  })
 
   useEffect(() => {
     async function think() {
@@ -402,17 +451,19 @@ function App() {
     }
   }, [input, setInput])
 
-  return (
-    <div className="app">
-      {initialized && <>
-        <BoardComponent board={board} />
-        <InputComponent />
-        <div className="log">
+  return (<>
+    {initialized && <>
+      <div className="app">
+        <div className='top-bar'>
+          <InputComponent />
+          <EngineOptions />
         </div>
-        <EngineOptions />
-      </>}
-    </div>
-  )
+        <BoardComponent board={board} />
+        <div className="log"><pre>{log.toReversed().join("\n\n")}</pre></div>
+      </div>
+    </>}
+    {!initialized && "Loading..."}
+  </>)
 }
 
 export default App

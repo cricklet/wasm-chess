@@ -2,12 +2,14 @@
   :root {
     --dark-square: #404a4b;
     --light-square: #505b5c;
-    --background: #303a3b;
+    --background: #1f2627;
 
     --dark-piece: #0a0c0f;
     --light-piece: #c8c8bc;
 
-    --label: #a2b1b3;
+    --label: #ddd;
+    --text: #eee;
+
     --invalid: rgb(170, 118, 118);
     --complete: rgb(110, 156, 117);
     --history: rgb(156, 110, 155);
@@ -23,7 +25,8 @@
     --dark-piece: #4a4c4f;
     --light-piece: #fffffa;
   
-    --label: #808a8b;
+    --label: #444;
+    --text: #222;
 
     --invalid: rgba(170, 85, 85, 0.667);
     --partial: rgba(85, 136, 170, 0.667);
@@ -33,7 +36,6 @@
 }
 
 :root {
-  --square-size: min(min(8rem, 10vw), 10vh);
   font-family: monospace;
 }
 
@@ -44,9 +46,6 @@
 body {
   padding: 0;
   margin: 0;
-}
-
-#root {
   background-color: var(--background);
 }
 
@@ -56,17 +55,27 @@ body {
   display: flex;
   justify-content: start;
   align-items: center;
-  padding-top: calc(var(--square-size) / 2);
+  --square-size: min(min(8rem, 7vw), 7vh);
+
+  display: flex;
   flex-direction: column;
 }
 
 .log {
-  padding-block: calc(var(--square-size) / 4);
-  padding-inline: calc(var(--square-size) / 8);
+  color: var(--text);
+
+  width: calc(var(--square-size) * 8);
+  padding: calc(var(--square-size) * 0.2) 1rem;
+
+  display: flex;
+
   font-size: 1rem;
   flex-grow: 1;
-  overflow-y: auto;
-  width: calc(var(--square-size) * 8);
+}
+
+pre {
+  margin: 0;
+  padding: 0;
 }
 
 .row {
@@ -175,6 +184,17 @@ body {
 
 /***********************************/
 
+.top-bar {
+  display: flex;
+  flex-direction: row;
+
+  justify-content: space-between;
+  align-items: center;
+
+  padding: calc(var(--square-size) * 0.2) 0;
+  width: calc(var(--square-size) * 8);
+}
+
 select {
   font-family: monospace;
   font-size: calc(var(--square-size) * 0.2);
@@ -182,11 +202,17 @@ select {
   padding:8px;
 
   color: var(--label);
-  margin-top: calc(var(--square-size) / 4);
-  margin-bottom: calc(var(--square-size) / 4);
+  background-color: var(--dark-square);
+
+  display: flex;
+  align-items: center;
 }
 
 .input {
+  flex: 1;
+  display: flex;
+  align-items: center;
+
   font-family: monospace;
   font-size: calc(var(--square-size) * 0.5);
   font-weight: 600;
@@ -194,9 +220,7 @@ select {
   height: calc(var(--square-size) * 0.5);
 
   color: var(--label);
-  margin-top: calc(var(--square-size) / 4);
-}
-
+}  
 .partial-input {
   background-color: var(--partial);
   color: #fff;
