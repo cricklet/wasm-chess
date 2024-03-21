@@ -267,6 +267,10 @@ function updateLog(log: string[], e: ReceiveFromWorker): string[] {
     return log
   }
 
+  if (e.name === 'uci' && e.output.startsWith('Game')) {
+    return log
+  }
+
   if (e.name === 'log' || e.name === 'error') {
     let value = prettyJson(e.msg).trim()
 
@@ -395,7 +399,7 @@ function App() {
       }
 
       let bestMovePromise = worker.search(start, moves)
-      let minWaitPromise = new Promise((resolve) => setTimeout(resolve, 1000))
+      let minWaitPromise = new Promise((resolve) => setTimeout(resolve, 2000))
 
       await Promise.all([bestMovePromise, minWaitPromise])
 
@@ -457,11 +461,13 @@ function App() {
   return (<>
     {initialized && <>
       <div className="app">
-        <div className='top-bar'>
-          <InputComponent />
-          <EngineOptions />
+        <div className="left">
+          <BoardComponent board={board} />
+          <div className='top-bar'>
+            <InputComponent />
+            <EngineOptions />
+          </div>
         </div>
-        <BoardComponent board={board} />
         <div className="log"><pre>{log.toReversed().join("\n\n")}</pre></div>
       </div>
     </>}

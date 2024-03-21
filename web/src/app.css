@@ -54,11 +54,20 @@ body {
   width: 100%;
   display: flex;
   justify-content: start;
-  align-items: center;
-  --square-size: min(min(8rem, 12vw), 8vh);
+  align-items: start;
+  --square-size: min(min(6rem, 10vw), 6vh);
 
   display: flex;
+  flex-direction: row;
+}
+
+.left {
+  display: flex;
   flex-direction: column;
+  align-items:start;
+  padding-left: 2rem;
+  padding-top: 2rem;
+  padding-bottom: 2rem;
 }
 
 .log {
@@ -71,6 +80,8 @@ body {
 
   font-size: 1rem;
   flex-grow: 1;
+
+  padding-top: 2rem;
 }
 
 pre {
